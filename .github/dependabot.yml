@@ -1,0 +1,33 @@
+# Version updates for pinned tooling. The package has no runtime dependencies;
+# every update below is development or interop tooling and lands through review.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      development:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directories: ["/interop", "/interop/adapters"]
+    schedule:
+      interval: weekly
+    groups:
+      interop:
+        patterns: ["*"]
+  - package-ecosystem: mix
+    directory: /interop/replay
+    schedule:
+      interval: weekly
+    # The RequestSeal peer is pinned to the release the error vocabulary matches;
+    # it moves only with a reviewed parity change.
+    ignore:
+      - dependency-name: request_seal
