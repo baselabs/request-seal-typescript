@@ -329,9 +329,11 @@ release close owned sockets. Errors carry no socket path or agent diagnostics.
 Signing and verification accept trailing `{maxBytes}` options on the handle,
 with a 1 MiB default and a 16 MiB ceiling. Outgoing requests have no additional
 library frame bound. The real agent retains its own limit; a post-send closure
-returns `custodian_protocol`. The live test signs a 262,000-byte payload,
-measures the agent's accepted/refused boundary, and checks larger requests are
-forwarded and refused by the peer. No specific boundary count is required.
+returns `custodian_protocol` through `KeyHandle.sign`. The same refusal through
+`Crypto.sign` returns `crypto/invalid_key`: its normalizer maps custody reasons
+that it does not pass through. The live test discovers the agent's acceptance
+boundary with bounded real signing calls, checks both refusal surfaces, and
+verifies that the next sign succeeds. No specific boundary count is required.
 See [the v0.4.1 custodian](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/custody/ssh_agent.ex).
 The shared corpus remains v0.4.0, unchanged between these releases.
 

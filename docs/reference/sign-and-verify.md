@@ -120,15 +120,15 @@ A caller abort during the replay stage reports nonretryable `store_timeout`, sin
 the claim may already have committed. An abort during an earlier stage reports the
 retryable `custody/deadline_exceeded` deadline instead.
 
-
 ## Per-call primitive and custody byte bounds
 
 RequestSeal v0.4.1 adds `max_bytes` on crypto and custody signing and verification.
 The TypeScript counterpart is an optional trailing `{maxBytes}` object:
 `Crypto.sign(algorithm, handle, data, options?)`,
 `Crypto.verify(algorithm, key, signature, data, options?)`,
-`handle.sign(algorithm, data, context, options?)`, and
-`handle.verify(algorithm, signature, data, context, options?)`.
+`handle.sign(algorithm, data, context, options?)`,
+`handle.verify(algorithm, signature, data, context, options?)`, and
+`publicKey.verify(algorithm, signature, data, options?)`.
 Context continues to carry the deadline and cancellation signal.
 
 `maxBytes` is an integer from 1 through `Crypto.maxBytesCeiling()` (16,777,216).
@@ -136,6 +136,8 @@ The default stays 1,048,576. Invalid, unknown, or malformed options return
 `invalid_options` before algorithm, handle, or capability validation. Own option
 keys are read once. Arrays, including repeated-key entries, reject; JavaScript
 object keys are unique before the call. Input over the selected bound returns
+`invalid_data`. `Crypto.sign`, `Crypto.verify`, and `publicKey.verify` check the
+data size before key validity, so oversized data with an unusable key reports
 `invalid_data`. Existing octet-string and Uint8Array input shapes are preserved.
 Unwrap does not accept this option.
 

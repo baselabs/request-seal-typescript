@@ -9,6 +9,7 @@ export function byteString(input: unknown): Result<Uint8Array<ArrayBuffer>> {
     const bytes = new Uint8Array(input.length);
     for (let i = 0; i < input.length; i++) {
       const code = input.charCodeAt(i);
+      // boundedData in crypto/primitive.ts checks the same rule before copying.
       if (code > 255) return err(messageError('invalid_message'));
       bytes[i] = code;
     }

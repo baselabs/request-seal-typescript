@@ -1,4 +1,4 @@
-// Derived from pinned Elixir constructors and call sites; regenerate with scripts/generate-parity.ts.
+// Derived from pinned Elixir constructors and call sites; regenerate with scripts/generate-parity.ts or scripts/render-parity.ts --update-table.
 export const ELIXIR_ERROR_PIN = '0a6568aa246326617f760e94e21b359285c6ddfc';
 const entries = [
   {

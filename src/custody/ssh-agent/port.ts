@@ -1,23 +1,17 @@
 import {CRYPTO_MAX_BYTES_CEILING} from "../../constants.ts";
 import {boundedBinary} from "../../crypto/primitive.ts";
 import { connect, type Socket } from "node:net";
-import { snapshotOptions } from "../../brand.ts";
-import { withDeadline, isContext, run, type Context } from "../../context.ts";
+import { run, type Context } from "../../context.ts";
 import { custodyError, isRequestSealError } from "../../errors/types.ts";
 import {
-  createKeyHandle,
-  type KeyHandle,
   type Custodian,
 } from "../../key_handle.ts";
 import { KeyIdentity } from "../../key_identity.ts";
 import {
-  isPublicKey,
-  bindPublicKey,
   verifyPublicKey,
   type PublicKey,
 } from "../../public_key.ts";
 import {
-  resolveAlgorithm,
   selection,
   type Spec,
 } from "../../crypto/algorithm.ts";

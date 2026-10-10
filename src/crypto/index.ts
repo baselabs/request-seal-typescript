@@ -6,7 +6,7 @@ import {isKeyHandle, verifyHandle} from '../key_handle.ts';
 import {isPublicKey, verifyPublicKey, bindPublicKey} from '../public_key.ts';
 import {withDeadline} from '../context.ts';
 import {resolveAlgorithm, algorithms} from './algorithm.ts';
-import {dataBytes} from './primitive.ts';
+import {dataBytes, boundedData, boundedBinary} from './primitive.ts';
 function normalize<T>(r: Result<T>): Result<T> {
   if (r.ok) return r;
   if (r.error.kind === 'custody' &&
@@ -38,6 +38,7 @@ export async function sign(
   if (!maximum.ok) return maximum;
   const spec = resolveAlgorithm(algorithm);
   if (!spec.ok) return spec;
+  if (!boundedData(data, maximum.value)) return err(cryptoError('invalid_data'));
   if (!isKeyHandle(key)) return err(cryptoError('invalid_key'));
   const c = withDeadline();
   if (!c.ok) return err(cryptoError('invalid_key'));
@@ -66,8 +67,7 @@ export async function verify(
         return err(cryptoError('key_mismatch'));
     } else return err(cryptoError('invalid_key'));
     if (
-      !(signature instanceof Uint8Array) ||
-      signature.length > SIGNATURE_MAX_BYTES
+      !boundedBinary(signature, SIGNATURE_MAX_BYTES)
     )
       return err(cryptoError('invalid_signature'));
     if (isPublicKey(key))

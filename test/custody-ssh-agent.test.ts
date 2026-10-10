@@ -293,20 +293,35 @@ socketTest('forwards selected byte bounds to a real agent and reports its observ
     const path = join(root, 'ed25519'); run('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', path]); run('ssh-add', [path]);
     const pub = await publicFile(path); handle = value(await adapter.createSshAgent('ed25519', socket, pub));
     const sign = (size: number) => (handle!.sign as (a: unknown, d: unknown, c: import('../src/context.ts').Context, o?: unknown) => Promise<Result<Uint8Array<ArrayBuffer>>>)('ed25519', new Uint8Array(size), value(withDeadline()), {maxBytes: 16_777_216});
-    value(await sign(262_000));
-    let accepted = 262_000, refused = 524_288;
-    const first = await sign(refused); assert.equal(first.ok, false); if (!first.ok) assert.equal(first.error.reason, 'custodian_protocol');
+    const ceiling = Crypto.maxBytesCeiling();
+    let accepted = 1024, refused = ceiling, attempts = 0;
+    const started = performance.now();
+    const probe = async (size: number) => {
+      assert.ok(++attempts <= 30, 'boundary discovery stays within 30 real sign calls');
+      assert.ok(performance.now() - started < 20000, 'boundary discovery stays within 20 seconds');
+      return sign(size);
+    };
+    const first = value(await probe(accepted));
+    value(await Crypto.verify('ed25519', pub, first, new Uint8Array(accepted)));
+    const last = await probe(refused);
+    assert.equal(last.ok, false);
+    if (!last.ok) assert.equal(last.error.reason, 'custodian_protocol');
     while (refused - accepted > 1) {
-      const size = Math.floor((accepted + refused) / 2), r = await sign(size);
+      const size = Math.floor((accepted + refused) / 2), r = await probe(size);
       if (r.ok) accepted = size;
       else {assert.equal(r.error.reason, 'custodian_protocol'); refused = size;}
     }
-    value(await sign(accepted));
-    const over = await sign(refused); assert.equal(over.ok, false); if (!over.ok) assert.equal(over.error.reason, 'custodian_protocol');
-    t.diagnostic(`Observed Ed25519 payload: ${accepted} accepted; ${refused} refused as custodian_protocol. This is a machine observation, not a portable byte-count assertion.`);
-    for (const size of [1_048_577, 16_777_216]) {
-      const r = await sign(size); assert.equal(r.ok, false); if (!r.ok) assert.equal(r.error.reason, 'custodian_protocol');
-    }
+    const signature = value(await probe(accepted));
+    value(await Crypto.verify('ed25519', pub, signature, new Uint8Array(accepted), {maxBytes: accepted}));
+    const over = await probe(refused);
+    assert.equal(over.ok, false);
+    if (!over.ok) {assert.equal(over.error.kind, 'custody'); assert.equal(over.error.reason, 'custodian_protocol');}
+    const normalized = await Crypto.sign('ed25519', handle, new Uint8Array(refused), {maxBytes: ceiling});
+    assert.equal(normalized.ok, false);
+    if (!normalized.ok) {assert.equal(normalized.error.kind, 'crypto'); assert.equal(normalized.error.reason, 'invalid_key');}
+    const recovered = value(await sign(1024));
+    value(await Crypto.verify('ed25519', pub, recovered, new Uint8Array(1024)));
+    t.diagnostic(`Observed Ed25519 payload: ${accepted} accepted; ${refused} refused as custodian_protocol; Crypto.sign returned crypto/invalid_key; next sign verified. ${attempts} discovery calls. No portable byte-count assertion.`);
   } finally {
     if (handle) await handle.release(); agent.kill('SIGTERM'); await once(agent, 'exit'); await rm(root, {recursive: true, force: true});
   }

@@ -16,7 +16,7 @@ import {
   type CustodyAlgorithm,
   type Spec,
 } from './crypto/algorithm.ts';
-import {dataBytes} from './crypto/primitive.ts';
+import {dataBytes, boundedBinary, binaryByteLength} from './crypto/primitive.ts';
 import {isPublicKey, type PublicKey} from './public_key.ts';
 import {isKeyIdentity, type KeyIdentity} from './key_identity.ts';
 import {isUnwrappedKey, type UnwrappedKey} from './custody/content_key.ts';
@@ -152,9 +152,8 @@ class ManagedHandle implements KeyHandle {
           }
         },
         (v): v is Uint8Array<ArrayBuffer> =>
-          v instanceof Uint8Array &&
-          v.length > 0 &&
-          v.length <= CUSTODY_SIGNATURE_MAX_BYTES,
+          boundedBinary(v, CUSTODY_SIGNATURE_MAX_BYTES) &&
+          binaryByteLength(v) > 0,
       );
     } catch {
       return err(custodyError('invalid_data'));
@@ -178,7 +177,7 @@ class ManagedHandle implements KeyHandle {
       if (!bytes.ok) return err(custodyError('invalid_data'));
       if (!(signature instanceof Uint8Array))
         return err(custodyError('invalid_signature'));
-      if (signature.length > CUSTODY_SIGNATURE_MAX_BYTES)
+      if (!boundedBinary(signature, CUSTODY_SIGNATURE_MAX_BYTES))
         return err(custodyError('limit'));
       const copied = new Uint8Array(signature);
       return this.#invoke(
@@ -220,25 +219,24 @@ class ManagedHandle implements KeyHandle {
     context: Context,
     options: unknown = {},
   ): Promise<Result<UnwrappedKey>> {
+    const opts = snapshotOptions(options, ['length']);
+    if (
+      !opts.ok ||
+      (Object.hasOwn(opts.value, 'length') &&
+        opts.value.length !== 128 &&
+        opts.value.length !== 256)
+    )
+      return err(custodyError('invalid_options'));
     try {
       if (!this.#port) return err(custodyError('key_not_found'));
       if (!isContext(context)) return err(custodyError('invalid_options'));
       if (!this.#matches(algorithm)) return err(custodyError('key_mismatch'));
       if (!this.capabilities.includes('unwrap')) return err(custodyError('unsupported_operation'));
       if (
-        !(wrappedKey instanceof Uint8Array) ||
-        wrappedKey.length === 0 ||
-        wrappedKey.length > SIGNATURE_MAX_BYTES
+        !boundedBinary(wrappedKey, SIGNATURE_MAX_BYTES) ||
+        binaryByteLength(wrappedKey) === 0
       )
         return err(custodyError('invalid_data'));
-      const opts = snapshotOptions(options, ['length']);
-      if (
-        !opts.ok ||
-        (Object.hasOwn(opts.value, 'length') &&
-          opts.value.length !== 128 &&
-          opts.value.length !== 256)
-      )
-        return err(custodyError('invalid_options'));
       const copied = new Uint8Array(wrappedKey);
       return this.#invoke(
         'unwrap',

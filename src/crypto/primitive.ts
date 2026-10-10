@@ -12,13 +12,24 @@ import * as subtle from './subtle.ts';
 // Caller properties can shadow length and byteLength; capture the shared TypedArray getter.
 // Uint16Array reaches that intrinsic even when Uint8Array allocations are instrumented.
 const byteLength = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint16Array.prototype), 'byteLength')!.get!;
+export function binaryByteLength(input: Uint8Array): number {
+  return byteLength.call(input) as number;
+}
 export function boundedBinary(input: unknown, maximum: number): input is Uint8Array {
-  try {return input instanceof Uint8Array && byteLength.call(input) <= maximum;} catch {return false;}
+  try {return input instanceof Uint8Array && binaryByteLength(input) <= maximum;} catch {return false;}
+}
+/** Check the octet-string or intrinsic binary size without allocating a copy. */
+export function boundedData(input: unknown, maximum: number): boolean {
+  if (typeof input !== 'string') return boundedBinary(input, maximum);
+  if (input.length > maximum) return false;
+  // Mirrors byteString's octet-string rule without allocating the copy it makes.
+  for (let i = 0; i < input.length; i++) if (input.charCodeAt(i) > 255) return false;
+  return true;
 }
 export function dataBytes(input: unknown, maximum = CRYPTO_DEFAULT_MAX_BYTES): Result<Uint8Array<ArrayBuffer>> {
   try {
     if (
-      !(typeof input === 'string' ? input.length <= maximum : boundedBinary(input, maximum))
+      !boundedData(input, maximum)
     )
       return err(cryptoError('invalid_data'));
     const r = byteString(input);
@@ -58,7 +69,8 @@ function signatureValid(
     spec.family === 'rsa'
       ? Math.ceil((key.algorithm as {name: string; modulusLength: number}).modulusLength / 8)
       : spec.width;
-  if (bytes.length !== width || bytes.length > SIGNATURE_MAX_BYTES)
+  const size = binaryByteLength(bytes);
+  if (size !== width || size > SIGNATURE_MAX_BYTES)
     return false;
   if (spec.family === 'ec') {
     const r = unsigned(bytes.subarray(0, width / 2)),

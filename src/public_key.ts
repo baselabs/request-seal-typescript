@@ -1,3 +1,4 @@
+import {byteLimit} from './crypto/options.ts';
 import {CRYPTO_DEFAULT_MAX_BYTES} from './constants.ts';
 import {encodeUtf8} from './runtime.ts';
 import {ok, err, type Result} from './result.ts';
@@ -9,7 +10,7 @@ import {
   type Spec,
 } from './crypto/algorithm.ts';
 import * as subtle from './crypto/subtle.ts';
-import {verifyKey} from './crypto/primitive.ts';
+import {boundedData, verifyKey} from './crypto/primitive.ts';
 import {decodeKey, publicSpki, writePem} from './custody/der.ts';
 import {
   snapshotJwk,
@@ -145,8 +146,10 @@ export class PublicKey {
       ? ok(true)
       : err(cryptoError('key_mismatch'));
   }
-  async verify(algorithm: unknown, signature: unknown, data: unknown): Promise<Result<true>> {
-    return this.#verify(algorithm, signature, data, CRYPTO_DEFAULT_MAX_BYTES);
+  async verify(algorithm: unknown, signature: unknown, data: unknown, options: unknown = {}): Promise<Result<true>> {
+    const maximum = byteLimit(options);
+    if (!maximum.ok) return maximum;
+    return this.#verify(algorithm, signature, data, maximum.value);
   }
   async #verify(
     algorithm: unknown,
@@ -157,6 +160,8 @@ export class PublicKey {
     const resolved = resolveAlgorithm(algorithm);
     if (!resolved.ok) return resolved;
     const spec: Spec = resolved.value;
+    // Same order as Crypto.verify: options, algorithm, data bound, then key compatibility.
+    if (!boundedData(data, maximum)) return err(cryptoError('invalid_data'));
     try {
       if (
         !compatible(this.#jwk, spec, this.#pssOnly) ||

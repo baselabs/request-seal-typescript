@@ -1,3 +1,4 @@
+import {PARITY_HEADER} from './parity-header.ts';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { ERROR_PARITY, ELIXIR_ERROR_PIN, ERROR_RETRYABLE } from '../src/errors/parity.ts';
 export function renderParity(): string {
@@ -38,7 +39,7 @@ if (process.argv[1]?.endsWith('/render-parity.ts')) {
     const retryEnd = suffix.indexOf('\n', retryExport);
     if (entriesStart < 0 || end < ' as const;'.length || retryStart < 0 || retryExport < 0 || retryEnd < 0 || !/^[a-f0-9]{40}$/.test(fixture.commit) || !Array.isArray(fixture.entries) || !Array.isArray(fixture.modules)) throw new Error('Invalid parity input');
     const retryable = Object.fromEntries(fixture.modules.map((m: {kind: string; retryable: {rules: unknown}}) => [m.kind, m.retryable.rules]));
-    writeFileSync('src/errors/parity.ts', '// Derived from pinned Elixir constructors and call sites; regenerate with scripts/render-parity.ts --update-table.\n'
+    writeFileSync('src/errors/parity.ts', PARITY_HEADER
       + `export const ELIXIR_ERROR_PIN = '${fixture.commit}';\nconst entries = `
       + JSON.stringify(fixture.entries, null, 2) + ' as const;'
       + suffix.slice(0, retryStart) + 'const retryableRules = '
