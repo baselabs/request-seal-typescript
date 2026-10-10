@@ -45,14 +45,14 @@ function transportTest(name: string, check: (t: TestContext) => Promise<void>) {
     await check(t);
   });
 }
-function rejected(r: Seal.Result<unknown>, expected: string, source?: string) {
+function rejected(r: Seal.Result<unknown>, expected: string, source?: string, stage: "verify" | "capture" = "verify") {
   assert.equal(r.ok, false);
   if (r.ok) assert.fail("expected rejection");
   const error = r.error;
   assert.equal(error.kind, "adapter");
   if (error.kind !== "adapter") assert.fail("expected adapter error");
   assert.equal(error.adapter, "node-http");
-  assert.equal(error.stage, "verify");
+  assert.equal(error.stage, stage);
   assert.equal(error.attempt, 0);
   assert.equal(error.reason, expected);
   if (source) {
@@ -71,6 +71,8 @@ async function exchange(
     p: Seal.WebBotAuthPolicy,
     directory: Awaited<ReturnType<typeof peer>>,
   ) => Promise<void>,
+  captureOptions: false | Readonly<Record<string, unknown>> = {},
+  includeHost = true,
 ) {
   const handle = await custody();
   const key = value(await handle.publicKey()), kid = value(await key.thumbprint());
@@ -103,13 +105,15 @@ async function exchange(
     content: { kind: "content", algorithms: ["sha-256"], section: "headers" },
   });
   let outcome: Promise<void> | undefined;
-  const server = createServer((req, res) => {
+  // Let the missing-Host case reach capture rather than the HTTP parser.
+  const server = createServer({ requireHostHeader: includeHost }, (req, res) => {
     outcome = (async () => {
-      value(await N.captureRequest(req));
+      if (captureOptions !== false) value(await N.captureRequest(req, captureOptions));
       await check(req, p, directory);
     })();
     void outcome.finally(() => res.end()).catch(() => {});
   });
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     server.listen(0, "127.0.0.1");
     await once(server, "listening");
@@ -129,16 +133,23 @@ async function exchange(
     await new Promise<void>((done, fail) => {
       const outgoing = request({
         host: "127.0.0.1", port: address.port, method: "POST", path: "/a%2Fb?x=1",
-        headers: ["Host", `127.0.0.1:${address.port}`, "Content-Length", String(bytes.length),
+        setHost: false,
+        headers: [...(includeHost ? ["Host", `127.0.0.1:${address.port}`] : []), "Content-Length", String(bytes.length),
           ...message.fields.flatMap(f => [f.name, Buffer.from(f.value).toString("latin1")])],
         agent: false,
       }, res => { res.resume(); res.once("end", done); });
+      timer = setTimeout(() => {
+        fail(new Error("Node HTTP exchange handler did not finish within 5000 ms"));
+        outgoing.destroy();
+        server.closeAllConnections();
+      }, 5000);
       outgoing.once("error", fail);
       outgoing.end(bytes);
     });
     assert.ok(outcome, "real HTTP listener executed");
     await outcome;
   } finally {
+    clearTimeout(timer);
     server.closeAllConnections();
     await new Promise<void>(done => server.close(() => done()));
     cache.close(); await directory.close(); await handle.release();
@@ -151,6 +162,9 @@ transportTest("Node Web Bot Auth verifies captured bytes against a real signed T
     const result = value(await verify(req, p));
     assert.equal(result.capture.message.rawTarget, "/a%2Fb?x=1");
     assert.equal(result.verification.profile.name, "web_bot_auth");
+    assert.equal(Seal.isWebBotAuthVerification(result.verification), true);
+    assert.equal(Seal.isWebBotAuthVerification({ ...result.verification }), false);
+    assert.equal(Seal.isWebBotAuthVerification(result), false);
     const principal = result.verification.signatures.agent!.principal;
     assert.equal(principal.kind, "agent");
     if (principal.kind === "agent") assert.equal(principal.provenance.proof, "signed");
@@ -162,6 +176,51 @@ transportTest("Node Web Bot Auth verifies captured bytes against a real signed T
     assert.equal(Object.isFrozen(result.capture), true);
     assert.equal(directory.requests, 1);
   });
+});
+transportTest("Node Web Bot Auth rejects an uncaptured real request without reserving an attempt", async () => {
+  const verify = verifier();
+  await exchange(true, async (req, p, directory) => {
+    assert.equal(req.readableFlowing, null);
+    assert.equal(req.method, "POST");
+    assert.ok(req.rawHeaders.includes("content-digest"));
+    rejected(await verify(req, p), "not_captured");
+    rejected(N.verification(req), "not_captured");
+    assert.equal(directory.requests, 0);
+    value(await N.captureRequest(req));
+    const accepted = value(await verify(req, p));
+    assert.equal(value(N.verification(req)), accepted.verification);
+    assert.equal(directory.requests, 1);
+  }, false);
+});
+for (const [name, options] of [
+  ["oversized supplied body", { maxBytes: 1, body: new TextEncoder().encode('{"a":1}') }],
+  ["non-byte supplied body", { body: '{"a":1}' }],
+] as const) transportTest(`Node Web Bot Auth preserves capture limit for ${name}`, async () => {
+  const verify = verifier();
+  await exchange(true, async (req, p, directory) => {
+    const captured = await N.captureRequest(req, options);
+    rejected(captured, "limit", undefined, "capture");
+    const result = await verify(req, p);
+    rejected(result, "limit", undefined, "capture");
+    assert.deepEqual(result, captured);
+    assert.deepEqual(await verify(req, p), captured);
+    rejected(N.verification(req), "not_captured");
+    assert.equal(directory.requests, 0);
+  }, false);
+});
+transportTest("Node Web Bot Auth preserves capture invalid_request for real fields without Host", async () => {
+  const verify = verifier();
+  await exchange(true, async (req, p, directory) => {
+    assert.equal(req.headers.host, undefined);
+    const captured = await N.captureRequest(req);
+    rejected(captured, "invalid_request", undefined, "capture");
+    const result = await verify(req, p);
+    rejected(result, "invalid_request", undefined, "capture");
+    assert.deepEqual(result, captured);
+    assert.deepEqual(await verify(req, p), captured);
+    rejected(N.verification(req), "not_captured");
+    assert.equal(directory.requests, 0);
+  }, false, false);
 });
 transportTest("Node Web Bot Auth stores the bounded unsigned request rejection", async () => {
   const verify = verifier();

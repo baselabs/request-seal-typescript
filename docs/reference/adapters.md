@@ -28,8 +28,8 @@ rejects with `parser_order`. A present Content-Length must equal retained bytes;
 Do not pair `capture(server)` with a parser reading the original request stream;
 use the replay stream, the verified bytes, or the Express verify hook below.
 
-Capture returns `{message, ingress, origin, replay}`. The capture and successful
-verification values are frozen and separately branded. Core transport evidence
+Capture returns `{message, ingress, origin, replay}`. The capture is frozen and privately branded. Successful adapter verification
+wrappers are frozen; their core verification facts retain their own brands. Core transport evidence
 remains declared. `ingress.evidence` is observed and records socket TLS protocol,
 ALPN, HTTP version, and the original origin. HTTP/2 pseudo-headers become
 message facts, never field occurrences; cookie crumbs combine with semicolon
@@ -87,7 +87,12 @@ Unsigned requests return adapter `request_rejected` with the bounded core source
 `missing_signature_input`, as the reference does; untrusted agents retain
 `agent_unresolved`. Both rejections consume the attempt and remain available
 through `verification(req)`. A second attempt returns `already_verified` without
-replacing stored facts.
+replacing stored facts. Verification before capture returns `not_captured` without
+reserving an attempt. A rejected capture retains its capture stage and reason:
+oversized or non-byte supplied bodies return `limit`, and fields without Host
+return `invalid_request`. These capture rejections remain available to repeated
+verification calls; `verification(req)` returns `not_captured` because no
+successful capture or verification state was created.
 
 An explicit `trustedProxies: {peers, field}` selects origin reconstruction.
 `peers` is a list of CIDR ranges or exact socket IP addresses, including native

@@ -190,5 +190,5 @@ for (const order of ['tls-first', 'connect-first']) test(`address retries preser
   const env = {...process.env}; delete env.NODE_TEST_CONTEXT;
   const child = spawnSync(process.execPath, [...prefix, 'test/support/discovery-address-order.ts', order], {env, encoding: 'utf8', timeout: 10_000});
   assert.equal(child.status, 0, child.stdout + child.stderr);
-  assert.equal(child.stdout, 'tls_failed retryable=false connections=1\n');
+  assert.equal(child.stdout, 'tls_failed retryable=false connections=1 order=::1,127.0.0.1\n');
 });

@@ -93,7 +93,6 @@ const states = new WeakMap<
   }
 >();
 const branded = new WeakSet<object>();
-const verified = new WeakSet<object>();
 const clientResponses = new WeakSet<object>();
 const registrations = new WeakSet<object>();
 function pairs(
@@ -815,7 +814,6 @@ export async function verifyRequest(
         return new Uint8Array(bytes);
       },
     });
-    verified.add(v);
     const result = ok(v);
     state.verified = result;
     return result;
@@ -879,7 +877,6 @@ export async function verifyQuorum(
         return new Uint8Array(bytes);
       },
     });
-    verified.add(result);
     state.verified = ok(result);
     return ok(result);
   } catch (e) {
@@ -943,7 +940,6 @@ export async function verifyWebBotAuth(
         return new Uint8Array(bytes);
       },
     });
-    verified.add(result);
     state.verified = ok(result);
     return ok(result);
   } catch (e) {

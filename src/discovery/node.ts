@@ -101,7 +101,8 @@ async function resolve(
       answers.every((a) => isIP(a.address) === a.family),
     "resolution_failed",
   );
-  return [...new Set(answers.map((a) => a.address))];
+  // Match the reference resolver: IPv6 first, retaining order within each family.
+  return [...new Set(answers.sort((a, b) => b.family - a.family).map((a) => a.address))];
 }
 function systemCertificates(): string[] | undefined {
   if (typeof tls.getCACertificates !== "function") return undefined;
