@@ -37,7 +37,7 @@ test('replay docs distinguish the caller-capped deadline from the reference time
   assert.match(source, /reference.*independent timeout/);
 });
 test('CI rejects a missing PostgreSQL URL while local checks still skip', async () => {
-  const {spawnSync} = await import('node:child_process');
+  const {spawnWithEnvSync: spawnSync} = await import('./support/child-env.ts');
   const env = {...process.env}; env.REQUESTSEAL_REPLAY_PG_URL = ''; delete env.NODE_TEST_CONTEXT;
   const args = process.versions.bun ? ['test', '--isolate', '--test-name-pattern=64 PostgreSQL claims', 'test/replay-postgres.test.ts'] : process.versions.deno ? ['test', '--no-check', '--allow-read', '--allow-env', '--allow-net', '--filter=64 PostgreSQL claims', 'test/replay-postgres.test.ts'] : ['--experimental-strip-types', '--no-warnings', '--test', '--test-name-pattern=64 PostgreSQL claims', 'test/replay-postgres.test.ts'];
   for (const flag of ['true', '']) {

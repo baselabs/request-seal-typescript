@@ -237,6 +237,11 @@ replacement values do not gain the validation of a constructor implicitly.
 Runtime limitations are consumer policy, not corpus semantics. Neither source
 vectors nor manifests change. `tools/conformance/runtime-limits.json` names the
 runtime, exact version, manifest ID, item IDs, observed rule ID, and reason.
+An optional nonempty `platforms` array restricts an entry to the listed Node-style
+`${process.platform}-${process.arch}` names, such as `darwin-arm64` or `linux-x64`.
+Omitting `platforms` applies the entry everywhere. Unknown entry keys, malformed
+platform names, and duplicate platform names reject the table, including entries
+for unselected runtimes and versions.
 Selection uses `process.versions.bun`, `process.versions.deno`, or
 `process.versions.node`; Bun and Deno take precedence over their Node compatibility
 version. A different version selects no entry; re-pinning requires a deliberate
@@ -245,9 +250,13 @@ policy update and verification.
 Bun 1.3.14 has one entry for
 `crypto/ecdsa_secp256r1_sha256_p1363_test`, items 261 and 262, observed as
 `crypto/invalid_signature`: its WebCrypto rejects published valid signatures
-with `s = 2^128` and `s = n - 2^128`.
+with `s = 2^128` and `s = n - 2^128` on `darwin-arm64`. The October 10, 2026
+ubuntu-24.04 CI failure log reports that both items verify on `linux-x64`, so
+this entry applies only to `darwin-arm64`.
 
-Each item still runs actual cryptography. An exact listed divergence counts as
+Each item still runs actual cryptography. An entry scoped to another platform
+does not exempt an outcome or trigger a stale check: the item must agree with
+the corpus oracle. An exact listed divergence counts as
 `runtime_limited`, separately from `executed` and `not_applicable`. A listed item
 that agrees with the corpus fails as `stale_runtime_limitation`; a different
 observed outcome or an unlisted divergence fails as `outcome_mismatch`. A listed

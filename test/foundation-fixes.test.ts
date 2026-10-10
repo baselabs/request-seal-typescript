@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import {spawnWithEnvSync as spawnSync} from './support/child-env.ts';
 import * as api from '../src/index.ts';
 import * as errors from '../src/errors/types.ts';
 import { ERROR_PARITY, RULE_IDS } from '../src/errors/parity.ts';

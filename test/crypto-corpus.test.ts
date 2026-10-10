@@ -163,14 +163,16 @@ test('public-only corpus import projects private JWK examples without changing t
 test('runtime limitations select only the exact named version', async () => {
   const limits = await import('../tools/conformance/loader.ts');
   const table = JSON.parse(await readFile('tools/conformance/runtime-limits.json', 'utf8'));
-  assert.equal(limits.selectRuntimeLimits(table, {bun: '1.3.14'}).length, 3);
+  assert.equal(limits.selectRuntimeLimits(table, {bun: '1.3.14'}, 'darwin-arm64').length, 3);
   assert.equal(limits.selectRuntimeLimits(table, {deno: '2.5.6'}).length, 2);
+  assert.equal(limits.selectRuntimeLimits(table, {bun: '1.3.14'}, 'linux-x64').length, 2);
+  assert.equal(limits.selectRuntimeLimits(table, {bun: '1.3.14'}).length, process.platform === 'darwin' && process.arch === 'arm64' ? 3 : 2);
   for (const versions of [{bun: '1.3.13'}, {bun: '1.3.15'}, {node: '24.21.0'}, {deno: '2.5.7'}])
     assert.deepEqual(limits.selectRuntimeLimits(table, versions), []);
   assert.deepEqual(limits.selectRuntimeLimits(table, {bun: '1.3.14-canary', node: '24.21.0'}), []);
-  assert.equal(limits.selectRuntimeLimits(table, {bun: '1.3.14', node: '24.21.0'}).length, 3);
+  assert.equal(limits.selectRuntimeLimits(table, {bun: '1.3.14', node: '24.21.0'}, 'darwin-arm64').length, 3);
 });
-test('a stale runtime limitation fails the real corpus CLI', {timeout: 30_000}, async () => {
+test('platform-scoped limitations execute elsewhere and fail stale on this platform', {timeout: 30_000}, async () => {
   const root = await mkdtemp(join(tmpdir(), 'request-seal-runtime-policy-'));
   try {
     await cp('src', join(root, 'src'), {recursive: true});
@@ -182,15 +184,28 @@ test('a stale runtime limitation fails the real corpus CLI', {timeout: 30_000}, 
     const version = process.versions[runtime]!;
     table[runtime] ??= {};
     table[runtime][version] ??= [];
-    table[runtime][version].push({id: 'crypto/ed25519_test', items: [1], observed: 'crypto/invalid_signature', reason: 'Published valid Ed25519 item proves stale policy fails.'});
-    await writeFile(join(root, 'tools/conformance/runtime-limits.json'), JSON.stringify(table));
+    table[runtime][version].push({id: 'crypto/ed25519_test', items: [1], observed: 'crypto/invalid_signature', reason: 'Published valid Ed25519 item proves stale policy fails.', platforms: [process.platform === 'darwin' ? 'linux-x64' : 'darwin-arm64']});
     const prefix = runtime === 'deno' ? ['run', '--allow-read'] : runtime === 'bun' ? ['run'] : ['--experimental-strip-types', '--no-warnings'];
-    const child = spawnSync(process.execPath, [...prefix, join(root, 'tools/conformance/cli.ts'), '--corpus', resolve('conformance'), '--pending-ok'], {encoding: 'utf8', timeout: 25_000});
+    const execute = async () => {
+      await writeFile(join(root, 'tools/conformance/runtime-limits.json'), JSON.stringify(table));
+      return spawnSync(process.execPath, [...prefix, join(root, 'tools/conformance/cli.ts'), '--corpus', resolve('conformance'), '--pending-ok'], {encoding: 'utf8', timeout: 25_000});
+    };
+    const elsewhere = await execute();
+    assert.equal(elsewhere.status, 0, elsewhere.stderr || elsewhere.stdout);
+    const executed = JSON.parse(elsewhere.stdout);
+    assert.equal(executed.ok, true);
+    assert.deepEqual(executed.failures, []);
+    assert.equal(executed.executed + executed.runtime_limited, 2993);
+    table[runtime][version].at(-1).platforms = [`${process.platform}-${process.arch}`];
+    const child = await execute();
     assert.equal(child.status, 1, child.stderr || child.stdout);
     assert.ok(child.stdout.trim(), child.stderr);
     const report = JSON.parse(child.stdout);
     assert.equal(report.ok, false);
-    assert.ok(report.failures.some((f: {id: string; reason: string}) => f.id === 'crypto/ed25519_test/0:1' && f.reason === 'stale_runtime_limitation'));
+    assert.deepEqual(report.failures.map((f: {id: string; reason: string}) => ({id: f.id, reason: f.reason})), [
+      {id: 'crypto/ed25519_test/0:1', reason: 'stale_runtime_limitation'},
+    ]);
+    console.log('RED scoped stale policy: exit=1 crypto/ed25519_test/0:1 stale_runtime_limitation');
   } finally {await rm(root, {recursive: true, force: true});}
 });
 test('an unlisted real divergence fails despite a runtime limitation', async () => {
@@ -206,4 +221,25 @@ test('an unlisted real divergence fails despite a runtime limitation', async () 
   assert.equal(c.report.ok, false);
   assert.equal(c.report.failures[0]?.reason, 'outcome_mismatch');
   assert.equal(c.report.runtime_limited, 0);
+});
+
+test('runtime limitation schema rejects malformed platforms and unknown keys in every release', () => {
+  const entry = {id: 'crypto/ed25519_test', items: [1], observed: 'crypto/invalid_signature', reason: 'Published valid item.'};
+  for (const platforms of [null, 'darwin-arm64', [], ['darwin'], ['Darwin-arm64'], ['darwin_arm64'], ['linux-x64-extra'], ['linux-x64\n'], ['unknown-x64'], ['linux-unknown'], [1], ['linux-x64', 'linux-x64']]) {
+    assert.throws(() => selectRuntimeLimits({bun: {'1.3.14': [{...entry, platforms}]}}, process.versions), /invalid_runtime_limits/, JSON.stringify(platforms));
+  }
+  assert.throws(() => selectRuntimeLimits({bun: {'1.3.14': [{...entry, platforms: ['linux-x64'], platform: 'linux-x64'}]}}, process.versions), /invalid_runtime_limits/);
+  assert.throws(() => selectRuntimeLimits({bun: {'1.3.14': [{...entry, extra: true}]}}, process.versions), /invalid_runtime_limits/);
+});
+
+test('a current-platform limitation recognizes the real observed rejection', async () => {
+  const {cryptoBatchItem} = await import('../tools/conformance/crypto-surfaces.ts');
+  const source = JSON.parse(await readFile('test/fixtures/wycheproof/ecdsa_secp256r1_sha256_p1363_test.json', 'utf8'));
+  const parent = source.testGroups.at(-1), value = parent.tests[0];
+  const result = await cryptoBatchItem({id: String(value.tcId), value, parent, position: 0, notApplicable: false}, {batch: {item_format: 'wycheproof-ecdsa/1'}});
+  const entry = {id: 'crypto/ecdsa_secp256r1_sha256_p1363_test', items: [value.tcId], observed: 'crypto/invalid_signature', reason: 'Published extreme-s signature.', platforms: [`${process.platform}-${process.arch}`]};
+  const runtime = process.versions.bun ? 'bun' : process.versions.deno ? 'deno' : 'node';
+  const limits = selectRuntimeLimits({[runtime]: {[process.versions[runtime]!]: [entry]}}, process.versions);
+  assert.equal(limits.length, 1);
+  assert.equal(classifyRuntimeResult(limits, entry.id, String(value.tcId), result), process.versions.bun && process.platform === 'darwin' && process.arch === 'arm64' ? 'runtime_limited' : 'stale_runtime_limitation');
 });

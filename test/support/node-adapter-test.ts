@@ -1,6 +1,6 @@
 import nodeTest from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import {execFileWithEnvSync as execFileSync} from "./child-env.ts";
 import { fileURLToPath } from "node:url";
 
 /** Native lanes exercise Node HTTP adapters on their actual Node substrate. */

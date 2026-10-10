@@ -137,7 +137,7 @@ const elixirOnPath = (process.env.PATH ?? '').split(delimiter).some(directory =>
 if (!elixirOnPath && process.env.CI === undefined) console.log('SKIP Elixir replay peer: Elixir is not on PATH');
 test('Elixir replay peer bounds a database URL without userinfo before startup', {timeout: 30_000, skip: !elixirOnPath && process.env.CI === undefined ? 'Elixir is not on PATH' : false}, async () => {
   assert.ok(elixirOnPath, 'CI requires Elixir on PATH');
-  const {spawnSync} = await import('node:child_process');
+  const {spawnWithEnvSync: spawnSync} = await import('./support/child-env.ts');
   const child = spawnSync('elixir', ['interop/replay/claim.exs'], {env: {...process.env, REQUESTSEAL_REPLAY_PG_URL: 'postgresql://localhost/db'}, encoding: 'utf8', timeout: 25_000});
   assert.equal(child.error, undefined, child.error?.message ?? 'Elixir subprocess must complete without a spawn error');
   assert.equal(child.status, 1, child.stdout + child.stderr);
@@ -146,7 +146,7 @@ test('Elixir replay peer bounds a database URL without userinfo before startup',
 });
 
 test('missing Elixir executable skips locally and fails in CI', async () => {
-  const {spawnSync} = await import('node:child_process');
+  const {spawnWithEnvSync: spawnSync} = await import('./support/child-env.ts');
   const {mkdtemp, rm} = await import('node:fs/promises');
   const {tmpdir} = await import('node:os'); const {join} = await import('node:path');
   const root = await mkdtemp(join(tmpdir(), 'request-seal-elixir-path-'));
@@ -154,11 +154,6 @@ test('missing Elixir executable skips locally and fails in CI', async () => {
     const args = process.versions.bun ? ['test', '--isolate', '--test-name-pattern=Elixir replay peer bounds', 'test/replay-fixes.test.ts'] : process.versions.deno ? ['test', '--no-check', '--allow-read', '--allow-env', '--allow-run=elixir', '--filter=Elixir replay peer bounds', 'test/replay-fixes.test.ts'] : ['--experimental-strip-types', '--no-warnings', '--test', '--test-name-pattern=Elixir replay peer bounds', 'test/replay-fixes.test.ts'];
     const env: NodeJS.ProcessEnv = {...process.env, PATH: root}; delete env.NODE_TEST_CONTEXT; delete env.CI;
     function execute(environment: NodeJS.ProcessEnv) {
-      const native = (globalThis as unknown as {Deno?: {Command: new (command: string, options: {args: string[]; env: Record<string, string>; clearEnv: boolean; stdout: 'piped'; stderr: 'piped'}) => {outputSync: () => {code: number; stdout: Uint8Array; stderr: Uint8Array}}}}).Deno;
-      if (native) {
-        const r = new native.Command(process.execPath, {args, env: Object.fromEntries(Object.entries(environment).filter((pair): pair is [string, string] => typeof pair[1] === 'string')), clearEnv: true, stdout: 'piped', stderr: 'piped'}).outputSync();
-        return {status: r.code, stdout: new TextDecoder().decode(r.stdout), stderr: new TextDecoder().decode(r.stderr)};
-      }
       return spawnSync(process.execPath, args, {env: environment, encoding: 'utf8', timeout: 10000});
     }
     const local = execute(env);

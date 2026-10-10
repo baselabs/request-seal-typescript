@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import {spawn} from "node:child_process";
+import {execFileWithEnvSync as execFileSync, spawnWithEnvSync as spawnSync} from "./support/child-env.ts";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {

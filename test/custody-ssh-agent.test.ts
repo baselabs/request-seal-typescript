@@ -2,7 +2,8 @@ import test from "node:test";
 import { nodeAdapterTest } from "./support/node-adapter-test.ts";
 const socketTest = nodeAdapterTest(import.meta.url);
 import assert from "node:assert/strict";
-import { spawn, spawnSync } from "node:child_process";
+import {spawn} from "node:child_process";
+import {spawnWithEnvSync as spawnSync} from "./support/child-env.ts";
 import { mkdtemp, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -77,6 +78,7 @@ test(
     const command = (program: string, args: string[]) => {
       const r = spawnSync(program, args, {
         env: { ...process.env, SSH_AUTH_SOCK: socket },
+        encoding: "utf8",
         timeout: 10000,
       });
       t.diagnostic(

@@ -4,7 +4,7 @@ import { createServer, request, type IncomingMessage } from "node:http";
 import { once } from "node:events";
 import { createPrivateKey, createHash, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import {execFileWithEnvSync as execFileSync} from "./support/child-env.ts";
 import { fileURLToPath } from "node:url";
 import * as Seal from "../src/index.ts";
 import * as N from "../src/adapters/node-http/index.ts";

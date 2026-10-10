@@ -29,7 +29,7 @@ test('receipt retention drift rejects every successful corpus claim while preser
   const {cp, mkdtemp, writeFile, readFile, rm} = await import('node:fs/promises');
   const {tmpdir} = await import('node:os');
   const {join, resolve} = await import('node:path');
-  const {spawnSync} = await import('node:child_process');
+  const {spawnWithEnvSync: spawnSync} = await import('./support/child-env.ts');
   const root = await mkdtemp(join(tmpdir(), 'request-seal-receipt-drift-'));
   try {
     for (const folder of ['src', 'tools', 'test/fixtures/upstream/httpwg-structured-fields']) await cp(folder, join(root, folder), {recursive: true});

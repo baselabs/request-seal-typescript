@@ -6,6 +6,7 @@ import {cp, mkdtemp, readFile, writeFile, rm, symlink} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
+import {spawnWithEnvSync} from './support/child-env.ts';
 import {createHash} from 'node:crypto';
 import {runCorpus, canonicalJson, surfaceRegistry, matches, type CorpusCase} from '../tools/conformance/loader.ts';
 const prefix = Object.hasOwn(process.versions, 'deno') ? ['run', '--allow-read'] : Object.hasOwn(process.versions, 'bun') ? ['run'] : ['--experimental-strip-types', '--no-warnings'];
@@ -373,26 +374,14 @@ test('vendoring skips only an explicit offline request', {timeout:30_000}, () =>
       ? ['test','--test-name-pattern=format documentation']
       : ['--experimental-strip-types','--no-warnings','--test','--test-name-pattern=format documentation'];
   const output = (selected: NodeJS.ProcessEnv) => {
-    // Deno's Node subprocess compatibility merges omitted environment keys.
-    // Its native clearEnv option preserves an explicitly unset offline switch.
-    const native = (globalThis as unknown as {Deno?: {Command: new (command: string, options: {
-      args: string[]; env: Record<string,string>; clearEnv: boolean; stdout: "piped"; stderr: "piped";
-    }) => {outputSync: () => {code: number; stdout: Uint8Array; stderr: Uint8Array}}}}).Deno;
-    if (native) {
-      const env = Object.fromEntries(Object.entries(selected).filter((pair): pair is [string,string] => typeof pair[1] === 'string'));
-      const r = new native.Command(process.execPath,{args:[...runtime,'test/conformance-vendor.test.ts'],env,clearEnv:true,stdout:'piped',stderr:'piped'}).outputSync();
-      const out = new TextDecoder().decode(r.stdout), error = new TextDecoder().decode(r.stderr);
-      assert.equal(r.code,0,out+error);
-      return out;
-    }
-    const r = spawnSync(process.execPath,[...runtime,'test/conformance-vendor.test.ts'],{env:selected,encoding:'utf8',timeout:10_000});
+    const r = spawnWithEnvSync(process.execPath,[...runtime,'test/conformance-vendor.test.ts'],{env:selected,encoding:'utf8',timeout:10_000});
     assert.equal(r.status,0,r.stdout+r.stderr);
     return r.stdout;
   };
   assert.match(output({...env,REQUEST_SEAL_OFFLINE:''}),/Live vendoring skipped: REQUEST_SEAL_OFFLINE is set/);
   // The real test directory has no gh; no replacement executable is installed.
   const unavailable = {...env,PATH:resolve('test')};
-  assert.notEqual(spawnSync('gh',['--version'],{env:unavailable}).status,0);
+  assert.notEqual(spawnWithEnvSync('gh',['--version'],{env:unavailable,encoding:'utf8'}).status,0);
   assert.doesNotMatch(output(unavailable),/Live vendoring skipped:/);
   assert.doesNotMatch(output(env),/Live vendoring skipped:/);
 });

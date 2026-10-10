@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {spawnSync} from 'node:child_process';
+import {spawnWithEnvSync as spawnSync} from './support/child-env.ts';
 const prefix = Object.hasOwn(process.versions, 'deno') ? ['eval', '--no-check'] : Object.hasOwn(process.versions, 'bun') ? ['-e'] : ['--experimental-strip-types', '--no-warnings', '--input-type=module', '-e'];
 const context = new URL('../src/context.ts', import.meta.url).href;
 const result = new URL('../src/result.ts', import.meta.url).href;

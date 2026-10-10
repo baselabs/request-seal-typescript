@@ -185,7 +185,7 @@ test('peer close during a real TLS handshake is a retryable connect failure', as
 });
 
 for (const order of ['tls-first', 'connect-first']) test(`address retries preserve a TLS failure with ${order} ordering`, {timeout: 15_000}, async () => {
-  const {spawnSync} = await import('node:child_process');
+  const {spawnWithEnvSync: spawnSync} = await import('./support/child-env.ts');
   const prefix = Object.hasOwn(process.versions, 'deno') ? ['run', '--no-check', '--allow-all'] : Object.hasOwn(process.versions, 'bun') ? ['run'] : ['--experimental-strip-types', '--no-warnings'];
   const env = {...process.env}; delete env.NODE_TEST_CONTEXT;
   const child = spawnSync(process.execPath, [...prefix, 'test/support/discovery-address-order.ts', order], {env, encoding: 'utf8', timeout: 10_000});

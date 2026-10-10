@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 9, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
+**Status:** maintained · **Kind:** guide · **Updated:** October 10, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
 
 # Contributing
 
@@ -59,7 +59,9 @@ at load.
 
 Conformance limitations live only in `tools/conformance/runtime-limits.json`.
 The CLI and crypto tests select exact runtime versions and share the same
-classification; never add a second test-side Bun exception. See the
+classification; never add a second test-side Bun exception. Optional `platforms`
+entries apply only to their listed `${process.platform}-${process.arch}` names;
+unscoped entries apply everywhere. Stale checks use the same platform selection. See the
 [format contract](docs/reference/corpus-format.md#consumer-runtime-limitations).
 
 Live vendoring verification runs unless `REQUEST_SEAL_OFFLINE` is set (any value),
