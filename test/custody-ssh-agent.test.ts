@@ -276,3 +276,57 @@ socketTest("cancels a pending agent exchange and closes the owned socket", async
     await rm(root, { recursive: true, force: true });
   }
 });
+
+socketTest('forwards selected byte bounds to a real agent and reports its observed refusal', {timeout: 30000}, async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'rsbytes-')), socket = join(root, 'socket');
+  const agent = spawn('ssh-agent', ['-D', '-a', socket], {stdio: 'ignore'});
+  let handle: import('../src/index.ts').KeyHandle | undefined;
+  try {
+    for (let i = 0; ; i++) {
+      try {await stat(socket); break;} catch {assert.ok(i < 100); await new Promise(r => setTimeout(r, 10));}
+    }
+    const run = (program: string, args: string[]) => {
+      const r = spawnSync(program, args, {encoding: 'utf8', env: {...process.env, SSH_AUTH_SOCK: socket}, timeout: 10000});
+      assert.equal(r.status, 0, r.stderr.toString()); return r;
+    };
+    const version = run('ssh', ['-V']); t.diagnostic((version.stdout.toString() + version.stderr.toString()).trim());
+    const path = join(root, 'ed25519'); run('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', path]); run('ssh-add', [path]);
+    const pub = await publicFile(path); handle = value(await adapter.createSshAgent('ed25519', socket, pub));
+    const sign = (size: number) => (handle!.sign as (a: unknown, d: unknown, c: import('../src/context.ts').Context, o?: unknown) => Promise<Result<Uint8Array<ArrayBuffer>>>)('ed25519', new Uint8Array(size), value(withDeadline()), {maxBytes: 16_777_216});
+    value(await sign(262_000));
+    let accepted = 262_000, refused = 524_288;
+    const first = await sign(refused); assert.equal(first.ok, false); if (!first.ok) assert.equal(first.error.reason, 'custodian_protocol');
+    while (refused - accepted > 1) {
+      const size = Math.floor((accepted + refused) / 2), r = await sign(size);
+      if (r.ok) accepted = size;
+      else {assert.equal(r.error.reason, 'custodian_protocol'); refused = size;}
+    }
+    value(await sign(accepted));
+    const over = await sign(refused); assert.equal(over.ok, false); if (!over.ok) assert.equal(over.error.reason, 'custodian_protocol');
+    t.diagnostic(`Observed Ed25519 payload: ${accepted} accepted; ${refused} refused as custodian_protocol. This is a machine observation, not a portable byte-count assertion.`);
+    for (const size of [1_048_577, 16_777_216]) {
+      const r = await sign(size); assert.equal(r.ok, false); if (!r.ok) assert.equal(r.error.reason, 'custodian_protocol');
+    }
+  } finally {
+    if (handle) await handle.release(); agent.kill('SIGTERM'); await once(agent, 'exit'); await rm(root, {recursive: true, force: true});
+  }
+});
+
+socketTest('direct agent callbacks bound input before released state and verify at the ceiling', async () => {
+  const {Custody} = await import('../src/index.ts');
+  const {AgentPort} = await import('../src/custody/ssh-agent/port.ts');
+  const {resolveAlgorithm} = await import('../src/crypto/algorithm.ts');
+  const local = value(await Custody.local('ed25519', await readFile('test/fixtures/upstream/crypto/ed25519_private.pem', 'utf8')));
+  try {
+    const port = new AgentPort('/unused', value(await local.publicKey()), value(resolveAlgorithm('ed25519')));
+    const sign = Crypto.sign as (a: unknown, k: unknown, d: unknown, o?: unknown) => Promise<Result<Uint8Array<ArrayBuffer>>>;
+    const data = new Uint8Array(16_777_216), sig = value(await sign('ed25519', local, data, {maxBytes: 16_777_216}));
+    value(await port.verify('ed25519', sig, data, value(withDeadline())));
+    await port.release();
+    for (const input of [new Uint8Array(16_777_217), 'not binary', null]) {
+      for (const r of [await port.sign('unknown', input, value(withDeadline())), await port.verify('unknown', sig, input, value(withDeadline()))]) {
+        assert.equal(r.ok, false); if (!r.ok) {assert.equal(r.error.kind, 'custody'); assert.equal(r.error.reason, 'invalid_data');}
+      }
+    }
+  } finally {await local.release();}
+});

@@ -1,5 +1,5 @@
 {
-  "commit": "b2392871933d99641a7cb2ca2726aefd20081dee",
+  "commit": "0a6568aa246326617f760e94e21b359285c6ddfc",
   "modules": [
     {
       "kind": "core",
@@ -4970,6 +4970,7 @@
       "reasons": [
         "invalid_data",
         "invalid_key",
+        "invalid_options",
         "invalid_signature",
         "key_mismatch",
         "unsupported_algorithm",
@@ -4983,6 +4984,10 @@
             "value": false
           },
           "invalid_key": {
+            "kind": "constant",
+            "value": false
+          },
+          "invalid_options": {
             "kind": "constant",
             "value": false
           },
@@ -5014,28 +5019,28 @@
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 165,
-              "expression": "RequestSeal.Crypto.verify(handle.algorithm, bytes, signature, public)\n      end\n\n    normalize(:verify, result)"
+              "line": 207,
+              "expression": "RequestSeal.Crypto.verify(handle.algorithm, bytes, signature, public,\n          max_bytes: RequestSeal.Crypto.max_bytes_ceiling()\n        )\n      end"
             },
             {
               "path": "lib/request_seal/crypto.ex",
-              "line": 60,
-              "expression": "Support.safe(:invalid_key, fn ->\n      resolved = {_, spec} = Algorithm.resolve(algorithm)\n      ensure(bounded_binary?(bytes, 0, 1_048_576), :invalid_data)"
+              "line": 81,
+              "expression": "Support.safe(:invalid_key, fn ->\n      max = max_bytes(opts)\n      resolved = {_, spec} = Algorithm.resolve(algorithm)\n      ensure(bounded_binary?(bytes, 0, max), :invalid_data)"
             }
           ]
         },
@@ -5047,28 +5052,28 @@
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 165,
-              "expression": "RequestSeal.Crypto.verify(handle.algorithm, bytes, signature, public)\n      end\n\n    normalize(:verify, result)"
+              "line": 207,
+              "expression": "RequestSeal.Crypto.verify(handle.algorithm, bytes, signature, public,\n          max_bytes: RequestSeal.Crypto.max_bytes_ceiling()\n        )\n      end"
             },
             {
               "path": "lib/request_seal/crypto.ex",
-              "line": 60,
-              "expression": "Support.safe(:invalid_key, fn ->\n      resolved = {_, spec} = Algorithm.resolve(algorithm)\n      ensure(bounded_binary?(bytes, 0, 1_048_576), :invalid_data)"
+              "line": 81,
+              "expression": "Support.safe(:invalid_key, fn ->\n      max = max_bytes(opts)\n      resolved = {_, spec} = Algorithm.resolve(algorithm)\n      ensure(bounded_binary?(bytes, 0, max), :invalid_data)"
             }
           ]
         }
@@ -5083,6 +5088,11 @@
           "kind": "crypto",
           "reason": "invalid_key",
           "rule_id": "crypto/invalid_key"
+        },
+        {
+          "kind": "crypto",
+          "reason": "invalid_options",
+          "rule_id": "crypto/invalid_options"
         },
         {
           "kind": "crypto",
@@ -5232,7 +5242,7 @@
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 45,
+              "line": 54,
               "expression": "Support.safe(fn ->\n      Support.timeout(opts)\n      {jose, _} = resolved = Algorithm.resolve(algorithm)\n      ensure(jose in ~w(EdDSA RS256 ES256 ES384), :unsupported_algorithm)"
             }
           ]
@@ -5245,7 +5255,7 @@
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 45,
+              "line": 54,
               "expression": "Support.safe(fn ->\n      Support.timeout(opts)\n      {jose, _} = resolved = Algorithm.resolve(algorithm)\n      ensure(jose in ~w(EdDSA RS256 ES256 ES384), :unsupported_algorithm)"
             }
           ]
@@ -5258,18 +5268,18 @@
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 103,
-              "expression": "Support.safe(\n      fn ->\n        timeout = Support.timeout(opts)\n        handle!(handle)"
+              "line": 143,
+              "expression": "Support.safe(\n      fn ->\n        timeout = Support.timeout(opts, allowed)\n        max = Support.max_bytes(opts)"
             }
           ]
         },
@@ -5281,40 +5291,40 @@
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 103,
-              "expression": "Support.safe(\n      fn ->\n        timeout = Support.timeout(opts)\n        handle!(handle)"
+              "line": 143,
+              "expression": "Support.safe(\n      fn ->\n        timeout = Support.timeout(opts, allowed)\n        max = Support.max_bytes(opts)"
             }
           ]
         },
         {
           "rule_id": "custody/deadline_exceeded",
           "path": "lib/request_seal/custody.ex",
-          "line": 261,
+          "line": 305,
           "expression": "Context.remaining(context) <= 0 -> {:error, Error.new(:deadline_exceeded)}\n      owner_dead?(owner) -> {:error, Error.new(:custodian_failure)}\n      true -> run_worker(context, callback)\n    end",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             }
           ]
@@ -5322,22 +5332,22 @@
         {
           "rule_id": "custody/custodian_failure",
           "path": "lib/request_seal/custody.ex",
-          "line": 262,
+          "line": 306,
           "expression": "owner_dead?(owner) -> {:error, Error.new(:custodian_failure)}\n      true -> run_worker(context, callback)\n    end\n  end",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             }
           ]
@@ -5345,32 +5355,32 @@
         {
           "rule_id": "custody/deadline_exceeded",
           "path": "lib/request_seal/custody.ex",
-          "line": 325,
+          "line": 369,
           "expression": "send(reply, {reply, {:error, Error.new(:deadline_exceeded)}})\n\n      owner_dead?(context.owner) ->\n        send(reply, {reply, {:error, Error.new(:custodian_failure)}})",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 263,
+              "line": 307,
               "expression": "true -> run_worker(context, callback)\n    end\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 276,
+              "line": 320,
               "expression": "watch_owner(caller, reply, context, callback)\n      end)\n\n    try do"
             }
           ]
@@ -5378,32 +5388,32 @@
         {
           "rule_id": "custody/custodian_failure",
           "path": "lib/request_seal/custody.ex",
-          "line": 328,
+          "line": 372,
           "expression": "send(reply, {reply, {:error, Error.new(:custodian_failure)}})\n\n      true ->\n        receive do",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 263,
+              "line": 307,
               "expression": "true -> run_worker(context, callback)\n    end\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 276,
+              "line": 320,
               "expression": "watch_owner(caller, reply, context, callback)\n      end)\n\n    try do"
             }
           ]
@@ -5411,32 +5421,32 @@
         {
           "rule_id": "custody/custodian_failure",
           "path": "lib/request_seal/custody.ex",
-          "line": 333,
+          "line": 377,
           "expression": "send(reply, {reply, {:error, Error.new(:custodian_failure)}})\n\n          {:DOWN, ^caller_ref, :process, ^caller, _} ->\n            :ok",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 263,
+              "line": 307,
               "expression": "true -> run_worker(context, callback)\n    end\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 276,
+              "line": 320,
               "expression": "watch_owner(caller, reply, context, callback)\n      end)\n\n    try do"
             }
           ]
@@ -5444,37 +5454,37 @@
         {
           "rule_id": "custody/custodian_failure",
           "path": "lib/request_seal/custody.ex",
-          "line": 365,
+          "line": 409,
           "expression": "send(reply, {reply, {:error, Error.new(:custodian_failure)}})\n\n      {:cancel, ^reply} ->\n        stop_runner(runner)",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 263,
+              "line": 307,
               "expression": "true -> run_worker(context, callback)\n    end\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 276,
+              "line": 320,
               "expression": "watch_owner(caller, reply, context, callback)\n      end)\n\n    try do"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 346,
+              "line": 390,
               "expression": "watch_runner(caller, caller_ref, owner_ref, reply, context, runner)\n        end\n    end\n  end"
             }
           ]
@@ -5482,37 +5492,37 @@
         {
           "rule_id": "custody/deadline_exceeded",
           "path": "lib/request_seal/custody.ex",
-          "line": 378,
+          "line": 422,
           "expression": "send(reply, {reply, {:error, Error.new(:deadline_exceeded)}})\n        end\n    end\n  end",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 263,
+              "line": 307,
               "expression": "true -> run_worker(context, callback)\n    end\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 276,
+              "line": 320,
               "expression": "watch_owner(caller, reply, context, callback)\n      end)\n\n    try do"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 346,
+              "line": 390,
               "expression": "watch_runner(caller, caller_ref, owner_ref, reply, context, runner)\n        end\n    end\n  end"
             }
           ]
@@ -5520,32 +5530,32 @@
         {
           "rule_id": "custody/deadline_exceeded",
           "path": "lib/request_seal/custody.ex",
-          "line": 294,
+          "line": 338,
           "expression": "else: {:error, Error.new(:deadline_exceeded)}\n\n      {:DOWN, ^monitor, :process, ^worker, _} ->\n        {:error, Error.new(:custodian_failure)}",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 263,
+              "line": 307,
               "expression": "true -> run_worker(context, callback)\n    end\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 280,
+              "line": 324,
               "expression": "receive_result(context, worker, monitor, reply)\n    after\n      :erlang.unalias(reply)\n      flush(reply)"
             }
           ]
@@ -5553,32 +5563,32 @@
         {
           "rule_id": "custody/custodian_failure",
           "path": "lib/request_seal/custody.ex",
-          "line": 297,
+          "line": 341,
           "expression": "{:error, Error.new(:custodian_failure)}\n    after\n      context |> Context.remaining() |> max(0) |> min(4_294_967_295) ->\n        if Context.remaining(context) > 0 do",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 263,
+              "line": 307,
               "expression": "true -> run_worker(context, callback)\n    end\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 280,
+              "line": 324,
               "expression": "receive_result(context, worker, monitor, reply)\n    after\n      :erlang.unalias(reply)\n      flush(reply)"
             }
           ]
@@ -5586,32 +5596,32 @@
         {
           "rule_id": "custody/deadline_exceeded",
           "path": "lib/request_seal/custody.ex",
-          "line": 306,
+          "line": 350,
           "expression": "{:error, Error.new(:deadline_exceeded)}\n        end\n    end\n  end",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 263,
+              "line": 307,
               "expression": "true -> run_worker(context, callback)\n    end\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 280,
+              "line": 324,
               "expression": "receive_result(context, worker, monitor, reply)\n    after\n      :erlang.unalias(reply)\n      flush(reply)"
             }
           ]
@@ -5619,22 +5629,22 @@
         {
           "rule_id": "custody/invalid_options",
           "path": "lib/request_seal/custody.ex",
-          "line": 267,
+          "line": 311,
           "expression": "def run(_, _), do: {:error, Error.new(:invalid_options)}\n\n  defp run_worker(context, callback) do\n    caller = self()",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             }
           ]
@@ -5642,27 +5652,27 @@
         {
           "rule_id": "custody/custodian_failure",
           "path": "lib/request_seal/custody.ex",
-          "line": 212,
+          "line": 256,
           "expression": "defp normalize(_, _), do: {:error, Error.new(:custodian_failure)}\n\n  @doc \"\"\"\n  Run a zero-arity callback in a sensitive process under an absolute deadline.",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 168,
+              "line": 212,
               "expression": "normalize(:verify, result)\n  end\n\n  defp invoke(handle, op, args, context) when op in [:sign, :unwrap],"
             }
           ]
@@ -5670,27 +5680,27 @@
         {
           "rule_id": "custody/invalid_signing_output",
           "path": "lib/request_seal/custody.ex",
-          "line": 187,
+          "line": 231,
           "expression": "defp normalize(:sign, {:ok, _}), do: {:error, Error.new(:invalid_signing_output)}\n\n  defp normalize(:unwrap, {:ok, bytes}) when is_binary(bytes) and byte_size(bytes) in 1..1024,\n    do: {:ok, bytes}",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 173,
+              "line": 217,
               "expression": "normalize(\n        op,\n        apply(handle.custodian, op, [handle.ref, handle.algorithm | args] ++ [context])\n      )"
             }
           ]
@@ -5698,27 +5708,27 @@
         {
           "rule_id": "custody/decryption_failed",
           "path": "lib/request_seal/custody.ex",
-          "line": 192,
+          "line": 236,
           "expression": "defp normalize(:unwrap, {:ok, <<>>}), do: {:error, Error.new(:decryption_failed)}\n\n  defp normalize(:public_key, {:ok, %PublicKey{} = public}) do\n    PublicKey.validate!(public)",
           "via": [
             {
               "path": "lib/request_seal/custody/ssh_agent.ex",
-              "line": 58,
+              "line": 67,
               "expression": "Custody.sign(provisional, \"\", opts) |> unwrap()\n      {:ok, handle(algorithm, socket_path, public, true)}\n    end)\n  end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 77,
-              "expression": "operation(handle, :sign, opts, fn ->\n      data!(bytes)\n      [bytes]\n    end)"
+              "line": 99,
+              "expression": "operation(\n      handle,\n      :sign,\n      opts,"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 116,
+              "line": 157,
               "expression": "case run(context, fn -> invoke(handle, op, args, context) end) do\n          {:ok, :ok} when op == :verify -> :ok\n          result -> result\n        end"
             },
             {
               "path": "lib/request_seal/custody.ex",
-              "line": 173,
+              "line": 217,
               "expression": "normalize(\n        op,\n        apply(handle.custodian, op, [handle.ref, handle.algorithm | args] ++ [context])\n      )"
             }
           ]
@@ -5726,7 +5736,7 @@
         {
           "rule_id": "custody/custodian_failure",
           "path": "lib/request_seal/custody.ex",
-          "line": 385,
+          "line": 429,
           "expression": "defp run_result(_), do: {:error, Error.new(:custodian_failure)}\n\n  defp stop_runner(runner) do\n    Process.exit(runner, :kill)",
           "via": []
         },
@@ -5784,7 +5794,7 @@
           "via": [
             {
               "path": "lib/request_seal/custody/local.ex",
-              "line": 180,
+              "line": 181,
               "expression": "Support.safe(\n      fn ->\n        ensure(match?(%KeyHandle{custodian: __MODULE__}, handle), :invalid_handle)\n        ensure(map_size(handle) == 5 and is_function(handle.ref, 0), :invalid_handle)"
             }
           ]
@@ -5797,7 +5807,7 @@
           "via": [
             {
               "path": "lib/request_seal/custody/local.ex",
-              "line": 180,
+              "line": 181,
               "expression": "Support.safe(\n      fn ->\n        ensure(match?(%KeyHandle{custodian: __MODULE__}, handle), :invalid_handle)\n        ensure(map_size(handle) == 5 and is_function(handle.ref, 0), :invalid_handle)"
             }
           ]
@@ -8925,6 +8935,11 @@
       "kind": "crypto",
       "reason": "invalid_key",
       "rule_id": "crypto/invalid_key"
+    },
+    {
+      "kind": "crypto",
+      "reason": "invalid_options",
+      "rule_id": "crypto/invalid_options"
     },
     {
       "kind": "crypto",

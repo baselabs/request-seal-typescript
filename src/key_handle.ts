@@ -1,3 +1,4 @@
+import {byteLimit} from './crypto/options.ts';
 import {snapshotOptions} from './brand.ts';
 import {
   withDeadline,
@@ -6,7 +7,7 @@ import {
   run,
   type Context,
 } from './context.ts';
-import {SIGNATURE_MAX_BYTES, CUSTODY_SIGNATURE_MAX_BYTES} from './constants.ts';
+import {CRYPTO_MAX_BYTES_CEILING, SIGNATURE_MAX_BYTES, CUSTODY_SIGNATURE_MAX_BYTES} from './constants.ts';
 import {custodyError, isRequestSealError} from './errors/types.ts';
 import {ok, err, type Result} from './result.ts';
 import {
@@ -26,12 +27,14 @@ export type KeyHandle = Readonly<{
     algorithm: unknown,
     data: unknown,
     context: Context,
+    options?: unknown,
   ) => Promise<Result<Uint8Array<ArrayBuffer>>>;
   verify: (
     algorithm: unknown,
     signature: unknown,
     data: unknown,
     context: Context,
+    options?: unknown,
   ) => Promise<Result<true>>;
   publicKey: (context?: Context) => Promise<Result<PublicKey>>;
   identity: (context?: Context) => Promise<Result<KeyIdentity>>;
@@ -127,20 +130,23 @@ class ManagedHandle implements KeyHandle {
     algorithm: unknown,
     data: unknown,
     context: Context,
+    options: unknown = {},
   ): Promise<Result<Uint8Array<ArrayBuffer>>> {
+    const maximum = byteLimit(options);
+    if (!maximum.ok) return err(custodyError('invalid_options'));
     try {
       if (!this.#port) return err(custodyError('key_not_found'));
       if (!isContext(context)) return err(custodyError('invalid_options'));
       if (!this.#matches(algorithm)) return err(custodyError('key_mismatch'));
       if (!this.capabilities.includes('sign')) return err(custodyError('unsupported_operation'));
-      const bytes = dataBytes(data);
+      const bytes = dataBytes(data, maximum.value);
       if (!bytes.ok) return err(custodyError('invalid_data'));
       return this.#invoke(
         'sign',
         context,
         async (p, c) => {
           try {
-            return await p.sign(this.algorithm, bytes.value, c);
+            return await p.sign(this.algorithm, bytes.value, c, {maxBytes: CRYPTO_MAX_BYTES_CEILING});
           } finally {
             bytes.value.fill(0);
           }
@@ -159,13 +165,16 @@ class ManagedHandle implements KeyHandle {
     signature: unknown,
     data: unknown,
     context: Context,
+    options: unknown = {},
   ): Promise<Result<true>> {
+    const maximum = byteLimit(options);
+    if (!maximum.ok) return err(custodyError('invalid_options'));
     try {
       if (!this.#port) return err(custodyError('key_not_found'));
       if (!isContext(context)) return err(custodyError('invalid_options'));
       if (!this.#matches(algorithm)) return err(custodyError('key_mismatch'));
       if (!this.capabilities.includes('verify')) return err(custodyError('unsupported_operation'));
-      const bytes = dataBytes(data);
+      const bytes = dataBytes(data, maximum.value);
       if (!bytes.ok) return err(custodyError('invalid_data'));
       if (!(signature instanceof Uint8Array))
         return err(custodyError('invalid_signature'));
@@ -177,7 +186,7 @@ class ManagedHandle implements KeyHandle {
         context,
         async (p, c) => {
           try {
-            return await p.verify(this.algorithm, copied, bytes.value, c);
+            return await p.verify(this.algorithm, copied, bytes.value, c, {maxBytes: CRYPTO_MAX_BYTES_CEILING});
           } finally {
             copied.fill(0);
             bytes.value.fill(0);
@@ -341,6 +350,7 @@ export function verifyHandle(
   signature: unknown,
   data: unknown,
   context: Context,
+  options: unknown = {},
 ): Promise<Result<true>> {
-  return managedVerify(key, algorithm, signature, data, context);
+  return managedVerify(key, algorithm, signature, data, context, options);
 }

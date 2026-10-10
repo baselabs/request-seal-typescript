@@ -1,4 +1,4 @@
-**Status:** development · **Kind:** overview · **Updated:** October 10, 2026 · **Governed by:** the public API and shared conformance corpus · **Review when:** package scope or installation changes
+**Status:** development · **Kind:** overview · **Updated:** October 10, 2026 · **Governed by:** RequestSeal v0.4.1 behavior and error vocabulary, and the shared v0.4.0 conformance corpus · **Review when:** package scope or installation changes
 
 # RequestSeal
 
@@ -149,7 +149,7 @@ allowlist. Exact-target, cookie, and per-occurrence byte coverage remain refused
 
 ## Compatibility
 
-Compatibility is checked against the byte-preserved RequestSeal `v0.4.0` corpus. See [the corpus pin and update command](CONTRIBUTING.md). Development reports pending surfaces; releases require complete coverage.
+Crypto and custody behavior and the error vocabulary follow RequestSeal `v0.4.1`. Compatibility is checked against the byte-preserved RequestSeal `v0.4.0` corpus. The pins differ because the corpus index is unchanged and v0.4.1 supplied no corpus release assets. See [the corpus pin and update command](CONTRIBUTING.md). Development reports pending surfaces; releases require complete coverage.
 
 Node 22.12.0 and 24.21.0 and Deno 2.5.6 verify the pinned published vectors.
 Bun 1.3.14 WebCrypto rejects two valid Wycheproof ECDSA P-256 signatures:

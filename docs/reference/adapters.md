@@ -272,9 +272,9 @@ certifies a decoded body as the wire content.
 ## Reference divergences
 
 The following adapter choices differ from, or are not decided by, the Elixir
-v0.4.0 framework boundaries:
+v0.4.1 framework boundaries:
 
-The references below are source observations at tag `v0.4.0`; line numbers
+The references below are source observations at tag `v0.4.1`; line numbers
 refer to files under `lib/request_seal/`.
 
 - GET or HEAD body signing is refused here. The Finch and Req translations pass
@@ -322,9 +322,18 @@ RS256 uses OpenSSH flag 2 (rsa-sha2-256). PSS and HMAC reject. Selection compare
 exact public components, never comments or identity-list positions. Every sign
 opens a fresh connection, checks current identities, parses bounded frames,
 converts ECDSA mpints to fixed-width r || s, and verifies the returned signature
-with the trusted public key before release. Frames are bounded to 1 MiB,
+with the trusted public key before release. Receive frames are bounded to 1 MiB,
 identity lists to 256, blobs/comments to 16 KiB. Deadline, cancellation, and
 release close owned sockets. Errors carry no socket path or agent diagnostics.
+
+Signing and verification accept trailing `{maxBytes}` options on the handle,
+with a 1 MiB default and a 16 MiB ceiling. Outgoing requests have no additional
+library frame bound. The real agent retains its own limit; a post-send closure
+returns `custodian_protocol`. The live test signs a 262,000-byte payload,
+measures the agent's accepted/refused boundary, and checks larger requests are
+forwarded and refused by the peer. No specific boundary count is required.
+See [the v0.4.1 custodian](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/custody/ssh_agent.ex).
+The shared corpus remains v0.4.0, unchanged between these releases.
 
 Unknown construction keys return custodian_rejected; removed operational keys
 return key_not_found; failed connection establishment returns custodian_unavailable;

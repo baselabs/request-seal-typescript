@@ -1,5 +1,5 @@
 import {byteString} from '../bytes.ts';
-import {SIGNATURE_BASE_MAX_BYTES, SIGNATURE_MAX_BYTES} from '../constants.ts';
+import {CRYPTO_DEFAULT_MAX_BYTES, SIGNATURE_MAX_BYTES} from '../constants.ts';
 import {cryptoError} from '../errors/types.ts';
 import {err, ok, type Result} from '../result.ts';
 import {
@@ -9,15 +9,20 @@ import {
   type Spec,
 } from './algorithm.ts';
 import * as subtle from './subtle.ts';
-export function dataBytes(input: unknown): Result<Uint8Array<ArrayBuffer>> {
+// Caller properties can shadow length and byteLength; capture the shared TypedArray getter.
+// Uint16Array reaches that intrinsic even when Uint8Array allocations are instrumented.
+const byteLength = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint16Array.prototype), 'byteLength')!.get!;
+export function boundedBinary(input: unknown, maximum: number): input is Uint8Array {
+  try {return input instanceof Uint8Array && byteLength.call(input) <= maximum;} catch {return false;}
+}
+export function dataBytes(input: unknown, maximum = CRYPTO_DEFAULT_MAX_BYTES): Result<Uint8Array<ArrayBuffer>> {
   try {
     if (
-      (!(input instanceof Uint8Array) && typeof input !== 'string') ||
-      (input as Uint8Array | string).length > SIGNATURE_BASE_MAX_BYTES
+      !(typeof input === 'string' ? input.length <= maximum : boundedBinary(input, maximum))
     )
       return err(cryptoError('invalid_data'));
     const r = byteString(input);
-    return r.ok ? r : err(cryptoError('invalid_data'));
+    return r.ok && r.value.length <= maximum ? r : err(cryptoError('invalid_data'));
   } catch {
     return err(cryptoError('invalid_data'));
   }
@@ -69,8 +74,9 @@ export async function signKey(
   spec: Spec,
   key: CryptoKey,
   input: unknown,
+  maximum = CRYPTO_DEFAULT_MAX_BYTES,
 ): Promise<Result<Uint8Array<ArrayBuffer>>> {
-  const data = dataBytes(input);
+  const data = dataBytes(input, maximum);
   if (!data.ok) return data;
   try {
     if (!bound(spec, key, 'sign')) return err(cryptoError('key_mismatch'));
@@ -91,8 +97,9 @@ export async function verifyKey(
   key: CryptoKey,
   signature: unknown,
   input: unknown,
+  maximum = CRYPTO_DEFAULT_MAX_BYTES,
 ): Promise<Result<true>> {
-  const data = dataBytes(input);
+  const data = dataBytes(input, maximum);
   if (!data.ok) return data;
   try {
     if (!bound(spec, key, 'verify')) return err(cryptoError('key_mismatch'));

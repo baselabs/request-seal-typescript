@@ -1,8 +1,10 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** Elixir release 0.4.0 at b2392871933d99641a7cb2ca2726aefd20081dee · **Review when:** the shared error vocabulary changes
+**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** Elixir release 0.4.1 at 0a6568aa246326617f760e94e21b359285c6ddfc · **Review when:** the shared error vocabulary changes
 
 # Error parity
 
-OBSERVED: extraction with `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts b2392871933d99641a7cb2ca2726aefd20081dee <output.json>` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
+OBSERVED: extraction with `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 0a6568aa246326617f760e94e21b359285c6ddfc <output.json>` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
+
+The error vocabulary is pinned to v0.4.1; the shared corpus stays at v0.4.0. The corpus index is byte-identical between those tags, and v0.4.1 supplied no corpus release assets. These pins track different artifacts.
 
 Extension-profile reasons are defined by extension packages and arrive with the profile row. The core layer union does not include `profile`.
 
@@ -141,6 +143,7 @@ Results are frozen on construction. `deepFreeze` returns a Result containing a s
 | digest |  | unsupported_algorithm | digest/unsupported_algorithm |
 | crypto |  | invalid_data | crypto/invalid_data |
 | crypto |  | invalid_key | crypto/invalid_key |
+| crypto |  | invalid_options | crypto/invalid_options |
 | crypto |  | invalid_signature | crypto/invalid_signature |
 | crypto |  | key_mismatch | crypto/key_mismatch |
 | crypto |  | unsupported_algorithm | crypto/unsupported_algorithm |

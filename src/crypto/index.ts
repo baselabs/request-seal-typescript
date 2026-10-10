@@ -1,4 +1,5 @@
-import {SIGNATURE_MAX_BYTES} from '../constants.ts';
+import {byteLimit} from './options.ts';
+import {CRYPTO_MAX_BYTES_CEILING, SIGNATURE_MAX_BYTES} from '../constants.ts';
 import {err, type Result} from '../result.ts';
 import {cryptoError} from '../errors/types.ts';
 import {isKeyHandle, verifyHandle} from '../key_handle.ts';
@@ -17,6 +18,7 @@ function normalize<T>(r: Result<T>): Result<T> {
         'unsupported_algorithm',
         'unsupported_format',
         'invalid_key',
+        'invalid_options',
         'key_mismatch',
         'invalid_data',
         'invalid_signature',
@@ -30,23 +32,29 @@ export async function sign(
   algorithm: unknown,
   key: unknown,
   data: unknown,
+  options: unknown = {},
 ): Promise<Result<Uint8Array<ArrayBuffer>>> {
+  const maximum = byteLimit(options);
+  if (!maximum.ok) return maximum;
   const spec = resolveAlgorithm(algorithm);
   if (!spec.ok) return spec;
   if (!isKeyHandle(key)) return err(cryptoError('invalid_key'));
   const c = withDeadline();
   if (!c.ok) return err(cryptoError('invalid_key'));
-  return normalize(await key.sign(algorithm, data, c.value));
+  return normalize(await key.sign(algorithm, data, c.value, {maxBytes: maximum.value}));
 }
 export async function verify(
   algorithm: unknown,
   key: unknown,
   signature: unknown,
   data: unknown,
+  options: unknown = {},
 ): Promise<Result<true>> {
+  const maximum = byteLimit(options);
+  if (!maximum.ok) return maximum;
   const spec = resolveAlgorithm(algorithm);
   if (!spec.ok) return spec;
-  const bytes = dataBytes(data);
+  const bytes = dataBytes(data, maximum.value);
   if (!bytes.ok) return bytes;
   try {
     if (isPublicKey(key)) {
@@ -63,11 +71,11 @@ export async function verify(
     )
       return err(cryptoError('invalid_signature'));
     if (isPublicKey(key))
-      return await verifyPublicKey(key, algorithm, signature, bytes.value);
+      return await verifyPublicKey(key, algorithm, signature, bytes.value, maximum.value);
     const c = withDeadline();
     if (!c.ok) return c;
     return normalize(
-      await verifyHandle(key, algorithm, signature, bytes.value, c.value),
+      await verifyHandle(key, algorithm, signature, bytes.value, c.value, {maxBytes: maximum.value}),
     );
   } catch {
     return err(cryptoError('invalid_signature'));
@@ -75,4 +83,5 @@ export async function verify(
     bytes.value.fill(0);
   }
 }
-export const Crypto = Object.freeze({algorithms, sign, verify});
+export function maxBytesCeiling(): number {return CRYPTO_MAX_BYTES_CEILING;}
+export const Crypto = Object.freeze({algorithms, sign, verify, maxBytesCeiling});

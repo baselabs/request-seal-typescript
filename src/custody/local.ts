@@ -1,5 +1,6 @@
 import {snapshotOptions} from '../brand.ts';
 import {
+  CRYPTO_MAX_BYTES_CEILING,
   HMAC_MIN_BYTES,
   HMAC_MAX_BYTES,
   KEY_MAX_BYTES,
@@ -21,7 +22,7 @@ import {
   importParameters,
   type Spec,
 } from '../crypto/algorithm.ts';
-import {signKey, verifyKey} from '../crypto/primitive.ts';
+import {boundedBinary, signKey, verifyKey} from '../crypto/primitive.ts';
 import * as subtle from '../crypto/subtle.ts';
 import {decodeKey, publicSpki, type DecodedKey} from './der.ts';
 import {
@@ -34,7 +35,8 @@ import {
   type Jwk,
 } from './jwk.ts';
 import {confineContentKey, type UnwrappedKey} from './content_key.ts';
-class LocalPort implements Custodian {
+/** @internal Direct custodian implementation; use the public factory for handles. */
+export class LocalPort implements Custodian {
   #key: CryptoKey | undefined;
   #verify: CryptoKey | undefined;
   #public: PublicKey | undefined;
@@ -59,8 +61,9 @@ class LocalPort implements Custodian {
     data: unknown,
     _context: Context,
   ): Promise<Result<Uint8Array<ArrayBuffer>>> {
+    if (!boundedBinary(data, CRYPTO_MAX_BYTES_CEILING)) return err(custodyError('invalid_data'));
     return this.#key
-      ? signKey(this.#spec, this.#key, data)
+      ? signKey(this.#spec, this.#key, data, CRYPTO_MAX_BYTES_CEILING)
       : err(custodyError('key_not_found'));
   }
   async verify(
@@ -69,8 +72,9 @@ class LocalPort implements Custodian {
     data: unknown,
     _context: Context,
   ): Promise<Result<true>> {
+    if (!boundedBinary(data, CRYPTO_MAX_BYTES_CEILING)) return err(custodyError('invalid_data'));
     return this.#verify
-      ? verifyKey(this.#spec, this.#verify, signature, data)
+      ? verifyKey(this.#spec, this.#verify, signature, data, CRYPTO_MAX_BYTES_CEILING)
       : err(custodyError('key_not_found'));
   }
   async publicKey(): Promise<Result<PublicKey>> {

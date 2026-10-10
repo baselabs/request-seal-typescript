@@ -13,10 +13,10 @@ test('native CI test lanes glob the same root test files as npm', () => {
 });
 test('CI reextracts pinned Elixir errors with the reference repository', () => {
   const source = read('.github/workflows/ci.yml');
-  assert.match(source, /git clone --depth 1 --branch v0\.4\.0 https:\/\/github.com\/baselabs\/request_seal/);
+  assert.match(source, /git clone --depth 1 --branch v0\.4\.1 https:\/\/github.com\/baselabs\/request_seal/);
   assert.match(source, /REQUEST_SEAL_REPO:.*runner\.temp/);
   assert.match(source, /--test test\/extract-elixir-reasons\.ts/);
-  assert.match(source, /b2392871933d99641a7cb2ca2726aefd20081dee/);
+  assert.match(source, /0a6568aa246326617f760e94e21b359285c6ddfc/);
 });
 
 test('parity table regeneration preserves helpers after the entries terminator', () => {
@@ -26,11 +26,11 @@ test('parity table regeneration preserves helpers after the entries terminator',
     const source = read('src/errors/parity.ts').replace('] as const;', '] as const;\nconst plantedHelper = 42;');
     writeFileSync(join(root, 'src/errors/parity.ts'), source);
     const prefix = Object.hasOwn(process.versions, 'deno') ? ['run', '--allow-read', '--allow-write'] : Object.hasOwn(process.versions, 'bun') ? ['run'] : ['--experimental-strip-types', '--no-warnings'];
-    const child = spawnSync(process.execPath, [...prefix, resolve('scripts/render-parity.ts'), '--update-table', resolve('test/fixtures/elixir-reasons-b239287.json')], {cwd: root, encoding: 'utf8'});
+    const child = spawnSync(process.execPath, [...prefix, resolve('scripts/render-parity.ts'), '--update-table', resolve('test/fixtures/elixir-reasons-0a6568a.json')], {cwd: root, encoding: 'utf8'});
     assert.equal(child.status, 0, child.stdout + child.stderr);
     assert.ok(read(join(root, 'src/errors/parity.ts')).includes('const plantedHelper = 42;'));
     const first = read(join(root, 'src/errors/parity.ts'));
-    const again = spawnSync(process.execPath, [...prefix, resolve('scripts/render-parity.ts'), '--update-table', resolve('test/fixtures/elixir-reasons-b239287.json')], {cwd: root, encoding: 'utf8'});
+    const again = spawnSync(process.execPath, [...prefix, resolve('scripts/render-parity.ts'), '--update-table', resolve('test/fixtures/elixir-reasons-0a6568a.json')], {cwd: root, encoding: 'utf8'});
     assert.equal(again.status, 0, again.stdout + again.stderr);
     assert.equal(read(join(root, 'src/errors/parity.ts')), first, 'second regeneration must preserve identical bytes');
   } finally {rmSync(root, {recursive: true, force: true});}

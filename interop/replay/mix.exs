@@ -7,8 +7,8 @@ defmodule RequestSealReplayInterop.MixProject do
       # Keep the exact Elixir/OTP pair in sync with .tool-versions and the peer CI setup.
       elixir: "1.20.3",
       deps: [
-        # Exact conformance peer identity, matching the vendored release.
-        {:request_seal, "== 0.4.0"},
+        # Exact conformance peer identity, matching the error vocabulary release; corpus remains v0.4.0.
+        {:request_seal, "== 0.4.1"},
         {:postgrex, "~> 0.22.4"}
       ]
     ]

@@ -1,3 +1,4 @@
+import {CRYPTO_DEFAULT_MAX_BYTES} from './constants.ts';
 import {encodeUtf8} from './runtime.ts';
 import {ok, err, type Result} from './result.ts';
 import {cryptoError} from './errors/types.ts';
@@ -17,6 +18,7 @@ import {
   permitted,
   type Jwk,
 } from './custody/jwk.ts';
+const verifiers = new WeakMap<object, (algorithm: unknown, signature: unknown, data: unknown, maximum: number) => Promise<Result<true>>>();
 const branded = new WeakSet<object>();
 const token = Object.freeze({});
 export function isPublicKey(value: unknown): value is PublicKey {
@@ -37,6 +39,7 @@ export class PublicKey {
     this.#jwk = jwk;
     this.#pssOnly = pssOnly;
     this.#spki = new Uint8Array(spki);
+    verifiers.set(this, this.#verify.bind(this));
     branded.add(this);
     Object.freeze(this);
   }
@@ -142,10 +145,14 @@ export class PublicKey {
       ? ok(true)
       : err(cryptoError('key_mismatch'));
   }
-  async verify(
+  async verify(algorithm: unknown, signature: unknown, data: unknown): Promise<Result<true>> {
+    return this.#verify(algorithm, signature, data, CRYPTO_DEFAULT_MAX_BYTES);
+  }
+  async #verify(
     algorithm: unknown,
     signature: unknown,
     data: unknown,
+    maximum: number,
   ): Promise<Result<true>> {
     const resolved = resolveAlgorithm(algorithm);
     if (!resolved.ok) return resolved;
@@ -163,7 +170,7 @@ export class PublicKey {
         false,
         ['verify'],
       );
-      return await verifyKey(spec, key, signature, data);
+      return await verifyKey(spec, key, signature, data, maximum);
     } catch {
       return err(cryptoError('invalid_key'));
     }
@@ -181,15 +188,16 @@ export class PublicKey {
 
 Object.freeze(PublicKey.prototype);
 Object.freeze(PublicKey);
-const publicVerify = Function.prototype.call.bind(PublicKey.prototype.verify);
 const publicBind = Function.prototype.call.bind(PublicKey.prototype.bind);
 export function verifyPublicKey(
   key: PublicKey,
   algorithm: unknown,
   signature: unknown,
   data: unknown,
+  maximum = CRYPTO_DEFAULT_MAX_BYTES,
 ): Promise<Result<true>> {
-  return publicVerify(key, algorithm, signature, data);
+  const verify = verifiers.get(key);
+  return verify ? verify(algorithm, signature, data, maximum) : Promise.resolve(err(cryptoError('invalid_key')));
 }
 export function bindPublicKey(
   key: PublicKey,

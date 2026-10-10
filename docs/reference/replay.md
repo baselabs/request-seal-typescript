@@ -132,7 +132,10 @@ For real database checks, install the isolated driver with
 `npm test`. Without the URL, local PostgreSQL tests print their skip reason; when `CI` is set,
 they fail instead. Cross-language
 checks additionally require `REQUESTSEAL_REPLAY_ELIXIR=1` and dependencies installed
-with `mix deps.get` in `interop/replay`; the peer pins published RequestSeal 0.4.0.
+with `mix deps.get` in `interop/replay`; the peer pins published RequestSeal 0.4.1. Its lock checksum is
+`834b005ddebd610e647c42f934c3120a659b7f316cdf81f9a064037194daef02`.
+The peer and error vocabulary follow v0.4.1; the corpus stays v0.4.0 because
+its index is byte-identical between the tags and v0.4.1 supplied no corpus assets.
 
 `ddl()` preserves the reference table definition byte for byte. For a large table,
 the caller may add an index on `retain_until`; otherwise retention sweep scans the

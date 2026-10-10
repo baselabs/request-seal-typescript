@@ -1,5 +1,5 @@
-// Derived from pinned Elixir constructors and call sites; regenerate with scripts/render-parity.ts --update-table.
-export const ELIXIR_ERROR_PIN = 'b2392871933d99641a7cb2ca2726aefd20081dee';
+// Derived from pinned Elixir constructors and call sites; regenerate with scripts/generate-parity.ts.
+export const ELIXIR_ERROR_PIN = '0a6568aa246326617f760e94e21b359285c6ddfc';
 const entries = [
   {
     "kind": "core",
@@ -704,6 +704,11 @@ const entries = [
     "kind": "crypto",
     "reason": "invalid_key",
     "rule_id": "crypto/invalid_key"
+  },
+  {
+    "kind": "crypto",
+    "reason": "invalid_options",
+    "rule_id": "crypto/invalid_options"
   },
   {
     "kind": "crypto",
@@ -1711,6 +1716,10 @@ const retryableRules = {
       "value": false
     },
     "invalid_key": {
+      "kind": "constant",
+      "value": false
+    },
+    "invalid_options": {
       "kind": "constant",
       "value": false
     },
