@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {spawnWithEnvSync} from './support/child-env.ts';
 import {createHash} from 'node:crypto';
-import {runCorpus, canonicalJson, surfaceRegistry, matches, type CorpusCase} from '../tools/conformance/loader.ts';
+import {runCorpus, canonicalJson, surfaceRegistry, matches, type CorpusCase, type CorpusReport} from '../tools/conformance/loader.ts';
 const prefix = Object.hasOwn(process.versions, 'deno') ? ['run', '--allow-read'] : Object.hasOwn(process.versions, 'bun') ? ['run'] : ['--experimental-strip-types', '--no-warnings'];
 async function copy(action: (root: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), 'request-seal-vendor-test-'));
@@ -26,23 +26,48 @@ test('vendored release inventory ties out implemented and pending items', {timeo
   assert.equal(report.listed, report.executed + report.not_applicable + report.runtime_limited + report.pending.reduce((n, p) => n + p.items, 0));
   assert.equal(report.cases, 173);
   assert.equal(report.listed, 3064);
-  // Foundation/wire/crypto/sign: 2,652; JOSE: 309; discovery.body: 4; replay.claim: 11; quorum.verify: 2; accept_signature.parse: 1; web_bot_auth.verify: 14.
-  // 3,064 listed = 2,993 executed/runtime-limited + 62 not applicable + 9 pending.
-  assert.equal(report.executed + report.runtime_limited, 2993);
+  // Foundation/wire/crypto/sign: 2,652; JOSE: 309; discovery.body: 4; replay.claim: 11; quorum.verify: 2; accept_signature.parse: 1; web_bot_auth.verify: 14; profile.name: 9.
+  // 3,064 listed = 3,002 executed/runtime-limited + 62 not applicable; zero pending.
+  assert.equal(report.executed + report.runtime_limited, 3002);
   assert.equal(report.not_applicable, 62);
-  assert.deepEqual(report.pending.map(({ids, ...entry}) => entry), [
-    {surface: 'profile.name', cases: 9, items: 9},
-  ]);
+  assert.deepEqual(report.pending, []);
   const expected = JSON.parse(await readFile('tools/conformance/pending.json', 'utf8'));
   assert.deepEqual(report.pending, expected);
 });
-test('pending release surfaces fail closed; CLI flag only permits pending', {timeout: 90_000}, async () => {
-  for (const pendingOk of [false, true]) {
-    const child = spawnSync(process.execPath, [...prefix, 'tools/conformance/cli.ts', '--corpus', 'conformance', ...(pendingOk ? ['--pending-ok'] : [])], {encoding: 'utf8', timeout: 30_000});
-    assert.equal(child.status, pendingOk ? 0 : 1, child.stdout + child.stderr);
-    const report = JSON.parse(child.stdout);
-    assert.equal(report.ok, pendingOk); assert.ok(report.pending.length > 0);
+/** Exercise the real CLI in an owned copy when mutating its committed allowlist.
+ * The live loader and corpus remain untouched while other tests run.
+ */
+async function pendingCli(corpus: string, pendingOk: boolean, unregister: boolean): Promise<{status: number | null; report: CorpusReport}> {
+  const root = await mkdtemp(resolve('test/.tmp-profile-pending-'));
+  try {
+    await cp(resolve('src'), join(root, 'src'), {recursive: true});
+    await cp(resolve('tools'), join(root, 'tools'), {recursive: true});
+    await writeFile(join(root, 'package.json'), '{"type":"module"}');
+    const index = JSON.parse(await readFile('conformance/index.json', 'utf8'));
+    const ids = index.cases.filter((c: any) => c.surface === 'profile.name').map((c: any) => c.id);
+    await writeFile(join(root, 'tools/conformance/pending.json'), canonicalJson([{surface:'profile.name',cases:ids.length,items:ids.length,ids}]));
+    if (unregister) {
+      const path = join(root, 'tools/conformance/loader.ts');
+      const source = await readFile(path, 'utf8');
+      const entry = '    ["profile.name", profileSurface, ["core","custody"]],\n';
+      assert.ok(source.includes(entry));
+      await writeFile(path, source.replace(entry, ''));
+    }
+    const child = spawnSync(process.execPath, [...prefix, join(root, 'tools/conformance/cli.ts'), '--corpus', resolve(corpus), '--unpinned', ...(pendingOk ? ['--pending-ok'] : [])], {encoding:'utf8',timeout:30_000});
+    assert.ok(child.stdout, child.stderr);
+    return {status:child.status, report:JSON.parse(child.stdout)};
+  } finally {await rm(root, {recursive:true,force:true});}
+}
+test('pending release surfaces fail closed; CLI flag only permits exact pending', {timeout:90_000}, async () => {
+  for (const pendingOk of [false,true]) {
+    const {status,report} = await pendingCli('conformance', pendingOk, true);
+    assert.equal(status, pendingOk ? 0 : 1, canonicalJson(report));
+    assert.equal(report.ok, pendingOk); assert.equal(report.pending[0]!.items, 9);
     assert.equal(report.known_positive_executed, true);
+    if (!pendingOk) assert.ok(report.failures.some((f: any) => f.reason === 'pending_surface'));
+    const complete = spawnSync(process.execPath, [...prefix, 'tools/conformance/cli.ts', '--corpus', 'conformance', ...(pendingOk ? ['--pending-ok'] : [])], {encoding:'utf8',timeout:30_000});
+    assert.equal(complete.status,0,complete.stdout+complete.stderr);
+    assert.deepEqual(JSON.parse(complete.stdout).pending,[]);
   }
 });
 for (const path of ['index.json', 'sources/httpwg-structured-fields/binary.json']) test(`vendored byte tamper: ${path}`, {timeout: 90_000}, async () => {
@@ -161,7 +186,8 @@ test('pending permission rejects changed pending counts', {timeout: 90_000}, asy
   await copy(async root => {
     await rewrite(root, 'cases/verify/invalid-policy.json', m => {m.surface = 'profile.name';});
     await rewrite(root, 'index.json', i => {i.cases.find((c: any) => c.id === 'verify/invalid-policy').surface = 'profile.name';});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const {report,status} = await pendingCli(root, true, true);
+    assert.equal(status, 1);
     assert.equal(report.ok, false);
     assert.ok(report.failures.some(f => f.reason === 'pending_count_mismatch'));
   });
@@ -258,7 +284,7 @@ for (const path of ['cases/jwe/aes_gcm_test.json', 'cases/jwe/rsa_oaep_2048_sha2
       assert.equal(report.not_applicable, 63, canonicalJson(report));
       assert.equal(report.ok, true, canonicalJson(report));
       // One newly excluded item leaves each registered Wycheproof batch format.
-      assert.equal(report.executed + report.runtime_limited, 2992);
+      assert.equal(report.executed + report.runtime_limited, 3001);
       assert.ok(report.failures.every(f => !['invalid_overrides', 'unexpected_item_shape', 'not_applicable_count'].includes(f.reason)));
     });
   });
@@ -413,19 +439,11 @@ test('smoke rejection matching declares its JOSE error family', async () => {
   assert.ok(matches({...manifest, expected: {rule_id: 'jose/input.invalid_base64'}}, err(joseError('invalid_base64', 'input'))));
   for (const [name, surface] of surfaceRegistry()) assert.ok(surface.errorKinds?.length, name);
 });
-test('pending permission rejects stale entries even when no surfaces remain pending', {timeout: 30_000}, async () => {
-  await copy(async root => {
-    await rewrite(root, 'index.json', i => {
-      const removed = i.cases.filter((c: any) => ['profile.name', 'web_bot_auth.verify'].includes(c.surface));
-      i.cases = i.cases.filter((c: any) => !removed.includes(c));
-      const paths = new Set(removed.map((c: any) => c.manifest));
-      i.files = i.files.filter((f: any) => !paths.has(f.path));
-    });
-    const original = JSON.parse(await readFile('conformance/index.json', 'utf8'));
-    for (const c of original.cases.filter((c: any) => ['profile.name','web_bot_auth.verify'].includes(c.surface))) await rm(join(root, c.manifest));
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
-    assert.ok(report.failures.some(f => f.reason === 'stale_pending_allowlist'), canonicalJson(report));
-  });
+test('pending permission rejects stale entries even when no surfaces remain pending', {timeout:30_000}, async () => {
+  const {status,report} = await pendingCli('conformance', true, false);
+  assert.equal(status,1);
+  assert.deepEqual(report.pending,[]);
+  assert.ok(report.failures.some((f: any) => f.reason === 'stale_pending_allowlist'), canonicalJson(report));
 });
 
 test('malformed pending JSON reports the bounded allowlist diagnostic', async () => {

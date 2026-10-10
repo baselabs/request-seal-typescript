@@ -12,7 +12,7 @@ test("sign verify and content digest surfaces execute the shared corpus", {timeo
   const r = await runCorpus("conformance", { pendingOk: true });
   assert.equal(r.ok, true, canonicalJson(r));
   // JOSE adds 309 items to the signing registry; discovery four, replay eleven, quorum and negotiation three more; Web Bot Auth fourteen.
-  assert.equal(r.executed + r.runtime_limited, 2993);
+  assert.equal(r.executed + r.runtime_limited, 3002);
   assert.equal(
     r.pending.some((p) =>
       ["sign", "verify", "digest.content"].includes(p.surface),

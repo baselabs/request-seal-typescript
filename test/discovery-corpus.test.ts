@@ -18,7 +18,7 @@ test(
       report.pending.some((p) => p.surface === "discovery.body"),
       false,
     );
-    assert.equal(report.executed + report.runtime_limited, 2993);
+    assert.equal(report.executed + report.runtime_limited, 3002);
   },
 );
 

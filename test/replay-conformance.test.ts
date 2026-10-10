@@ -21,8 +21,8 @@ test('replay registration leaves pending and adds exactly eleven executed items'
   const report = await runCorpus('conformance', {pendingOk: true});
   assert.equal(report.pending.some(p => p.surface === 'replay.claim'), false);
   assert.equal(report.ok, true, JSON.stringify(report));
-  assert.equal(report.executed + report.runtime_limited, 2993);
-  assert.equal(report.pending.reduce((n,p) => n+p.items,0), 9);
+  assert.equal(report.executed + report.runtime_limited, 3002);
+  assert.equal(report.pending.reduce((n,p) => n+p.items,0), 0);
 });
 
 test('receipt retention drift rejects every successful corpus claim while preserving sweep and bound rejections', {timeout: 60000}, async () => {

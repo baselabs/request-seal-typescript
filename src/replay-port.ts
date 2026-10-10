@@ -30,7 +30,7 @@ export type ReplayFacts = Readonly<{
   tag: string | null;
   created: number | null;
   expires: number | null;
-  profile: Readonly<{ name: "rfc9421" }>;
+  profile: Readonly<{ name: "rfc9421" }> | import("./profile.ts").ProfileStamp;
 }>;
 
 /** Successful atomic claim; contains only public adapter identity and retention. */

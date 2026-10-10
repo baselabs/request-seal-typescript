@@ -143,6 +143,31 @@ export function fieldSchemas(
 export function isPolicy(value: unknown): value is Policy {
   return typeof value === "object" && value !== null && policies.has(value);
 }
+/** Internal shared freshness boundary for policies and extension preflight. */
+export function normalizeFreshness(input: unknown): Freshness | "not_evaluated" {
+  if (input === "not_evaluated") return input;
+      const f = snapshot(input, [
+        "clock",
+        "maxAge",
+        "skew",
+        "requireExpires",
+      ]);
+      ensure(
+        Object.keys(f).length === 4 &&
+          typeof f.clock === "function" &&
+          (f.maxAge === null || integer(f.maxAge, 1, CLOCK_MAX_SECONDS)) &&
+          integer(f.skew, 0, FRESHNESS_MAX_SKEW_SECONDS) &&
+          typeof f.requireExpires === "boolean",
+        "invalid_policy",
+        "input",
+      );
+      return Object.freeze({
+        clock: f.clock as () => number,
+        maxAge: f.maxAge as number | null,
+        skew: f.skew,
+        requireExpires: f.requireExpires,
+      });
+}
 export function createPolicy(input: unknown): Result<Policy> {
   try {
     const a = snapshot(input, [
@@ -176,30 +201,7 @@ export function createPolicy(input: unknown): Result<Policy> {
       "input",
     );
     ensure(typeof a.keyResolver === "function", "invalid_policy", "input");
-    let freshness: Policy["freshness"] = "not_evaluated";
-    if (a.freshness !== "not_evaluated") {
-      const f = snapshot(a.freshness, [
-        "clock",
-        "maxAge",
-        "skew",
-        "requireExpires",
-      ]);
-      ensure(
-        Object.keys(f).length === 4 &&
-          typeof f.clock === "function" &&
-          (f.maxAge === null || integer(f.maxAge, 1, CLOCK_MAX_SECONDS)) &&
-          integer(f.skew, 0, FRESHNESS_MAX_SKEW_SECONDS) &&
-          typeof f.requireExpires === "boolean",
-        "invalid_policy",
-        "input",
-      );
-      freshness = Object.freeze({
-        clock: f.clock as () => number,
-        maxAge: f.maxAge as number | null,
-        skew: f.skew,
-        requireExpires: f.requireExpires,
-      });
-    }
+    const freshness = normalizeFreshness(a.freshness);
     let content: Policy["content"] = "not_required";
     if (a.content !== "not_required") {
       const c = snapshot(a.content, ["kind", "algorithms", "section"]);

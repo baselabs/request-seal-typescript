@@ -195,7 +195,7 @@ test('platform-scoped limitations execute elsewhere and fail stale on this platf
     const executed = JSON.parse(elsewhere.stdout);
     assert.equal(executed.ok, true);
     assert.deepEqual(executed.failures, []);
-    assert.equal(executed.executed + executed.runtime_limited, 2993);
+    assert.equal(executed.executed + executed.runtime_limited, 3002);
     table[runtime][version].at(-1).platforms = [`${process.platform}-${process.arch}`];
     const child = await execute();
     assert.equal(child.status, 1, child.stderr || child.stdout);

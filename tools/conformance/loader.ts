@@ -1,3 +1,4 @@
+import {profileSurface} from "./profile-surface.ts";
 import {webBotAuthSurface} from './web-bot-auth.ts';
 import {quorumSurface,acceptSignatureSurface} from './quorum-surfaces.ts';
 import {replaySurface} from './replay-surfaces.ts';
@@ -152,6 +153,7 @@ const smoke: Surface = (manifest, resources) => {
 };
 export function surfaceRegistry(): ReadonlyMap<string, Surface> {
   const entries: [string, Surface, readonly ErrorKind[]][] = [
+    ["profile.name", profileSurface, ["core","custody"]],
     ['web_bot_auth.verify', webBotAuthSurface, ['core']],
     ['replay.claim', replaySurface, ['core','replay']], ['quorum.verify', quorumSurface, ['core','custody']],
     ['accept_signature.parse', acceptSignatureSurface, ['core']], ['smoke', smoke, ['jose']],

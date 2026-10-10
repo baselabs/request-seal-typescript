@@ -103,6 +103,24 @@ async function freshness(
     skew: policy.skew,
   });
 }
+/** Internal coverage/freshness pipeline shared by selected verification and preflight. */
+export async function authenticationPreflight(input: InnerList, components: InnerList, extra: Policy["extraComponents"], freshnessPolicy: Policy["freshness"] | (() => Policy["freshness"]), context: Context): Promise<Verification["freshness"]> {
+    const covered = new Set(identities(input)),
+      needed = new Set(identities(components));
+    ensure(
+      [...needed].every((id) => covered.has(id)),
+      "missing_required_component",
+      "policy",
+    );
+    ensure(
+      extra === "allow" ||
+        [...covered].every((id) => needed.has(id)),
+      "unexpected_component",
+      "policy",
+    );
+    return freshness(parameters(input), typeof freshnessPolicy === "function" ? freshnessPolicy() : freshnessPolicy, context);
+
+}
 async function content(
   m: HttpMessage,
   input: InnerList,
@@ -170,6 +188,7 @@ async function replay(
   fresh: Verification["freshness"],
   policy: Policy["replay"],
   context: Context,
+  profile: ReplayFacts["profile"],
 ): Promise<Verification["replay"]> {
   if (policy === "not_required") return policy;
   ensure(
@@ -194,7 +213,7 @@ async function replay(
     tag: (params.tag ?? null) as string | null,
     created: f.created,
     expires: f.expires,
-    profile: Object.freeze({ name: "rfc9421" }),
+    profile,
   });
   return commitReplay(facts, retainUntil, policy, context);
 }
@@ -260,12 +279,13 @@ export async function commitReplay<F>(
 /** Per-label cache; schemas remain part of the key so slot policies stay independent. */
 export type BaseCache = Map<string, ReturnType<typeof build>>;
 type ParsedCandidate = Readonly<{input: InnerList; signature: Item; baseCache: BaseCache}>;
-async function verifyLabel(
+export async function verifyLabel(
   message: unknown,
   policy: unknown,
   options: unknown,
   observeIdentity?: (identity: KeyIdentity) => void,
   parsed?: ParsedCandidate,
+  profile: ReplayFacts["profile"] = Object.freeze({name: "rfc9421"}),
 ): Promise<Result<Verification>> {
   try {
     // Reserved stamps have their own bounded reason even when other options reject.
@@ -327,20 +347,7 @@ async function verifyLabel(
       "limit",
       "input",
     );
-    const covered = new Set(identities(input)),
-      needed = new Set(identities(policy.components));
-    ensure(
-      [...needed].every((id) => covered.has(id)),
-      "missing_required_component",
-      "policy",
-    );
-    ensure(
-      policy.extraComponents === "allow" ||
-        [...covered].every((id) => needed.has(id)),
-      "unexpected_component",
-      "policy",
-    );
-    const fresh = await freshness(params, policy.freshness, c.value);
+    const fresh = await authenticationPreflight(input, policy.components, policy.extraComponents, policy.freshness, c.value);
     ensure(
       !Object.hasOwn(params, "alg") ||
         policy.algorithms.some(a => typeof a === "string" && a === params.alg),
@@ -457,7 +464,7 @@ async function verifyLabel(
       if (contentResult.error.kind === "core") throw contentResult.error;
       fail("digest_unsupported", "content");
     }
-    const replayFacts = await replay(params, algorithm, fresh, policy.replay, c.value);
+    const replayFacts = await replay(params, algorithm, fresh, policy.replay, c.value, profile);
     let identity: KeyIdentity | undefined;
     if (observeIdentity) {
       const id = await run(c.value, async () => {
@@ -480,14 +487,14 @@ async function verifyLabel(
         keyid: (params.keyid ?? null) as string | null,
         crypto: "valid",
       },
-      profile: {name: "rfc9421"}, content: contentResult.value, freshness: fresh,
+      profile, content: contentResult.value, freshness: fresh,
       replay: replayFacts, principal: "unattributed", authorization: "not_evaluated",
     });
     if (result.ok && identity) observeIdentity!(identity);
     return result;
   } catch (e) {
     if (isRequestSealError(e) && e.kind === "custody" && e.reason === "deadline_exceeded") return err(e);
-    return err(bounded(e, "invalid_options", "input"));
+    return err(bounded(e, typeof profile.name === "string" ? "invalid_options" : "invalid_policy", "input"));
   }
 }
 

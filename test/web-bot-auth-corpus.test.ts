@@ -60,10 +60,10 @@ test(
     }
     const report = await runCorpus("conformance", { pendingOk: true });
     assert.equal(report.ok, true, canonicalJson(report));
-    assert.equal(report.executed + report.runtime_limited, 2993);
+    assert.equal(report.executed + report.runtime_limited, 3002);
     assert.equal(
       report.pending.reduce((n, p) => n + p.items, 0),
-      9,
+      0,
     );
   },
 );

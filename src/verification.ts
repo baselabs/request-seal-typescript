@@ -23,7 +23,7 @@ export type Verification = Readonly<{
     keyid: string | null;
     crypto: "valid";
   }>;
-  profile: Readonly<{ name: "rfc9421" }> | import("./web-bot-auth/verification.ts").WebBotAuthProfile;
+  profile: Readonly<{ name: "rfc9421" }> | import("./web-bot-auth/verification.ts").WebBotAuthProfile | import("./profile.ts").ProfileStamp;
   content: "not_required" | DigestFacts;
   freshness: "not_evaluated" | FreshnessFacts;
   replay:
@@ -93,7 +93,8 @@ export function completed(value: Verification): Result<Verification> {
   Object.defineProperties(result, {
     toJSON: { value: inspect },
     [Symbol.for("nodejs.util.inspect.custom")]: { value: inspect },
-    [Symbol.for("Deno.customInspect")]: { value: inspect },
+    [Symbol.for("Deno.customInspect")]: { value: (render?: (value: unknown) => string) =>
+      typeof render === "function" ? render(inspect()) : inspect() },
   });
   Object.freeze(result);
   verifications.add(result);
@@ -155,7 +156,9 @@ export function verificationFacts(value: unknown): Result<unknown> {
       keyid: value.signature.keyid,
       crypto: "valid",
     },
-    profile: value.profile,
+    profile: Array.isArray(value.profile.name)
+      ? Object.fromEntries(Object.entries(value.profile).map(([k, v]) => [k, typeof v === "boolean" ? String(v) : v === null ? "nil" : v]))
+      : value.profile,
     content:
       value.content === "not_required"
         ? "not_required"
