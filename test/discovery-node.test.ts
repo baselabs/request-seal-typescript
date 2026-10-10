@@ -147,10 +147,14 @@ test(
   { timeout: 15000 },
   async (t) => {
     const { Discovery: NodeDiscovery } = await api();
+    let sent = 0;
     const p = await peer((_req, res) => {
+      const date = new Date();
+      sent = Math.floor(date.getTime() / 1000);
       res.writeHead(200, {
         "content-type": "application/jwk-set+json",
         "cache-control": "max-age=30",
+        date: date.toUTCString(),
       });
       res.end(jwks());
     });
@@ -161,7 +165,9 @@ test(
       const set = value(await NodeDiscovery.fetch(s));
       assert.deepEqual(Object.keys(set.keys), [kid]);
       assert.equal(set.proof, "not_applicable");
-      assert.equal(set.expiresAt - set.fetchedAt, 30);
+      // RFC 9111 Section 4.2.3: the lifetime is max-age less the apparent age,
+      // which is one second when the Date and the clock read straddle a second.
+      assert.equal(set.expiresAt - set.fetchedAt, 30 - Math.max(set.fetchedAt - sent, 0));
       assert.equal(p.requests, 1);
       p.ca.set(original);
       assert.equal(value(await set.keys[kid]!.key.thumbprint()), kid);
@@ -444,8 +450,11 @@ test(
   { timeout: 15000 },
   async (t) => {
     const { Discovery: NodeDiscovery } = await api();
-    let mode = "inline";
+    let mode = "inline", keysSent = 0;
     const p = await peer((q, r) => {
+      const date = new Date();
+      if (q.url === "/keys") keysSent = Math.floor(date.getTime() / 1000);
+      r.setHeader("date", date.toUTCString());
       r.setHeader("content-type", "application/json");
       r.setHeader(
         "cache-control",
@@ -477,7 +486,8 @@ test(
       assert.ok((await NodeDiscovery.fetch(s)).ok);
       mode = "nested";
       const set = value(await NodeDiscovery.fetch(s));
-      assert.equal(set.expiresAt - set.fetchedAt, 10);
+      // The shorter JWKS lifetime governs, less its RFC 9111 apparent age.
+      assert.equal(set.expiresAt - set.fetchedAt, 10 - Math.max(set.fetchedAt - keysSent, 0));
       assert.equal(set.keys[kid]!.sourceType, "cimd");
       assert.equal(set.keys[kid]!.location, `https://localhost:${p.port}/keys`);
       mode = "mismatch";
