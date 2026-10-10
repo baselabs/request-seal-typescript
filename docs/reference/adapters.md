@@ -28,8 +28,9 @@ rejects with `parser_order`. A present Content-Length must equal retained bytes;
 Do not pair `capture(server)` with a parser reading the original request stream;
 use the replay stream, the verified bytes, or the Express verify hook below.
 
-Capture returns `{message, ingress, origin, replay}`. The capture is frozen and privately branded. Successful adapter verification
-wrappers are frozen; their core verification facts retain their own brands. Core transport evidence
+Capture returns `{message, ingress, origin, replay}`. The capture is frozen and
+privately branded. Successful adapter verification wrappers are frozen; their
+core verification facts retain their own brands. Core transport evidence
 remains declared. `ingress.evidence` is observed and records socket TLS protocol,
 ALPN, HTTP version, and the original origin. HTTP/2 pseudo-headers become
 message facts, never field occurrences; cookie crumbs combine with semicolon

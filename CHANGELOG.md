@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Try IPv6 discovery addresses before IPv4, stable within each family, and remove duplicate answers before the 64-address bound, as RequestSeal does. A host whose IPv6 route silently drops traffic now spends the deadline on the IPv6 address first.
 - Add the Profile extension surface with bounded package stamps, shared selected-label verification, profile-bound replay facts, and execution of all nine profile corpus cases.
 - Widen `Verification.profile` and `ReplayFacts.profile` to include extension stamps; exhaustive narrowing consumers must handle the two-string extension name tuple. `ProfileStamp<MetadataKey>` restricts named metadata to scalar values while runtime validation enforces integer, Unicode, and size bounds.
 - Encode explicit verification facts as UTF-8, convert null stamp metadata to the reference's empty string, and canonicalize whole-stamp key order for replay commitments. Bound name parts and keys to 255 Unicode code points and reject lone surrogates in every stamp string.

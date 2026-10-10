@@ -96,13 +96,14 @@ async function resolve(
   }
   remaining(context);
   ensure(
-    answers.length >= 1 &&
-      answers.length <= 64 &&
-      answers.every((a) => isIP(a.address) === a.family),
+    answers.every((a) => isIP(a.address) === a.family),
     "resolution_failed",
   );
-  // Match the reference resolver: IPv6 first, retaining order within each family.
-  return [...new Set(answers.sort((a, b) => b.family - a.family).map((a) => a.address))];
+  // Match the reference resolver: IPv6 first, retaining order within each family,
+  // then remove duplicates before applying the address bound.
+  const addresses = [...new Set(answers.sort((a, b) => b.family - a.family).map((a) => a.address))];
+  ensure(addresses.length >= 1 && addresses.length <= 64, "resolution_failed");
+  return addresses;
 }
 function systemCertificates(): string[] | undefined {
   if (typeof tls.getCACertificates !== "function") return undefined;

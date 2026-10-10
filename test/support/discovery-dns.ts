@@ -4,7 +4,8 @@ export async function dnsPublisher() {
   const socket = createSocket("udp4");
   let a = "127.0.0.1",
     aaaa = "::1",
-    rebind = false;
+    rebind = false,
+    copies = 1;
   const queries: number[] = [];
   socket.on("message", (query, remote) => {
     let end = 12;
@@ -27,7 +28,8 @@ export async function dnsPublisher() {
     query.copy(head, 0, 0, 2);
     head.writeUInt16BE(0x8580, 2);
     head.writeUInt16BE(1, 4);
-    head.writeUInt16BE(data ? 1 : 0, 6);
+    const answers = data ? (type === 1 ? copies : 1) : 0;
+    head.writeUInt16BE(answers, 6);
     const rr = Buffer.alloc(12);
     rr.writeUInt16BE(0xc00c, 0);
     rr.writeUInt16BE(type, 2);
@@ -37,7 +39,7 @@ export async function dnsPublisher() {
     const response = Buffer.concat([
       head,
       query.subarray(12, end),
-      ...(data ? [rr, data] : []),
+      ...Array.from({ length: answers }, () => [rr, data!]).flat(),
     ]);
     socket.send(response, remote.port, remote.address);
     if (rebind && queries.length % 2 === 0) a = "169.254.169.254";
@@ -53,6 +55,10 @@ export async function dnsPublisher() {
     set(ip: string, v6 = "") {
       a = ip;
       aaaa = v6;
+    },
+    /** Repeat the A answer; resolvers return every record, duplicates included. */
+    repeat(n: number) {
+      copies = n;
     },
     rebind() {
       a = "127.0.0.1";

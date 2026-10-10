@@ -550,6 +550,14 @@ test(
         "address_denied",
       );
       assert.equal(p.requests, 2);
+      // The reference removes duplicate answers before applying the 64-address bound.
+      dns.set("127.0.0.1");
+      dns.repeat(65);
+      assert.ok(
+        (await NodeDiscovery.fetch(s, { dnsServers: [dns.server] })).ok,
+      );
+      assert.equal(p.requests, 3);
+      dns.repeat(1);
       t.diagnostic(
         `DNS A/AAAA: vetted; permitted rebind pinned without second query; subsequent metadata answer: address_denied; loopback accepts unchanged`,
       );

@@ -120,7 +120,10 @@ Fetch options are `timeoutMs`, `clock`, `context` and `dnsServers`. The default
 resolver uses `dns.lookup(host, {all: true})`. An explicit `dnsServers` list uses
 an independent real DNS resolver for A and AAAA, without changing process or OS
 settings; it has at most 16 IP server endpoints, with optional ports. Every
-answer still passes the same address policy. Context cancellation and deadlines
+answer still passes the same address policy. As in the reference, IPv6 addresses
+are tried before IPv4, keeping resolver order within each family; duplicates are
+removed before the 64-address bound applies. A host with an unreachable IPv6 route
+spends the deadline on that address first. Context cancellation and deadlines
 destroy owned sockets. Every refusal returns only bounded discovery facts.
 Non-200 statuses map to `unexpected_status` (except the explicit redirect policy).
 5xx are retryable; 4xx are not. The rule comes from the pinned status call site.

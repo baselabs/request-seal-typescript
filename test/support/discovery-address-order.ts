@@ -10,16 +10,23 @@ import {Discovery, DiscoverySource} from '../../src/discovery/node.ts';
 const address = process.argv[2] === 'connect-first' ? '127.0.0.1' : '::1';
 const other = address === '::1' ? '127.0.0.1' : '::1';
 const accepted: string[] = [];
-const p = await peer((_req, res) => res.end(), address);
-p.server.on('connection', () => accepted.push(address));
 const tcp = createServer(socket => {accepted.push(other); socket.destroy();});
+// The peer's ephemeral port can already be taken on the other family; pick a new one.
+let p: Awaited<ReturnType<typeof peer>> | undefined;
+for (let attempt = 0; attempt < 5 && !p; attempt++) {
+  const candidate = await peer((_req, res) => res.end(), address);
+  const bound = await new Promise<boolean>((done, fail) => {
+    const refused = (error: NodeJS.ErrnoException) => error.code === 'EADDRINUSE' ? done(false) : fail(error);
+    tcp.once('error', refused);
+    tcp.listen({host: other, port: candidate.port, ipv6Only: true}, () => {tcp.removeListener('error', refused); done(true);});
+  });
+  if (bound) p = candidate; else await candidate.close();
+}
+assert.ok(p, 'no port was free on both loopback families after five attempts');
+p.server.on('connection', () => accepted.push(address));
 let dns: Awaited<ReturnType<typeof dnsPublisher>> | undefined;
 const dog = setTimeout(() => {console.log('held');process.exit(3);}, 2000); dog.unref();
 try {
-  await new Promise<void>((done, fail) => {
-    tcp.once('error', fail);
-    tcp.listen({host: other, port: p.port, ipv6Only: true}, () => {tcp.removeListener('error', fail); done();});
-  });
   dns = await dnsPublisher();
   const source = DiscoverySource.create({type: 'jwks_uri', location: `https://localhost:${p.port}/keys`, permittedAddresses: ['::1', '127.0.0.1'], cacerts: [new Uint8Array(new X509Certificate(rootCertificates[0]!).raw)]});
   assert.ok(source.ok);
@@ -31,4 +38,4 @@ try {
   assert.ok(dns.queries.includes(1));
   assert.ok(dns.queries.includes(28));
   console.log('tls_failed retryable=false connections=' + p.connections + ' order=' + accepted.join(','));
-} finally {clearTimeout(dog); await dns?.close(); await new Promise<void>(done => tcp.close(() => done())); await p.close();}
+} finally {clearTimeout(dog); await dns?.close(); await new Promise<void>(done => tcp.close(() => done())); await p!.close();}
