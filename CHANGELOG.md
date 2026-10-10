@@ -1,0 +1,71 @@
+# Changelog
+
+## Unreleased
+
+- Align HTTP handle signing and the error vocabulary with RequestSeal 0.4.0: explicit `signingTimeout` bounds, `signer_algorithm_mismatch` with its exact message, and `signing_failed` with a bounded custody source on both forms. Handle deadlines start immediately before custody, after signature-base construction, and are capped at `signingTimeout` (default 5,000 ms) even under a longer caller Context. Generated-spec KeyHandle failures now report `signing_failed` (previously `signer_failed`); direct `handle.sign` malformed output now reports `invalid_signing_output` (previously `custodian_failure`). Add nullable core `message` and `source` fields; preserve callable `signer_failed` behavior. Re-pin the error extraction, shared corpus, and replay peer.
+- Rename the npm package from `request-seal` to `@request-seal/core` under the `request-seal` organization; use `@request-seal/core/<subpath>` for every subpath import.
+- Add captured Node HTTP Web Bot Auth verification, shared attempt storage, and executable signed TLS directory examples.
+- Reject concurrent capture consumers and retained length mismatches; derive HTTP/2 scheme from TLS and reject conflicting Host/authority.
+- Add captured-request quorum verification with shared replay and single-verification guards.
+- Apply redirect method/body rules, validate redirect policy before delivery, remove Location fragments, and report actual client attempts.
+- Measure Fetch runtime overrides and eligibility in the wire lane; refuse Node sec-fetch-mode signing, empty-query targets on Node majors below 24, and planted runtime markers.
+- Deliver response signatures with their exact buffered bytes, use one clock for Date and created, and omit prohibited lengths.
+- Require absolute ssh-agent sockets and preserve connection error parity; execute every README TypeScript fence against real inputs.
+- Validate literal discovery addresses before deadline dispatch; restore replay timer coverage beside caller cancellation and cap built-test concurrency at 4.
+- Add optional Node HTTP capture/replay, final response signing, bounded signed clients, Fetch signing and runtime-restricted verification, and caller-selected OpenSSH agent custody. Record exact Node/Deno/Bun wire observations and generated-key OpenSSL checks.
+- Hold the process only while a run is active: each run arms its own referenced deadline timer, so a run whose only pending work is a caller callback that never settles ends with `deadline_exceeded` at its deadline on Node, Deno and Bun instead of being dropped; idle and settled Contexts never keep a process alive; pass a Context signal to stop sooner.
+- Reject foreign `err()` and `adapterError` payloads with `TypeError`; accept any callable signer or KeyHandle for Accept-Signature fulfillment (an intentional divergence from the reference's two-argument function); permit shared stateless digest factories while rejecting overlapping operations on one session; check fetched cache results against their fetch clock and snapshots against the cache clock; decode every query key eagerly and classify TLS failures as the reference does; avoid idle timers for signal-free contexts and reattach cancellation listeners on reuse after internal release.
+- Redact every individual Verification in JSON and runtime inspection while preserving explicit canonical facts; accept callable signers, trust callbacks, and held-key resolvers without Function.length gates, including KeyHandle signing.
+- Document Web Bot Auth deadline phases, held-key fallback conditions, coverage-only nested evidence, host normalization differences, and generic principal narrowing. Verify origin confinement against two real loopback TLS peers.
+- Add source-bound Web Bot Auth protocol-00 signing and verification, trusted agent provenance, nested coverage evidence, and one profile-separated envelope replay claim.
+- Execute all fourteen Web Bot Auth corpus cases; preserve published bytes and rejection expectations. Add real signed TLS directory rotation/removal, OpenSSL byte agreement, and counting-store checks.
+- Permit explicit JOSE algorithm choices in discovery lookup while retaining key metadata restrictions; apply replay retention ceilings after the complete envelope's earliest end.
+- Match reference quorum assignment search and tie-breaking, check bindings incrementally and yield after about 10 ms of search work, and merge canonical identities with union-find.
+- Parse quorum signature dictionaries once, cache per-label bases by field schema, enforce asymmetric handle identity consistency when observed or supplied, and preserve configured failure order.
+- Align replay rejection, Accept-Signature validation precedence and reference string normalization; add caller-owned ordered fulfillment and redact quorum policies and composite results in JSON inspection; preserve custody deadlines during fulfillment.
+- Executed differential coverage: 2,160 count-only instances from the original brute force (any mode, up to 5 slots), plus 2,160 instances checked on assignments and reasons with bindings, merged and unknown identities, all modes and units, and 8 to 16 slots. The 14 recorded divergence cases are checked against the reference port.
+- Add branded quorum policies, identity-aware assignment with bounded exact search, nested and same-parameter bindings, and independent single-label verification facts.
+- Add RFC 9421 Accept-Signature parsing and verified-pool challenge matching; execute all three quorum and negotiation corpus cases.
+- Keep Context ownership release internal, align safe-number receipt bounds with claims, and reject corpus receipt/claim retention disagreements. Document required-content deadlines and verify-produced number ends.
+- Normalize caller replay store errors, accept the exact signed bigint retention lower bound, release replay child Context listeners, and preserve deadline_exceeded during required content checks.
+- Keep receipt construction internal, verify the packed PostgreSQL export, and require the real database URL in CI. PostgreSQL cross-language checks run where REQUESTSEAL_REPLAY_ELIXIR=1 and an Elixir toolchain with the pinned dependencies are present; the CI Elixir lane is separate work.
+- Add branded replay claims and receipts, shared exclusive retention arithmetic, a bounded single-isolate memory store, and the dependency-free replay-postgres subpath over caller-owned autocommit queries.
+- Execute all eleven v0.3.1 replay.claim cases, add a verbatim replay smoke case, and pass Context cancellation to the store while preventing a late commitment from reaching storage.
+- Add bounded compact JWS signing and verification, JWE encryption and authenticated decryption, one-level nesting, explicit policy snapshots, and separately branded results.
+- Add confined JOSE key-management capabilities, unconditional random fallback on unwrap failure, OAEP uniform-error tests and timing measurements, and reciprocal OpenSSL checks for RSA-OAEP (SHA-1 and SHA-256), A128GCMKW and A256GCMKW (empty AAD), and direct A128GCM and A256GCM in both directions.
+- Execute all v0.3.1 JWS/JWE cases and both JOSE Wycheproof batches; retain source verdicts, declared overrides, applicability counts, and the two exact Bun ECDSA limitations.
+- Re-pin error parity to RequestSeal v0.3.1 (commit b0d6f94); add `retention_exceeded` before replay commitment and storage when the retention end exceeds the clock bound.
+- Add explicit generic signing and verification, frozen policies and layered verifications, canonical fact serialization, and a caller-owned replay port.
+- Add RFC 9530 digests, bounded incremental SHA-2 with construction self-tests, and the Node-compatible hasher subpath.
+- Execute the shared signing and verification corpus and add a tooling smoke case for each new surface.
+- Preserve the discovery Node source type in built exports; refuse OS trust when Node has no non-empty system CA list. Retain cache rollback history through no-store, expiry and invalidation, and count CRLF within the chunk-line limit.
+- Run live corpus vendoring when offline mode is unset, independently of gh; align Deno permissions and extract error rules directly from the pinned commit.
+- Add bounded discovery sources, JWKS/directory/CIMD snapshots, directory possession proofs, source-bound key sets and resolutions, caller-owned caches, and the resolver bridge.
+- Add the `./discovery-node` HTTPS transport with pinned-address TLS connections, IANA address denial, exact exceptions, manual redirects, proxy exclusion, cancellation, and body/decompression ceilings.
+- All four `discovery.body` cases execute from the unchanged v0.3.1 corpus: 2,979 executed or runtime-limited items, 62 not applicable, and 23 pending out of 3,064; add real TLS, DNS, proxy, rotation and removal probes.
+- Add captured WebCrypto primitives, separate HTTP/JWS registries, fixed RSA-PSS parameters, and fixed-width ECDSA and canonical Ed25519 verification.
+- Add bounded DER/PEM codecs, validated RSA CRT import, private local key handles, public key formats and thumbprints, opaque identities, deadline containment, and confined RSA-OAEP/AES capabilities.
+- Add pinned RFC and Wycheproof vectors, OpenSSL reciprocity, crypto/key corpus surfaces, batch counts and overrides, canary checks, and HMAC timing measurements.
+- Keep deadline contexts reusable across nested and sequential runs; settlement releases only the active run, and idle contexts without caller or parent signals do not arm timers.
+- Bound JOSE deadline error parity to the crypto layer and reject invalid adapter constructor arguments with TypeError.
+- Add the ESM package scaffold, strict TypeScript build, web-only core typecheck, Node runtime lanes, Deno and Bun core lanes, and staged trusted-publishing workflow.
+- Add Result and eleven bounded error variants with parity against Elixir RequestSeal v0.3.1 (commit b0d6f94), including status-derived discovery retryability.
+- Add copied ByteString inputs, strict base64/base64url, ordered bounded I-JSON with exact number lexemes, and RFC numeric guards.
+- Add branded deadline contexts, callback fault containment, deep freezing, and own-key option snapshots.
+- Add the corpus loader, checksummed three-case tooling corpus, CLI, tamper checks, self-checks, and package boundary validation.
+- Run live corpus vendoring when gh is available and offline mode is unset; align Deno permissions and extract error rules directly from the pinned commit.
+- All four `discovery.body` cases execute from the unchanged v0.3.1 corpus: 2,965 executed or runtime-limited items, 62 not applicable, and 37 pending out of 3,064; add real TLS, DNS, proxy, rotation and removal probes.
+- Keep deadline contexts reusable across nested and sequential runs; settlement releases only the active run, and idle contexts do not arm timers.
+- Move the corpus pin to RequestSeal v0.3.1, index SHA-256 `222bae05fe7a240c6457ec02659e39f1785629290c7883dca404dd21d71f0398` (verified by `scripts/vendor-corpus.ts v0.3.1 --update-pin`).
+- Vendor the checksummed RequestSeal v0.3.0 conformance corpus; pin its release commit and index digest. Validate batch inventories, per-item pins and overrides, positive references, and execution counts. Report pending surfaces against a committed allowlist during development and block releases until complete coverage. Wycheproof overrides are declared pins with cited clauses and may replace valid, invalid, or acceptable published verdicts; HTTPWG and RFC 9421 batches reject overrides.
+- Require an explicit schema for Structured Fields parsing and caller-built tree serialization; parsed trees retain their schema. Revision strings disable inner lists unless a schema enables them.
+- Add parseField with ordered occurrence combination, selective uniqueKeys, and independent uniqueParameters policies.
+- Require RFC 3986 IPv6 or IPvFuture bracketed authorities; reject bracketed IPv4 forms and zone identifiers.
+- Pin canonical base64 padding: byte sequences with nonzero padding bits reject under the shared decoding rule.
+- Preserve immutable parsed bytes, snapshot caller-built signature parameters, and require branded messages for bases and related requests.
+- Align validation precedence and negative zero serialization; support exact bigint decimal coefficients below 10³⁰ with RFC decimal magnitude limits.
+- Add bounded RFC 8941/RFC 9651 Structured Fields parsing, ordered typed trees, unique mode, explicit schemas, and canonical serialization.
+- Add lossless HTTP message, field, body, and transport values with copied bytes, target-form validation, and optional Content-Digest generation.
+- Add all RFC 9421 signature-base components, related requests, trailers, Structured Fields selection, and exact query encoding.
+- Register four wire corpus surfaces and two upstream batch formats; add checksummed HTTPWG, RFC 9421, and real HTTP capture tests.
+- Keep the tooling smoke corpus independently pinned and excluded from the package.

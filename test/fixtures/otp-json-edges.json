@@ -1,0 +1,22 @@
+{
+  "evidence_class": "observed",
+  "otp_version": "29.0.3",
+  "command": "erl -noshell -eval 'Release = erlang:system_info(otp_release), {ok, Version} = file:read_file(filename:join([code:root_dir(), \"releases\", Release, \"OTP_VERSION\"])), io:format(\"OTP ~s~n\", [string:trim(Version)]), lists:foreach(fun(B) -> try V = json:decode(B), io:format(\"~s accepted ~p~n\", [B,V]) catch C:R -> io:format(\"~s rejected ~p:~p~n\", [B,C,R]) end end, [<<\"1e-400\">>, <<\"1e400\">>, <<\"0e999999\">>]), halt().'",
+  "edges": [
+    {
+      "literal": "1e-400",
+      "accepted": true,
+      "output": "0.0"
+    },
+    {
+      "literal": "1e400",
+      "accepted": false,
+      "output": "error:{unexpected_sequence,<<\"1.0e400\">>}"
+    },
+    {
+      "literal": "0e999999",
+      "accepted": true,
+      "output": "0.0"
+    }
+  ]
+}

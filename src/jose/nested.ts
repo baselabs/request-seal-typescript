@@ -1,0 +1,74 @@
+import { snapshotOptions } from "../brand.ts";
+import { encodeUtf8 } from "../runtime.ts";
+import {err, type Result } from "../result.ts";
+import { JWE, type JweResult } from "./jwe.ts";
+import { JWS, type JwsResult } from "./jws.ts";
+import { compact, headerValue, need, take } from "./header.ts";
+import {joseError} from "../errors/types.ts";
+import { publicSafe, ok } from "./support.ts";
+const branded = new WeakSet<object>();
+export type NestedResult = Readonly<{ jwe: JweResult; jws: JwsResult }>;
+export function isNestedResult(value: unknown): value is NestedResult {
+  return typeof value === "object" && value !== null && branded.has(value);
+}
+export function innerCompact(input: Uint8Array): Result<readonly string[]> {
+  const framed = compact(input, 3, false);
+  return !framed.ok && framed.error.reason === 'invalid_serialization' ? err(joseError('nesting_depth', 'nesting')) : framed;
+}
+export async function decrypt(
+  input: unknown,
+  policy: unknown,
+  options: unknown,
+): Promise<Result<NestedResult>> {
+  return publicSafe(async () => {
+    const opts = snapshotOptions(options, ["content_types", "context"]);
+    need(opts.ok, "invalid_options");
+    const o = opts.value;
+    const types = o.content_types;
+    need(
+      Array.isArray(types) && types.length > 0 && types.length <= 64,
+      "invalid_options",
+    );
+    const copied = Array.from(types);
+    need(
+      new Set(copied).size === copied.length &&
+        copied.every(
+          (t) =>
+            typeof t === "string" &&
+            encodeUtf8(t).length > 0 &&
+            encodeUtf8(t).length <= 256,
+        ),
+      "invalid_options",
+    );
+    const snapshot = snapshotOptions(policy, ["jwe", "jws"]);
+    need(snapshot.ok && Object.keys(snapshot.value).length === 2, "invalid_policy");
+    const p = snapshot.value;
+    const stageOptions = Object.hasOwn(o, "context")
+      ? { context: o.context }
+      : {};
+    const outer = await JWE.decrypt(input, p.jwe, stageOptions);
+    if (!outer.ok) return outer;
+    const plaintext = outer.value.plaintext;
+    try {
+      need(
+        copied.includes(headerValue(outer.value.header, "cty")),
+        "content_type_mismatch",
+        "nesting",
+      );
+      take(innerCompact(plaintext));
+      const inner = await JWS.verify(plaintext, p.jws, stageOptions);
+      if (!inner.ok) return inner;
+      need(
+        !inner.value.header.some((pair) => pair[0] === "cty"),
+        "nesting_depth",
+        "nesting",
+      );
+      const result = Object.freeze({ jwe: outer.value, jws: inner.value });
+      branded.add(result);
+      return ok(result);
+    } finally {
+      plaintext.fill(0);
+    }
+  });
+}
+export const Nested = Object.freeze({ decrypt, isResult: isNestedResult });

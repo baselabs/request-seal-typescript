@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "es2024",
+      "dom"
+    ],
+    "types": []
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/node_hasher.ts",
+    "src/discovery/node.ts",
+    "src/adapters/node-http/**/*.ts",
+    "src/custody/ssh-agent/**/*.ts"
+  ]
+}

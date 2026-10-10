@@ -1,0 +1,9 @@
+{
+  "name": "request-seal-adapter-interop",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "express": "5.2.1",
+    "fastify": "5.12.5"
+  }
+}

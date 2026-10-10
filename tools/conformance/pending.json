@@ -1,0 +1,18 @@
+[
+  {
+    "cases": 9,
+    "ids": [
+      "profile/bare",
+      "profile/core-kind",
+      "profile/extension",
+      "profile/oversized",
+      "profile/reserved-request-seal",
+      "profile/reserved-request_seal",
+      "profile/reserved-rfc9421",
+      "profile/reserved-web-bot-auth",
+      "profile/reserved-web_bot_auth"
+    ],
+    "items": 9,
+    "surface": "profile.name"
+  }
+]

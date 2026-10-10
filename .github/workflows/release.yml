@@ -1,0 +1,38 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.21.0'
+      - name: Install the trusted-publishing npm toolchain
+        run: npm install --global npm@11.19.0 --ignore-scripts
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Require complete release corpus coverage
+        run: node --experimental-strip-types --no-warnings tools/conformance/cli.ts --corpus conformance
+      - run: npm audit --audit-level=high
+      - run: npm pack --dry-run
+      - name: Check the tag and registry version
+        id: existing
+        run: node --experimental-strip-types --no-warnings scripts/registry-check.ts
+      # Trusted publishing stages the artifact; approval on npmjs.com makes it live.
+      - name: Stage the verified package with provenance
+        if: steps.existing.outputs.published == 'false'
+        run: npm stage publish --provenance

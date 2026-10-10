@@ -1,0 +1,1 @@
+{"class":"byte_exact","evidence_class":"published_vector","expected":{"bytes":{"b64":"NDI"}},"format":"request-seal-conformance-case/1","id":"wire/parse","inputs":{"field_type":"item","mode":"rfc","raw":{"b64":"NDI"},"schema":"rfc8941"},"source":{"document":"RFC 8941","section":"2","url":"https://www.rfc-editor.org/rfc/rfc8941.html#section-2"},"surface":"structured_fields.parse"}

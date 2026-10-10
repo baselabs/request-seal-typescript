@@ -1,0 +1,5 @@
+**Status:** maintained · **Kind:** provenance · **Updated:** October 9, 2026 · **Governed by:** RFC 9421 Sections 2.1 and 2.2 · **Review when:** published examples change
+
+Component example bytes are transcribed from [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.txt), Sections 2.1 through 2.2.9. Each entry cites its section and quotes the published signature base line in `example_bytes`. Expected bytes never come from either implementation. The RFC Trust Legal Provisions apply.
+
+`(SP)` notation is stored as a literal space; RFC 8792 line wrapping is removed. The obsolete folded field in Section 2.1 is represented after HTTP/1.1 unfolding, as the message model requires. Request origin facts are supplied explicitly from the example's stated transport and Host context. For examples that omit unrelated facts, message attributes only supply the context needed to run the component. The final signature parameters line is assembled by the test; the RFC publishes the component lines, not full bases for these fragments.

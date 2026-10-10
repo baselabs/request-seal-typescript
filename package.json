@@ -1,0 +1,79 @@
+{
+  "name": "@request-seal/core",
+  "version": "0.1.0",
+  "description": "Standards-based HTTP message signatures and JOSE for web-standard runtimes.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./node-hasher": {
+      "types": "./dist/node_hasher.d.ts",
+      "default": "./dist/node_hasher.js"
+    },
+    "./replay-postgres": {
+      "types": "./dist/replay/postgres.d.ts",
+      "default": "./dist/replay/postgres.js"
+    },
+    "./discovery-node": {
+      "types": "./dist/discovery/node.d.ts",
+      "node": "./dist/discovery/node.js",
+      "default": "./dist/discovery/node.js"
+    },
+    "./node-http": {
+      "types": "./dist/adapters/node-http/index.d.ts",
+      "default": "./dist/adapters/node-http/index.js"
+    },
+    "./fetch": {
+      "types": "./dist/adapters/fetch/index.d.ts",
+      "default": "./dist/adapters/fetch/index.js"
+    },
+    "./custody-ssh-agent": {
+      "types": "./dist/custody/ssh-agent/index.d.ts",
+      "default": "./dist/custody/ssh-agent/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/baselabs/request-seal-typescript.git"
+  },
+  "homepage": "https://github.com/baselabs/request-seal-typescript#readme",
+  "bugs": {
+    "url": "https://github.com/baselabs/request-seal-typescript/issues"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "typecheck:web": "tsc -p tsconfig.web.json",
+    "test": "node --unhandled-rejections=strict --experimental-strip-types --no-warnings --test-concurrency=4 --test test/*.test.ts",
+    "test:red": "node --unhandled-rejections=strict --experimental-strip-types --no-warnings --test test/red/planted.test.ts",
+    "self-checks": "node --experimental-strip-types --no-warnings self-checks.ts",
+    "build": "node --experimental-strip-types --no-warnings scripts/clean-dist.ts && tsc -p tsconfig.build.json",
+    "conformance": "node --experimental-strip-types --no-warnings tools/conformance/cli.ts --corpus test/fixtures/corpus-smoke --smoke && node --experimental-strip-types --no-warnings tools/conformance/cli.ts --corpus conformance --pending-ok",
+    "pack:check": "node --experimental-strip-types --no-warnings scripts/pack-check.ts",
+    "check": "npm run typecheck && npm run typecheck:web && npm test && npm run self-checks && npm run build && npm run conformance && npm run pack:check"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "fast-check": "4.10.2",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,3 @@
+# Upstream vectors and captures are exact bytes; never normalize them.
+test/fixtures/** -text
+conformance/** -text
