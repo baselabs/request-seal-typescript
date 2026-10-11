@@ -1,0 +1,4 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": ["*.ts", "../../test/support/peer-process.ts", "../../test/support/discovery-peer.ts"]
+}

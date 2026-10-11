@@ -64,6 +64,6 @@ test('CI test steps keep repository credentials out of their environment', () =>
 
 test('CI PostgreSQL service images use immutable Linux image digests', () => {
   const images = [...read('.github/workflows/ci.yml').matchAll(/image: (postgres:\S+)/g)].map(m => m[1]);
-  assert.equal(images.length, 2);
+  assert.equal(images.length, 3, 'Node, native, and reciprocal jobs each have one PostgreSQL service');
   for (const image of images) assert.match(image!, /^postgres:18@sha256:[a-f0-9]{64}$/);
 });

@@ -6,3 +6,7 @@ test/.tmp-*/
 interop/replay/_build/
 interop/replay/deps/
 interop/replay/.cache/
+interop/elixir/_build/
+interop/elixir/deps/
+interop/elixir/.cache/
+interop/reciprocal/.cache/

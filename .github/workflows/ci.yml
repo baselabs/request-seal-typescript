@@ -44,8 +44,8 @@ jobs:
       - run: command -v ssh-agent ssh-keygen ssh-add && ssh -V
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
-          otp-version: '29.1.1'
-          elixir-version: '1.20.4'
+          otp-version: '29.0.3'
+          elixir-version: '1.20.3'
       - name: Reextract the pinned Elixir error vocabulary
         run: |
           git clone --depth 1 --branch v0.4.1 https://github.com/baselabs/request_seal.git "$RUNNER_TEMP/request-seal-reference"
@@ -99,8 +99,8 @@ jobs:
       - run: command -v ssh-agent ssh-keygen ssh-add && ssh -V
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
-          otp-version: '29.1.1'
-          elixir-version: '1.20.4'
+          otp-version: '29.0.3'
+          elixir-version: '1.20.3'
       - name: Prove Deno rejects a failure
         if: matrix.runtime == 'deno'
         run: |
@@ -130,3 +130,48 @@ jobs:
       # Findings block this lane until individually adjudicated.
       - run: npm audit --audit-level=high
       - run: npm pack --dry-run
+  reciprocal:
+    name: reciprocal
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18@sha256:885953109528ad3dfc90362b1a6f50a78620b5315be19f187753d267e484dc5b
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: requestseal_replay
+        ports: ['5432/tcp']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      REQUESTSEAL_REPLAY_ELIXIR: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.21.0'
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: '29.0.3'
+          elixir-version: '1.20.3'
+      - run: elixir --version
+      - run: npm ci --ignore-scripts
+      - run: npm ci --prefix interop --ignore-scripts
+      - run: npm ci --prefix interop/reciprocal --ignore-scripts
+      - run: mix local.hex --force && mix local.rebar --force
+      - run: mix deps.get --check-locked && mix compile --warnings-as-errors
+        working-directory: interop/elixir
+      - run: mix deps.get --check-locked && mix compile --warnings-as-errors
+        working-directory: interop/replay
+      - run: npm run typecheck --prefix interop/reciprocal
+      - run: node --experimental-strip-types --no-warnings --test test/peer-process.test.ts test/replay-reciprocal.test.ts test/reciprocal.test.ts
+        env:
+          REQUESTSEAL_REPLAY_PG_URL: postgresql://postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/requestseal_replay
+      - run: npm run exchange --prefix interop/reciprocal
+        env:
+          REQUESTSEAL_REPLAY_PG_URL: postgresql://postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/requestseal_replay
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: reciprocal-exchange
+          path: interop/reciprocal/.cache/exchange.jsonl

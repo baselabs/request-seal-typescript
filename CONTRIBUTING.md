@@ -67,3 +67,14 @@ unscoped entries apply everywhere. Stale checks use the same platform selection.
 Live vendoring verification runs unless `REQUEST_SEAL_OFFLINE` is set (any value),
 with a printed skip reason. The check does not depend on `gh`. Offline tests use
 only vendored bytes and loopback peers.
+
+## Reciprocal exchange
+
+The optional reciprocal check requires exactly Elixir 1.20.3 and Erlang/OTP 29
+(the local and CI toolchain patch is 29.0.3), plus Hex, rebar3, OpenSSL, and an
+existing PostgreSQL database. These Elixir requirements apply to the reciprocal
+check, not the TypeScript package. The error extraction check separately needs
+OTP 29 as described above. See [reciprocity](docs/reference/reciprocity.md) for
+isolated workspace installation, the exact published peer, the exchange protocol,
+and local commands. The CI check is named `reciprocal`; release verification runs
+it through the same reusable workflow. Registry failures fail this check.
