@@ -85,7 +85,7 @@ const policy = must(Policy.create({
 }));
 
 // Behind a proxy the socket peer is the proxy. Trust its Forwarded header only when the peer matches.
-const trustedProxies = { peers: ["127.0.0.1"], field: "forwarded" };
+const trustedProxies = { peers: ["127.0.0.1"], field: "forwarded" }; // Replace 127.0.0.1 with your exact proxy address.
 const server = createServer(async (req, res) => {
   const captured = await captureRequest(req, { trustedProxies });
   if (!captured.ok) assert.ok(captured.error.kind === "adapter" && captured.error.reason === "invalid_request");
@@ -123,6 +123,9 @@ server.closeAllConnections();
 
 Capture every request first with `captureRequest`, then verify and parse `verified.value.bytes` as shown below. The stream is consumed, so do not run a body parser afterward. Alternatively, use `express.raw({ type: () => true, inflate: false, verify })` with `captureBody` for bodies of any content type, and call `captureRequest` for requests without body framing that skip the raw parser. With parser hooks, set `inflate: false` to prevent decoding before capture. Capture precedes URL rewriting; the adapter reads `originalUrl` when Express has rewritten it.
 
+
+In your project, run `npm install express` and use `import express from "express";`. Replace the program's `createRequire` setup with that import. The complete program loads the repository's pinned version for its automated checks.
+
 ```ts
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
@@ -150,7 +153,7 @@ app.use(async (req: any, res: any) => {
   const verified = captured.ok ? await verifyRequest(req, policy, { label: "sig" }) : captured;
   if (!verified.ok) return res.status(401).end();
   const text = new TextDecoder().decode(verified.value.bytes);
-  const value = req.headers["content-type"] === "application/json" ? JSON.parse(text).name : text;
+  const value = req.headers["content-type"]?.split(";", 1)[0].trim().toLowerCase() === "application/json" ? JSON.parse(text).name : text;
   res.json({ accepted: value });
 });
 const server = createServer(app).listen(0, "127.0.0.1");
@@ -162,6 +165,7 @@ for (const [method, contentType, text, expected] of [
   ["GET", "", "", ""],
   ["POST", "text/plain", "Ada", "Ada"],
   ["POST", "application/json", '{"name":"Ada"}', "Ada"],
+  ["POST", "application/json; charset=utf-8", '{"name":"Ada"}', "Ada"],
 ]) {
   const body = new TextEncoder().encode(text);
   const headers = contentType ? [["Content-Type", contentType]] : [];
@@ -182,6 +186,9 @@ Express is your dependency. In your project install it with `npm install express
 
 Fastify parses after `preParsing`, so capture the raw request there and return the retained bytes as the stream Fastify parses. Register `capture(app.server)` first so the adapter snapshots the request line and headers before Fastify handles them. Returning a different stream would change what the parser reads and defeat the check: the replay stream verifies that every byte it handed out matches the capture.
 
+
+In your project, run `npm install fastify` and use `import fastify from "fastify";`. Replace the program's `createRequire` setup with that import. The complete program loads the repository's pinned version for its automated checks.
+
 ```ts
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -189,7 +196,7 @@ import { Custody, Policy, ok, type KeyResolver, type Result } from "@request-sea
 import { capture, captureRequest, signedRequest, verifyRequest } from "@request-seal/core/node-http";
 
 const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
-// In your project: import Fastify from "fastify". This repository loads the version its tests pin.
+// In your project: import fastify from "fastify". This repository loads the version its tests pin.
 const fastify = createRequire(new URL("../../interop/adapters/package.json", import.meta.url))("fastify");
 const key = must(await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) }));
 const components = '("@method" "@request-target" "content-digest")';

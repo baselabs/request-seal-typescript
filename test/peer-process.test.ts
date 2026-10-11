@@ -3,7 +3,8 @@ const test = nodeAdapterTest(import.meta.url);
 import assert from 'node:assert/strict';
 import {spawnSync, spawn} from 'node:child_process';
 import {mkdtemp, rm, stat, writeFile, readFile} from 'node:fs/promises';
-import {resolve} from 'node:path';
+import {resolve, join} from 'node:path';
+import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {appendFileSync} from 'node:fs';
 import {spawnPeer, requireHex} from './support/peer-process.ts';
@@ -170,23 +171,39 @@ test('watchdog rejects a living owner that is no longer its parent', {timeout: 5
   finally {await owned.stop();}
 
   process.kill(process.ppid, 0); // The claimed owner exists, but is not the watchdog's parent.
-  const p = spawn('node', [fileURLToPath(new URL('./support/peer-watchdog.mjs', import.meta.url)), String(process.ppid), 'node', '-e', program], {detached: true, stdio: 'pipe'});
+  const directory = await mkdtemp(join(tmpdir(), 'request-seal-watchdog-'));
+  const ledger = join(directory, 'peers.jsonl');
+  const p = spawn('node', [fileURLToPath(new URL('./support/peer-watchdog.mjs', import.meta.url)), String(process.ppid), 'node', '-e', program], {detached: true, stdio: 'pipe', env: {...process.env, REQUESTSEAL_PEER_LEDGER: ledger}});
   if (process.env.REQUESTSEAL_PEER_LEDGER && p.pid) appendFileSync(process.env.REQUESTSEAL_PEER_LEDGER, JSON.stringify({pid: p.pid, group: p.pid}) + '\n');
-  p.stdout.resume(); p.stderr.resume();
-  const closed = new Promise<number | null>(done => p.once('close', done));
+  let diagnostic = '';
+  p.stdout.resume(); p.stderr.setEncoding('utf8'); p.stderr.on('data', chunk => {diagnostic += chunk;});
+  const closed = new Promise<{code: number | null; signal: NodeJS.Signals | null}>(done => p.once('close', (code, signal) => done({code, signal})));
   let exceeded = false;
   const bound = setTimeout(() => {exceeded = true; try {process.kill(-p.pid!, 'SIGKILL');} catch {}}, 2500);
   try {
     await new Promise<void>((done, reject) => {p.once('spawn', done); p.once('error', reject);});
     process.kill(-p.pid!, 0); // Known-positive group probe before observing termination.
-    const code = await closed;
-    // An invalid parent can be rejected before the child initializes; readiness is not required here.
-    assert.notEqual(code, 0);
+    let childPid: number | undefined;
+    const deadline = Date.now() + 1000;
+    while (!childPid && Date.now() < deadline) {
+      try {childPid = JSON.parse((await readFile(ledger, 'utf8')).trim().split('\n')[0]!).pid;}
+      catch (error) {if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;}
+      if (!childPid) await new Promise<void>(done => setTimeout(done, 5));
+    }
+    assert.ok(childPid, 'the watchdog records the real child before termination');
+    process.kill(childPid, 0); // Known-positive child probe before watchdog termination.
+    const ended = await closed;
+    assert.deepEqual(ended, {code: null, signal: "SIGKILL"});
+    assert.match(diagnostic, /PEER_PARENT_MISMATCH/, 'termination is attributed to the parent mismatch');
+    assert.throws(() => process.kill(childPid, 0), /ESRCH/, 'the watchdog ended its recorded child');
+    process.kill(process.ppid, 0); // The claimed owner is still alive.
     assert.equal(exceeded, false, 'the watchdog detects parent mismatch while the recorded owner is still alive');
     assert.throws(() => process.kill(-p.pid!, 0), /ESRCH/, 'the invalid owner process group was reaped');
   } finally {
     clearTimeout(bound); p.stdin.destroy();
     try {process.kill(-p.pid!, 'SIGKILL');} catch {}
+    await closed;
+    await rm(directory, {recursive: true, force: true});
   }
 });
 

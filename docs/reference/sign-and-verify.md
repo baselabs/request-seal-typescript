@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** RequestSeal v0.4.1 crypto and custody behavior, RFC 9421, RFC 9530, and the shared conformance corpus · **Review when:** signing, policy, digest, or verification contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 crypto and custody behavior, RFC 9421, RFC 9530, and the shared conformance corpus · **Review when:** signing, policy, digest, or verification contracts change
 
 # Signing and verification
 
@@ -123,7 +123,7 @@ retryable `custody/deadline_exceeded` deadline instead.
 
 ## Per-call primitive and custody byte bounds
 
-RequestSeal v0.4.1 adds `max_bytes` on crypto and custody signing and verification.
+RequestSeal for Elixir 0.4.1 adds `max_bytes` on crypto and custody signing and verification.
 The TypeScript counterpart is an optional trailing `{maxBytes}` object:
 `Crypto.sign(algorithm, handle, data, options?)`,
 `Crypto.verify(algorithm, key, signature, data, options?)`,
@@ -148,7 +148,7 @@ must explicitly pass the ceiling after the managed boundary has checked the
 caller's bound. Message, Body, JWS, adapters, and SignatureBase retain their
 fixed 1 MiB limits.
 
-Source: [RequestSeal v0.4.1 crypto](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/crypto.ex)
+Source: [RequestSeal for Elixir 0.4.1 crypto](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/crypto.ex)
 and [custody](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/custody.ex).
 The error vocabulary pin is v0.4.1; the shared corpus remains v0.4.0 because its
 index is byte-identical across the tags and v0.4.1 supplied no corpus assets.

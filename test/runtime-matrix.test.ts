@@ -25,7 +25,7 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   const nativeBoundary: Record<string, string> = {
     '22.12.0': 'OS trust requires a nonempty system store; empty-query Fetch signing returns `adapter/invalid_request`.',
     '24.21.0': 'Fetch verification returns `adapter/invalid_request` outside the measured allowlist.',
-    '26.11.1': 'Required check name: `Node 26`; same Fetch verification restriction.',
+    '26.11.1': 'Fetch verification returns `adapter/invalid_request` outside the measured allowlist.',
   };
   const expected: string[][] = tokens.map(version => [`Node ${version}`, version, nativeBoundary[version]!]);
   for (const version of denos) expected.push([`Deno ${version}`, version, version === '2.9.7'

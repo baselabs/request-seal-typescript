@@ -14,7 +14,7 @@ const stop = () => {
 };
 process.on('SIGTERM', () => {});
 const watch = setInterval(() => {
-  if (process.ppid !== Number(owner)) {stop(); return;}
+  if (process.ppid !== Number(owner)) {console.error('PEER_PARENT_MISMATCH'); stop(); return;}
   try {process.kill(Number(owner), 0);} catch {stop();}
 }, 100);
 child.on('error', error => {console.error(error.message); clearInterval(watch); process.exitCode = 1;});

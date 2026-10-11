@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { documentationFences, executeFence, extractFences, runtime } from "./support/docs-fences.ts";
 
 const fences = documentationFences();
@@ -50,6 +51,10 @@ for (const wrapper of ["````", "~~~"])
   test(`nested TypeScript fence is rejected inside ${wrapper}`, () => {
     assert.throws(() => extractFences("example.md", wrapper + "text\n```ts\nthrow Error('nested');\n```\n" + wrapper), /nested TypeScript fence/);
   });
+for (const opener of ["```ts", "~~~typescript", "```sh"])
+  test(`HTML blocks cannot conceal a fence opener: ${opener}`, () => {
+    assert.throws(() => extractFences("example.md", `<details>\n${opener}\nthrow Error('hidden');\n${opener.slice(0, 3)}\n</details>`), /HTML block contains a fence opener/);
+  });
 test("unclosed TypeScript fences reject", () => {
   assert.throws(() => extractFences("example.md", "~~~ts\nthrow Error('unclosed');"), /unclosed TypeScript fence/);
 });
@@ -68,13 +73,27 @@ test("fence collection includes Markdown outside the guides", async () => {
 });
 
 test("new repository Markdown cannot bypass fence collection before staging", async () => {
-  const file = `test/docs-coverage-${crypto.randomUUID()}.md`;
+  const copy = await mkdtemp(join(tmpdir(), "request-seal-coverage-"));
   try {
-    await writeFile(file, "```typescript\nthrow Error('new repository fence');\n```\n");
-    const found = documentationFences().find(f => f.file === file);
+    // Git reads the real index here; object history is unnecessary for ls-files.
+    await mkdir(join(copy, ".git/objects"), {recursive: true});
+    await mkdir(join(copy, ".git/refs"), {recursive: true});
+    for (const file of ["HEAD", "index", "config"]) await cp(join(".git", file), join(copy, ".git", file));
+    // Preserve the Git-backed collector while isolating the probe from the working tree.
+    const files = execFileSync("git", ["ls-files", "--", "*.md"], {encoding: "utf8"}).trim().split("\n");
+    for (const file of files) {
+      await mkdir(dirname(join(copy, file)), {recursive: true});
+      await cp(file, join(copy, file));
+    }
+    const file = "test/docs-coverage.md";
+    await mkdir(join(copy, "test"), {recursive: true});
+    await writeFile(join(copy, file), "```typescript\nthrow Error('new repository fence');\n```\n");
+    const collected = documentationFences(copy);
+    assert.ok(collected.some(f => f.file === "README.md"), "known README programs remain visible through the copied index");
+    const found = collected.find(f => f.file === file);
     assert.ok(found);
     await assert.rejects(executeFence(found), /new repository fence/);
-  } finally { await rm(file, {force: true}); }
+  } finally { await rm(copy, {recursive: true, force: true}); }
 });
 
 test("runtime-looking comments reject even on shell fences", () => {

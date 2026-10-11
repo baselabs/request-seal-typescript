@@ -17,6 +17,8 @@ const runtimeLike = /(?:\brun\b|\bruntime\b|\bdeno\b|\bbun\b)/i;
 export function extractFences(file: string, source: string): Fence[] {
   const lines = source.split(/\r?\n/), fences: Fence[] = [];
   for (const token of markdown.parse(source, {})) {
+    if (token.type === "html_block" && /(?:^|\n)\s*(?:> ?)*(?:`{3,}|~{3,})/.test(token.content))
+      throw new Error(`${file}: HTML block contains a fence opener`);
     if (token.type !== "fence") continue;
     const language = token.info.trim();
     if (typescriptLike.test(language) && language !== "ts" && language !== "typescript")

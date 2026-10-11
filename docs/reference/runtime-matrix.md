@@ -15,7 +15,7 @@ assertions use exact patch versions.
 | --- | --- | --- |
 | Node 22.12.0 | 22.12.0 | OS trust requires a nonempty system store; empty-query Fetch signing returns `adapter/invalid_request`. |
 | Node 24.21.0 | 24.21.0 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
-| Node 26.11.1 | 26.11.1 | Required check name: `Node 26`; same Fetch verification restriction. |
+| Node 26.11.1 | 26.11.1 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Deno 2.5.6 | 2.5.6 | `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
 | Deno 2.9.7 | 2.9.7 | Denied OS roots check only; without `--allow-sys=ca`, source creation and fetch return `discovery/transport_unavailable`. Full-suite support is not asserted. |
 | Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |

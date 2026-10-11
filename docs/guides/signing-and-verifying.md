@@ -81,6 +81,8 @@ Cover `@scheme` as well as `@authority` when the scheme matters. RFC 9421 omits 
 | `content` | `"not_required"`, or which digest algorithms must be present and recomputed. |
 | `replay` | `"not_required"`, or a nonce commitment and a store. See [replay protection](replay-protection.md). |
 
+On NTP-synchronized hosts, a few seconds of `skew` accommodates small clock differences; a wider window accepts older signatures.
+
 Optional members are `extraComponents` (`"allow"` or `"reject"`), `maxSignatures`, and `fieldSchemas` for Structured Fields you cover.
 
 `verify(message, policy, { label })` checks exactly the signature you name. It does not try every label and accept the first that passes. It returns a frozen `Verification` only after the cryptography, coverage, freshness, content, and replay layers all succeed. Calling `serializeVerification` gives the ordered, language-neutral facts if you need to log or compare them; the default JSON form hides parameters and key identifiers.
@@ -133,8 +135,6 @@ A message can carry more than one signature, for example one from the sender and
 ## Respond to a rejection
 
 Every failure is a `Result` with a bounded `error`. Branch on `error.kind` and `error.reason`; never on message text. The adapters wrap the underlying reason in `error.source`.
-
-On NTP-synchronized hosts, a few seconds of `skew` accommodates small clock differences; a wider window accepts older signatures.
 
 The function below maps any error to an HTTP status. It is a recommendation, not a requirement; change a status if your service has a reason to. For `adapter/limit`, 413 is an optional alternative to 400. The reasoning, stated once:
 

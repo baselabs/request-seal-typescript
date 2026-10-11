@@ -73,7 +73,7 @@ and target-inapplicable components. Up to 16 requests and 65,536 bytes are
 accepted. `AcceptSignature.serialize(requests)` produces canonical bytes with
 parameter order keyid, alg, created, expires, nonce, tag.
 
-Reference parity: the published RequestSeal v0.4.1 implementation drops
+Reference parity: the published RequestSeal for Elixir 0.4.1 implementation drops
 Structured Fields parameter types before validating requests. This port therefore
 accepts `tag=abc` and `keyid=:YWJj:` as the string `"abc"` and serializes them
 as quoted strings. This differs from RFC 9421 Section 5's string type

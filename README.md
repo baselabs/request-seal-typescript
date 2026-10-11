@@ -12,7 +12,7 @@ npm install @request-seal/core
 
 See [CHANGELOG.md](CHANGELOG.md) for published versions and unreleased changes. The package is ESM. It needs Node 22.12.0 or newer, and the core API also runs on Deno and Bun (see Compatibility below). In TypeScript, use `nodenext` or `bundler` module resolution so subpath imports such as `@request-seal/core/fetch` resolve. Complete programs generate keys, close their loopback servers, and assert results; the labeled verification excerpts need the setup in their expanded programs.
 
-Save a complete program as `example.ts` in a project whose `package.json` has `"type": "module"`. On Node 22, run `node --experimental-strip-types example.ts`; on Node 24 and later, run `node example.ts`. For fences marked Deno, run `deno run --allow-read --allow-net=127.0.0.1,jsr.io example.ts`; for Bun, run `bun run example.ts`.
+Save a complete program as `example.ts` in a project whose `package.json` has `"type": "module"`. On Node 22, run `node --experimental-strip-types example.ts`; on Node 24 and later, run `node example.ts`. For programs marked Deno, run `deno run --allow-read --allow-net=127.0.0.1,jsr.io example.ts`; for Bun, run `bun run example.ts`.
 
 ## Sign a request
 
@@ -23,12 +23,11 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { Custody } from "@request-seal/core";
 import { signedFetch } from "@request-seal/core/fetch";
-// In production, load persisted keys from your secret store.
 const key = await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) });
 const server = createServer((req, res) => res.end(String(req.headers["signature-input"]))).listen(0, "127.0.0.1");
 await new Promise((ready) => server.once("listening", ready));
 const spec = { label: "sig", components: '("@method" "@authority" "@path")', algorithm: "hmac-sha256", expiresIn: 60 };
-const sent = await signedFetch(`http://127.0.0.1:${(server.address() as { port: number }).port}/orders`, { method: "POST", body: "hi" }, { spec, signer: key.ok ? key.value : assert.fail() });
+const sent = await signedFetch(`http://127.0.0.1:${(server.address() as { port: number }).port}/orders`, { method: "GET" }, { spec, signer: key.ok ? key.value : assert.fail() });
 assert.ok(sent.ok && (await sent.value.response.text()).startsWith('sig=("@method" "@authority" "@path")')); server.close();
 ```
 
@@ -36,11 +35,25 @@ Next: [getting started](docs/guides/getting-started.md) for a core sign/verify r
 
 ## Verify an RFC 9421 request
 
-Build an explicit policy, then call `verify(message, policy, { label: "sig" })`. The [strict RFC 9421 recipe](#strict-rfc-9421) below signs a body, checks its digest, and rejects a second use.
+Build an explicit policy, then call `verify(message, policy, { label: "sig" })`. This bodyless example signs a GET, verifies it with a configured key, and rejects a changed method. The [strict RFC 9421 recipe](#strict-rfc-9421) below also checks a body digest and rejects a second use.
+
+```ts
+import assert from "node:assert/strict";
+import { Custody, Message, Policy, ok, sign, verify, type Result } from "@request-seal/core";
+const must = <T>(r: Result<T>): T => { assert.ok(r.ok); return (r as { value: T }).value; };
+const key = must(await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) }));
+const components = '("@method" "@authority" "@path")';
+const policy = must(Policy.create({ algorithms: ["hmac-sha256"], components, keyResolver: () => ok({ algorithm: "hmac-sha256", key }), freshness: { clock: () => Math.floor(Date.now() / 1000), maxAge: 60, skew: 5, requireExpires: true }, content: "not_required", replay: "not_required" }));
+const signed = must(await sign(must(await Message.request("GET", "https://api.example/orders", [], "")), { label: "sig", components, algorithm: "hmac-sha256", expiresIn: 60 }, key));
+must(await verify(signed, policy, { label: "sig" }));
+const altered = must(Message.create({ ...signed, method: "DELETE" }));
+const rejected = await verify(altered, policy, { label: "sig" });
+assert.ok(!rejected.ok && rejected.error.kind === "core" && rejected.error.reason === "invalid_signature");
+```
 
 ## Verify a Web Bot Auth request
 
-[Web Bot Auth](docs/guides/web-bot-auth.md) lets automated agents sign their requests so a site can tell who is calling. Web Bot Auth does not authenticate request bodies. Verification trusts only the agent directories you configure, checks the signature against keys from them, and returns the verified agent. It never authorizes: that stays your decision.
+[Web Bot Auth](docs/guides/web-bot-auth.md) lets automated agents sign their requests so a site can tell who is calling. A Web Bot Auth signature covers `@authority` by default, not the body. To authenticate the body, the agent signs `content-digest` and the verification policy requires content checking; the excerpts below do not. Verification trusts only the agent directories you configure, checks the signature against keys from them, and returns the verified agent. It never authorizes: that stays your decision.
 
 `content: "not_required"` skips body digest checks; `replay: "not_required"` allows repeated signatures within their freshness window. These local test programs use unsigned snapshots with `requireSignedDirectory: false`; production directories should keep the signed-directory default. See the [signed directory program](docs/guides/web-bot-auth.md).
 
@@ -49,6 +62,8 @@ Each verification excerpt below is at most fifteen lines and matches the code be
 ### Express
 
 This GET route accepts bodyless requests. `captureRequest` runs first so the exact request line, headers, and body are kept before any parser touches them. See [Node HTTP](docs/guides/node-http.md) for Fastify, proxies, and body parsers.
+
+In your project, run `npm install express` and use `import express from "express";`. Replace the complete program's `createRequire` setup with that import; it loads the repository's pinned dependency only for these executable examples.
 
 Verification excerpt (14 lines):
 
@@ -220,7 +235,7 @@ A verifier states six choices: algorithms, required components, a key resolver, 
 
 ### Strict RFC 9421
 
-Accepts one algorithm, requires exact coverage, recomputes the body digest, bounds the signature count, and lets each signature work once.
+Accepts one algorithm, requires exact coverage, recomputes the body digest, bounds the signature count, and lets each signature work once. `createMemoryStore` is per process; use the [PostgreSQL store](docs/guides/replay-protection.md#postgresql-store) for multi-instance deployments.
 
 ```ts
 import assert from "node:assert/strict";
@@ -261,7 +276,7 @@ assert.ok(!again.ok && again.error.kind === "core" && again.error.reason === "re
 
 ### Strict Web Bot Auth
 
-Trusts one configured directory, refuses long-lived signatures and unrelated labels, and claims each nonce once.
+Trusts one configured directory, refuses long-lived signatures and unrelated labels, and claims each nonce once. `createMemoryStore` is per process; use the [PostgreSQL store](docs/guides/replay-protection.md#postgresql-store) for multi-instance deployments.
 
 ```ts
 import assert from "node:assert/strict";
@@ -372,6 +387,6 @@ Reference: [signing and verification](docs/reference/sign-and-verify.md), [adapt
 
 ## Compatibility
 
-The core runs on Node 22.12.0, 24.21.0, and 26.11.1, Deno 2.5.6, and Bun 1.3.14. Fetch signs on those runtimes, but Fetch verification supports only Deno 2.5.6. HTTPS discovery requires Node; use caller-owned snapshots elsewhere. In browsers (Chromium 156.0.8078.4, Firefox 157.0, WebKit 27.2), the Fetch adapter signs only; core verification is separate. See the [runtime matrix](docs/reference/runtime-matrix.md) for exact tested versions, permissions, and limitations.
+The core runs on Node 22.12.0, 24.21.0, and 26.11.1, Deno 2.5.6, and Bun 1.3.14. Fetch signs on those runtimes, but Fetch verification supports only Deno 2.5.6. HTTPS discovery requires Node; use caller-owned snapshots elsewhere. In browsers (Chromium 156.0.8078.4, Firefox 157.0, WebKit 27.2), the Fetch adapter signs only. Core `verify` checks a caller-built `Message` under an explicit policy without using the Fetch adapter. See the [runtime matrix](docs/reference/runtime-matrix.md) for exact tested versions, permissions, and limitations.
 
 Crypto, custody, and error vocabulary follow RequestSeal for Elixir 0.4.1; conformance uses its byte-preserved 0.4.0 corpus. See [the corpus pin](CONTRIBUTING.md) and [replay protection](docs/reference/replay.md).
