@@ -46,7 +46,7 @@ test('browser signedFetch delivers an authenticated POST to the page server', as
   const owner = value(await Seal.Custody.local('hmac-sha256', {hmac: crypto.getRandomValues(new Uint8Array(32))}));
   try {
     const result = value(await signedFetch(new Request(origin, {method: 'POST', body: payload()}), undefined,
-      {spec: {label: 'sig', components: '("@method")', algorithm: 'hmac-sha256', expiresIn: 60}, signer: owner, signingTimeout: 30000}));
+      {spec: {label: 'sig', components: '("@method")', algorithm: 'hmac-sha256', expiresIn: 60}, signer: owner}, {signingTimeout: 30000}));
     assert.equal(result.response.status, 200);
     await result.response.arrayBuffer();
   } finally {await owner.release();}
