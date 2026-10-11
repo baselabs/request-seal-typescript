@@ -6,6 +6,7 @@ import { isDiscoveryCache, type DiscoveryCache } from "./cache.ts";
 import { fromSnapshot } from "./snapshot.ts";
 import { type Resolution } from "./body.ts";
 import { ensure, unwrap, failure } from "./support.ts";
+/** A discovery-backed signature key resolver. @inline */
 export type KeyResolver = (
   request: unknown,
 ) => Promise<
@@ -13,6 +14,7 @@ export type KeyResolver = (
     Readonly<{ algorithm: Resolution["algorithm"]; key: Resolution["key"] }>
   >
 >;
+/** Create a resolver over a branded key set or caller-owned discovery cache. */
 function resolver(input: unknown, opts: unknown): Result<KeyResolver> {
   try {
     const a = unwrap(snapshotOptions(opts, ["algorithms"]), "invalid_options");
@@ -62,8 +64,13 @@ function resolver(input: unknown, opts: unknown): Result<KeyResolver> {
     return failure(e, "invalid_options");
   }
 }
-const Resolver = Object.freeze(Object.assign(resolver, { fromSnapshot }));
-export const Discovery = Object.freeze({ resolver: Resolver });
+const Resolver = Object.freeze(Object.assign(resolver, {
+  /** Parse a caller-supplied discovery snapshot without fetching it. */
+  fromSnapshot }));
+/** Snapshot resolution and explicit discovery operations. */
+export const Discovery = Object.freeze({
+  /** Create a resolver over a branded key set or caller-owned discovery cache. */
+  resolver: Resolver });
 export { DiscoverySource, isDiscoverySource, directoryId } from "./source.ts";
 export {
   isKeySet,

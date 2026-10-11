@@ -14,12 +14,14 @@ import {
 import { messageError, isRequestSealError } from '../errors/types.ts';
 import type { Reason } from '../errors/parity.ts';
 import { err, ok, type Result } from '../result.ts';
+/** An owned HTTP field occurrence with its section and byte value. */
 export type FieldOccurrence = Readonly<{
   name: string;
   value: Uint8Array;
   section: 'headers' | 'trailers';
   provenance: 'caller' | 'http1' | 'http2' | 'http3';
 }>;
+/** Owned or unavailable body bytes with explicit retention and completeness facts. */
 export type Body = Readonly<{
   state: 'retained' | 'streaming' | 'consumed' | 'unavailable';
   bytes: Uint8Array | null;
@@ -27,11 +29,13 @@ export type Body = Readonly<{
   ownership: 'caller';
   maxBytes: number;
 }>;
+/** Branded TLS and peer-certificate facts captured by an adapter. */
 export type TransportFacts = Readonly<{
   httpVersion: 'unknown' | 'http1_0' | 'http1_1' | 'http2' | 'http3';
   tls: 'unknown' | 'plain' | 'tls';
   evidence: 'declared';
 }>;
+/** A branded HTTP request or response preserving target and field bytes. */
 export type Message = Readonly<{
   kind: 'request' | 'response';
   method: string | null;
@@ -50,15 +54,19 @@ const messages = new WeakSet<object>();
 const fieldOccurrences = new WeakSet<object>();
 const bodies = new WeakSet<object>();
 const transportFacts = new WeakSet<object>();
+/** Check the private brand of an HTTP message. */
 export function isMessage(value: unknown): value is Message {
   return typeof value === 'object' && value !== null && messages.has(value);
 }
+/** Check the private brand of a field occurrence. */
 export function isFieldOccurrence(value: unknown): value is FieldOccurrence {
   return typeof value === 'object' && value !== null && fieldOccurrences.has(value);
 }
+/** Check the private brand of a body snapshot. */
 export function isBody(value: unknown): value is Body {
   return typeof value === 'object' && value !== null && bodies.has(value);
 }
+/** Check the private brand of captured transport facts. */
 export function isTransportFacts(value: unknown): value is TransportFacts {
   return typeof value === 'object' && value !== null && transportFacts.has(value);
 }
@@ -340,22 +348,33 @@ function message(input: unknown, related = false): Message {
     relatedRequest: request,
   }, messages);
 }
+/** Field occurrence construction and validation. */
 export const FieldOccurrence = Object.freeze({
+  /** Validate and brand the supplied HTTP snapshot. */
   create: (a: unknown): Result<FieldOccurrence> => protect(() => field(a), 'invalid_field'),
+  /** Validate the snapshot using the same boundary as construction. */
   validate: (a: unknown): Result<FieldOccurrence> => protect(() => field(a), 'invalid_field'),
 });
+/** Body snapshot construction and validation. */
 export const Body = Object.freeze({
+  /** Validate and brand the supplied HTTP snapshot. */
   create: (a: unknown): Result<Body> => protect(() => body(a), 'invalid_body'),
+  /** Validate the snapshot using the same boundary as construction. */
   validate: (a: unknown): Result<Body> => protect(() => body(a), 'invalid_body'),
 });
+/** Transport snapshot construction and validation. */
 export const TransportFacts = Object.freeze({
+  /** Validate and brand the supplied HTTP snapshot. */
   create: (a: unknown): Result<TransportFacts> => protect(() => transport(a), 'invalid_transport'),
+  /** Validate the snapshot using the same boundary as construction. */
   validate: (a: unknown): Result<TransportFacts> =>
     protect(() => transport(a), 'invalid_transport'),
 });
+/** Validate and brand a lossless HTTP message snapshot. */
 export function createMessage(a: unknown): Result<Message> {
   return protect(() => message(a), 'invalid_message');
 }
+/** Validate a message snapshot through the same constructor boundary. */
 export const validateMessage = createMessage;
 async function builder(
   kind: 'request' | 'response',
@@ -441,9 +460,13 @@ async function builder(
     );
   }
 }
+/** Lossless HTTP message construction and validation. */
 export const Message = Object.freeze({
+  /** Validate and brand the supplied HTTP snapshot. */
   create: createMessage,
+  /** Validate the snapshot using the same boundary as construction. */
   validate: validateMessage,
+  /** Build a branded HTTP request with owned field and body bytes. */
   request: (
     method: unknown,
     target: unknown,
@@ -451,6 +474,7 @@ export const Message = Object.freeze({
     bytes: unknown,
     options: unknown = {},
   ): Promise<Result<Message>> => builder('request', method, target, fields, bytes, options),
+  /** Build a branded HTTP response with owned field and body bytes. */
   response: (
     status: unknown,
     fields: unknown,

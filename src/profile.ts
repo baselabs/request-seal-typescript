@@ -12,9 +12,11 @@ import type { Verification, FreshnessFacts } from "./verification.ts";
 
 /** Descriptive extension selection; source-specific enforcement belongs to the extension. */
 export type ProfileMetadataValue = string | boolean | null | number;
+/** A namespaced extension profile name and bounded public metadata. */
 export type ProfileStamp<MetadataKey extends string = never> = Readonly<{
   name: readonly [packageName: string, kind: string];
 }> & Readonly<Record<Exclude<MetadataKey, "name">, ProfileMetadataValue>>;
+/** Paired parsed Signature-Input and Signature dictionaries. */
 export type SignatureDictionaries = readonly [
   readonly (readonly [string, InnerList])[],
   Readonly<Record<string, Item>>,
@@ -67,6 +69,7 @@ function protectedError(e: unknown) {
 function validSignatureInput(input: unknown): boolean {
   try { return validInner(input as Member); } catch { return false; }
 }
+/** Parse paired Signature-Input and Signature dictionaries within the member limit. */
 function dictionaries(message: unknown, max: number): Result<SignatureDictionaries> {
   try {
     ensure(isMessage(message) && Number.isSafeInteger(max) && max >= 1 && max <= STRUCTURED_FIELDS_LIMITS.maxMembers, "invalid_policy", "input");
@@ -83,6 +86,7 @@ function paired(message: unknown, max: number) {
   ensure(inputs.size === signatures.size && [...inputs.keys()].every(k => signatures.has(k)), "label_mismatch", "fields");
   return values;
 }
+/** Validate covered components and signature freshness before verification. */
 async function preflight(input: unknown, components: unknown, extra: "allow" | "reject", freshness: unknown): Promise<Result<FreshnessFacts | "not_evaluated">> {
   try {
     const required = inner(components);
@@ -152,8 +156,11 @@ function signatureSnapshot(value: unknown): Item {
   ensure(bareKind === "bytes" && bytes instanceof Uint8Array && bytes.length >= 1 && bytes.length <= SIGNATURE_MAX_BYTES, "invalid_signature_field", "fields");
   return {kind: "item", value: {kind: "bytes", value: new Uint8Array(bytes)}, parameters: parameters as Item["parameters"]};
 }
+/** Verify a selected signature label under an explicit extension profile stamp. */
 function verifyLabel<K extends string>(message: unknown, policy: unknown, selectedLabel: unknown, input: unknown, signature: unknown, stamp: ProfileStamp<K>): Promise<Result<Verification>>;
+/** Verify a selected signature label under an explicit extension profile stamp. */
 function verifyLabel(message: unknown, policy: unknown, selectedLabel: unknown, input: unknown, signature: unknown, stamp: unknown): Promise<Result<Verification>>;
+/** Verify a selected signature label under an explicit extension profile stamp. */
 async function verifyLabel(message: unknown, policy: unknown, selectedLabel: unknown, input: unknown, signature: unknown, stamp: unknown): Promise<Result<Verification>> {
   try {
     const profile = snapshotStamp(stamp);
@@ -173,4 +180,12 @@ async function verifyLabel(message: unknown, policy: unknown, selectedLabel: unk
   } catch (e) { return err(protectedError(e)); }
 }
 /** Unstable extension boundary. Pin the package exactly and keep profile names constant. */
-export const Profile = Object.freeze({validSignatureInput, dictionaries, preflight, verifyLabel});
+export const Profile = Object.freeze({
+  /** Check the brand and shape of a signature-input inner list. */
+  validSignatureInput,
+  /** Parse paired Signature-Input and Signature dictionaries within the member limit. */
+  dictionaries,
+  /** Validate covered components and signature freshness before verification. */
+  preflight,
+  /** Verify a selected signature label under an explicit extension profile stamp. */
+  verifyLabel});

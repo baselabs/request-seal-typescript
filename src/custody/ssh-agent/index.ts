@@ -60,4 +60,7 @@ export async function createSshAgent(
     return failure(e);
   }
 }
-export const SSHAgent = Object.freeze({ create: createSshAgent });
+/** Caller-selected OpenSSH agent custody construction. */
+export const SSHAgent = Object.freeze({
+  /** Bind an algorithm and public key to a caller-selected OpenSSH agent socket. */
+  create: createSshAgent });

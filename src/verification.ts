@@ -7,6 +7,7 @@ import type { DigestFacts } from "./digest.ts";
 import { isReplayReceipt } from "./replay/receipt.ts";
 import { coreError } from "./errors/types.ts";
 import { ok, err, type Result } from "./result.ts";
+/** The clock, age, skew, and timestamps used in successful freshness validation. */
 export type FreshnessFacts = Readonly<{
   now: number;
   created: number | null;
@@ -14,6 +15,7 @@ export type FreshnessFacts = Readonly<{
   maxAge: number | null;
   skew: number;
 }>;
+/** Branded signature, content, freshness, replay, and principal verification facts. */
 export type Verification = Readonly<{
   label: string;
   signature: Readonly<{
@@ -33,6 +35,7 @@ export type Verification = Readonly<{
   authorization: "not_evaluated";
 }>;
 const verifications = new WeakSet<object>();
+/** Check the private brand of a single-signature verification result. */
 export function isVerification(value: unknown): value is Verification {
   return (
     typeof value === "object" && value !== null && verifications.has(value)
@@ -167,6 +170,7 @@ export function verificationFacts(value: unknown): Result<unknown> {
     authorization: value.authorization,
   });
 }
+/** Encode the canonical public verification facts as JSON bytes. */
 export function serializeVerification(value: unknown): Result<Uint8Array> {
   const r = verificationFacts(value);
   if (!r.ok) return r;

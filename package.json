@@ -61,19 +61,30 @@
     "url": "https://github.com/baselabs/request-seal-typescript/issues"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "typecheck:web": "tsc -p tsconfig.web.json",
+    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.json",
+    "typecheck:web": "node node_modules/typescript/bin/tsc -p tsconfig.web.json",
     "test": "node --unhandled-rejections=strict --experimental-strip-types --no-warnings --test-concurrency=4 --test test/*.test.ts",
     "test:red": "node --unhandled-rejections=strict --experimental-strip-types --no-warnings --test test/red/planted.test.ts",
     "self-checks": "node --experimental-strip-types --no-warnings self-checks.ts",
-    "build": "node --experimental-strip-types --no-warnings scripts/clean-dist.ts && tsc -p tsconfig.build.json",
+    "build": "node --experimental-strip-types --no-warnings scripts/clean-dist.ts && node node_modules/typescript/bin/tsc -p tsconfig.build.json",
     "conformance": "node --experimental-strip-types --no-warnings tools/conformance/cli.ts --corpus test/fixtures/corpus-smoke --smoke && node --experimental-strip-types --no-warnings tools/conformance/cli.ts --corpus conformance --pending-ok",
     "pack:check": "node --experimental-strip-types --no-warnings scripts/pack-check.ts",
-    "check": "npm run typecheck && npm run typecheck:web && npm test && npm run self-checks && npm run build && npm run conformance && npm run pack:check"
+    "check": "npm run typecheck && npm run typecheck:web && npm run build && npm test && npm run self-checks && npm run conformance && npm run pack:check",
+    "docs": "node --import ./scripts/typedoc-register.mjs node_modules/typedoc/bin/typedoc --options typedoc.json"
   },
   "devDependencies": {
+    "@types/markdown-it": "14.1.2",
     "@types/node": "26.6.4",
     "fast-check": "4.10.2",
-    "typescript": "7.0.2"
+    "github-slugger": "2.0.0",
+    "markdown-it": "14.3.2",
+    "typedoc": "0.28.20",
+    "typescript": "7.0.2",
+    "typescript-docs": "npm:typescript@6.0.3"
+  },
+  "overrides": {
+    "typedoc": {
+      "typescript": "$typescript"
+    }
   }
 }

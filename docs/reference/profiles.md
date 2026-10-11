@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** RequestSeal v0.4.1 Profile contract, ADR 0013, RFC 9421, and the shared conformance corpus · **Review when:** extension surface, stamps, or verification facts change
+**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** RequestSeal v0.4.1 Profile contract (reference ADR 0013, the extension-profile boundary), RFC 9421, and the shared conformance corpus · **Review when:** extension surface, stamps, or verification facts change
 
 # Extension profiles
 

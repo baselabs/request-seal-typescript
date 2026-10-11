@@ -497,6 +497,7 @@ export async function verifyLabel(
   }
 }
 
+/** Verify one HTTP signature under an explicit branded policy. */
 export function verify(message: unknown, policy: unknown, options: unknown): Promise<Result<Verification>> {
   return verifyLabel(message, policy, options);
 }

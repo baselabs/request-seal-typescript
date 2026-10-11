@@ -8,6 +8,7 @@ import { createReplayStore, storeOperation } from './store.ts';
 /** Caller-owned, autocommit query. Affected-row count only; no connection is retained by the library. */
 export type Query = (sql: string, params: readonly string[], context: Readonly<{signal: AbortSignal; remainingMs: number}>) => Promise<number>;
 const tableName = (value: unknown): value is string => typeof value === 'string' && value.length >= 1 && value.length <= 63 && /^[a-z][a-z0-9_]*$/.test(value);
+/** Validate a table name and return replay-store creation SQL. */
 export function ddl(table: unknown): Result<string> {
   return tableName(table) ? ok(`CREATE TABLE "${table}" (namespace bytea NOT NULL, key bytea NOT NULL, retain_until bigint NOT NULL, PRIMARY KEY (namespace, key))`) : err(replayError('invalid_store'));
 }

@@ -19,10 +19,12 @@ import { bytes, headerValue, need, take, type Header } from "./header.ts";
 import { bounded, publicSafe, alive, JWE_ALGORITHMS } from "./support.ts";
 const branded = new WeakSet<object>(),
   token = Object.freeze({});
+/** Owned encrypted-key and content-encryption-key bytes from key wrapping. */
 export type WrapResult = Readonly<{
   encrypted_key: Uint8Array<ArrayBuffer>;
   header: Header;
 }>;
+/** Check the private brand of a JOSE key-management handle. */
 export function isKeyManagementHandle(
   value: unknown,
 ): value is KeyManagementHandle {
@@ -47,6 +49,7 @@ export class KeyManagementHandle {
     branded.add(this);
     Object.freeze(this);
   }
+  /** Import caller-owned local key material into a confined capability. */
   static async local(
     algorithm: unknown,
     material: unknown,
@@ -144,6 +147,7 @@ export class KeyManagementHandle {
       }
     });
   }
+  /** Wrap a generated content-encryption key with the bound key-management algorithm. */
   async wrap(
     algorithm: unknown,
     content: unknown,
@@ -189,6 +193,7 @@ export class KeyManagementHandle {
       );
     });
   }
+  /** Authenticate and decrypt content using the bound direct-encryption key. */
   async decrypt(
     encryptedKey: unknown,
     header: Header,
@@ -239,6 +244,7 @@ export class KeyManagementHandle {
       );
     });
   }
+  /** Confine an unwrapped content-encryption key in a decryption capability. */
   async unwrap(
     encryptedKey: unknown,
     header: Header,
@@ -281,10 +287,12 @@ export class KeyManagementHandle {
       }, "decryption_failed");
     });
   }
+  /** Release retained key-management custody and invalidate the capability. */
   async release(): Promise<Result<true>> {
     this.#key = undefined;
     return ok(true);
   }
+  /** Return a bounded public inspection view without retained cryptographic bytes. */
   toJSON(): unknown {
     return Object.freeze({
       kind: "KeyManagementHandle",
@@ -346,7 +354,10 @@ export async function wrapPublic(
     "signer_failed",
   );
 }
+/** Constructors and branding checks for JOSE key-management capabilities. */
 export const KeyManagement = Object.freeze({
+  /** Import caller-owned local key material into a confined capability. */
   local: KeyManagementHandle.local,
+  /** Check the private brand of a key-management capability. */
   isHandle: isKeyManagementHandle,
 });

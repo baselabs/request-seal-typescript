@@ -21,7 +21,7 @@ async function main(): Promise<void> {
   assert.equal(pkg.name, '@request-seal/core');
   assert.equal(pkg.publishConfig.access, 'public');
   assert.equal(pkg.dependencies, undefined);
-  assert.deepEqual(Object.keys(pkg.devDependencies).sort(), ['@types/node', 'fast-check', 'typescript']);
+  assert.deepEqual(Object.keys(pkg.devDependencies).sort(), ['@types/markdown-it', '@types/node', 'fast-check', 'github-slugger', 'markdown-it', 'typedoc', 'typescript', 'typescript-docs']);
   const [pack] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {encoding: 'utf8'}));
   assert.equal(pack.name, '@request-seal/core');
   assert.equal(pack.filename, `request-seal-core-${pkg.version}.tgz`);

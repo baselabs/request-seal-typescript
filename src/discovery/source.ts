@@ -3,7 +3,9 @@ import { decodeBase64Url, encodeBase64Url } from "../bytes.ts";
 import { certificate } from "./certificate.ts";
 import { parseAddress } from "./address.ts";
 import { ensure, failure, options, inspectable, list } from "./support.ts";
+/** Supported discovery source kinds. @inline */
 export type SourceType = "directory" | "jwks_uri" | "cimd";
+/** A branded HTTPS discovery source with bounded transport and cache policies. */
 export type DiscoverySource = Readonly<{
   type: SourceType;
   location: string;
@@ -34,6 +36,7 @@ const limits = Object.freeze({
   maxTtl: 86400,
   negativeTtl: 30,
 });
+/** Check the private brand of a discovery source. */
 export function isDiscoverySource(s: unknown): s is DiscoverySource {
   return !!s && typeof s === "object" && sources.has(s);
 }
@@ -53,6 +56,7 @@ function validDirectoryId(v: unknown): v is string {
     /^[\x20-\x7e]+$/.test(v)
   );
 }
+/** Check whether a string is a valid directory key identifier. */
 export function directoryId(value: unknown): Result<boolean> {
   return ok(validDirectoryId(value));
 }
@@ -261,7 +265,10 @@ export function createSource(input: unknown): Result<DiscoverySource> {
     return failure(e, "invalid_source");
   }
 }
+/** Discovery source construction and directory identifier validation. */
 export const DiscoverySource = Object.freeze({
+  /** Snapshot, validate, and brand an HTTPS discovery source. */
   create: createSource,
+  /** Check the directory key identifier syntax. */
   directoryId,
 });

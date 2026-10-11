@@ -26,7 +26,9 @@ import {
   systemClock,
   list,
 } from "./support.ts";
+/** Discovery proof status. @inline */
 export type Proof = "signed" | "unsigned" | "not_applicable";
+/** A branded resolved public key with origin, proof, and expiration facts. */
 export type Resolution = Readonly<{
   key: PublicKey;
   keyId: string;
@@ -43,9 +45,11 @@ export type Resolution = Readonly<{
 }>;
 const resolutions = new WeakSet<object>(),
   sets = new WeakSet<object>();
+/** Check the private brand of a discovery resolution. */
 export function isResolution(v: unknown): v is Resolution {
   return !!v && typeof v === "object" && resolutions.has(v);
 }
+/** Check the private brand of a discovery key set. */
 export function isKeySet(v: unknown): v is KeySet {
   return !!v && typeof v === "object" && sets.has(v);
 }
@@ -59,6 +63,7 @@ export function resolution(data: Resolution): Resolution {
     proof: data.proof,
   });
 }
+/** A branded immutable discovery key set with bounded key lookup. */
 export type KeySet = Readonly<{
   source: DiscoverySource;
   origin: string;
@@ -67,6 +72,7 @@ export type KeySet = Readonly<{
   expiresAt: number;
   revision: string;
   proof: Proof;
+  /** Resolve an eligible key by identifier, allowed algorithms, and current time. */
   lookup: (
     keyId: unknown,
     algorithms: unknown,
@@ -96,6 +102,7 @@ export function keySet(data: Omit<KeySet, "lookup">): KeySet {
     proof: data.proof,
   });
 }
+/** Resolve an eligible key by identifier, allowed algorithms, and current time. */
 export async function lookup(
   set: unknown,
   kid: unknown,

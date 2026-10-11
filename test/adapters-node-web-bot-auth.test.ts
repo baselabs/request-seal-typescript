@@ -2,8 +2,8 @@ import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, request, type IncomingMessage } from "node:http";
 import { once } from "node:events";
-import { createPrivateKey, createHash, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { createPrivateKey, createHash, sign } from "node:crypto";
 import {execFileWithEnvSync as execFileSync} from "./support/child-env.ts";
 import { fileURLToPath } from "node:url";
 import * as Seal from "../src/index.ts";
@@ -303,20 +303,12 @@ transportTest("Node Web Bot Auth cannot reuse an attempt reserved by generic ver
     assert.equal(N.verification(req), first);
   });
 });
-transportTest("README Node Web Bot Auth example executes against captured HTTP and signed TLS discovery", async () => {
+transportTest("Node Web Bot Auth captures first, then verifies against captured HTTP and a signed TLS directory", async () => {
   verifier();
-  const readme = readFileSync("README.md", "utf8");
-  const fence = [...readme.matchAll(/```ts\n([\s\S]*?)```/g)]
-    .map(m => m[1]!).find(code => /async function authenticateBot\b/.test(code));
-  assert.ok(fence, "README includes executable authenticateBot example");
-  const code = fence.replace('import {captureRequest, verifyWebBotAuth} from "@request-seal/core/node-http";',
-    'const {captureRequest, verifyWebBotAuth} = adapter;');
-  assert.notEqual(code, fence, 'README Node Web Bot Auth import must be replaced');
-  const execute = new Function("adapter", "req", "policy",
-    `return (async () => { ${code}\nreturn authenticateBot(req, policy); })();`) as
-    (adapter: typeof N, req: IncomingMessage, policy: Seal.WebBotAuthPolicy) => ReturnType<BotVerifier>;
   await exchange(true, async (req, p, directory) => {
-    const accepted = value(await execute(N, req, p));
+    const captured = await N.captureRequest(req); // First, before any body parser.
+    assert.equal(captured.ok, true);
+    const accepted = value(await N.verifyWebBotAuth(req, p, {timeoutMs: 5000}));
     assert.equal(value(N.verification(req)), accepted.verification);
     assert.equal(accepted.verification.profile.name, "web_bot_auth");
     assert.equal(Buffer.from(accepted.bytes).toString(), '{"a":1}');

@@ -10,15 +10,19 @@ import {err, ok, type Result} from '../result.ts';
 import * as subtle from '../crypto/subtle.ts';
 const keys = new WeakSet<object>();
 const token = Object.freeze({});
+/** A confined AES decryption capability without an exported key. */
 export type UnwrappedKey = Readonly<{
   length: 128 | 256;
+  /** Authenticate and decrypt content using confined key material. */
   decrypt: (
     ciphertext: unknown,
     options: unknown,
     context: Context,
   ) => Promise<Result<Uint8Array<ArrayBuffer>>>;
+  /** Release retained custody and invalidate the capability. */
   release: () => Promise<Result<true>>;
 }>;
+/** Check the private brand of an unwrapped content key. */
 export function isUnwrappedKey(value: unknown): value is UnwrappedKey {
   return typeof value === 'object' && value !== null && keys.has(value);
 }

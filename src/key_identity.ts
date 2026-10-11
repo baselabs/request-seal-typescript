@@ -9,9 +9,11 @@ const classKeys = new WeakMap<KeyIdentity, string>();
 /** Internal, nonserialized canonical equivalence key for scoped identity merging. */
 export function identityClassKey(identity: KeyIdentity): string | undefined { return classKeys.get(identity); }
 const token = Object.freeze({});
+/** Check the private brand of a key identity. */
 export function isKeyIdentity(value: unknown): value is KeyIdentity {
   return typeof value === 'object' && value !== null && identities.has(value);
 }
+/** A branded public, symmetric, or unknown key identity. */
 export class KeyIdentity {
   readonly kind: 'public' | 'symmetric' | 'unknown';
   #bytes: Uint8Array<ArrayBuffer> | undefined;
@@ -27,6 +29,7 @@ export class KeyIdentity {
     identities.add(this);
     Object.freeze(this);
   }
+  /** Derive an identity from a branded public key's canonical components. */
   static fromPublic(key: PublicKey): Result<KeyIdentity> {
     if (!isPublicKey(key)) return err(custodyError('invalid_key'));
     const r = key.identityBytes();
@@ -34,6 +37,7 @@ export class KeyIdentity {
       ? ok(new KeyIdentity(token, 'public', r.value))
       : err(custodyError('invalid_key'));
   }
+  /** Create a symmetric identity from caller-supplied nonsecret bytes. */
   static symmetric(value: unknown): Result<KeyIdentity> {
     try {
       if (
@@ -51,9 +55,11 @@ export class KeyIdentity {
       return err(custodyError('invalid_options'));
     }
   }
+  /** Create an identity that cannot establish key equivalence. */
   static unknown(): Result<KeyIdentity> {
     return ok(new KeyIdentity(token, 'unknown'));
   }
+  /** Compare branded key identities using their canonical identity bytes. */
   static same(a: unknown, b: unknown): Result<boolean> {
     if (!isKeyIdentity(a) || !isKeyIdentity(b))
       return err(custodyError('invalid_key'));
@@ -68,6 +74,7 @@ export class KeyIdentity {
       diff |= a.#bytes![i]! ^ b.#bytes![i]!;
     return ok(diff === 0);
   }
+  /** Return a bounded public inspection view without retained cryptographic bytes. */
   toJSON(): Readonly<{kind: KeyIdentity['kind']}> {
     return Object.freeze({kind: this.kind});
   }

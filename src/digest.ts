@@ -14,16 +14,23 @@ import { isMessage, isBody, type Message, type Body } from "./message/index.ts";
 import { digestError, isRequestSealError } from "./errors/types.ts";
 import type { Reason } from "./errors/parity.ts";
 import { ok, err, type Result } from "./result.ts";
+/** Supported content-digest algorithm identifiers. */
 export type DigestAlgorithm = "sha-256" | "sha-512";
+/** Content or representation digest field selection. */
 export type DigestKind = "content" | "representation";
+/** A caller-owned incremental hashing session. */
 export type HashSession = {
+  /** Hash an owned chunk while enforcing state and total byte limits. */
   update: (chunk: Uint8Array) => void | Promise<void>;
+  /** Finalize the selected digest algorithms into a canonical digest field. */
   finish: () => Uint8Array | Promise<Uint8Array>;
 };
 /** create, update, and finish must be own properties; bind class prototype methods explicitly. */
 export type IncrementalHasher = {
+  /** Create a bounded digest state after validating the incremental hasher. */
   create: (algorithm: DigestAlgorithm) => HashSession | Promise<HashSession>;
 };
+/** Verified digest kind, algorithms, section, and processed byte count. */
 export type DigestFacts = Readonly<{
   kind: "content-digest" | "repr-digest";
   checked: readonly string[];
@@ -126,16 +133,19 @@ function validate(value: Dictionary): Result<Dictionary> {
     return err(error(e, "invalid_field"));
   }
 }
+/** Parse a Content-Digest dictionary and validate its members. */
 export function parseDigest(bytes: unknown): Result<Dictionary> {
   const r = sfParse("dictionary", bytes, { schema });
   return r.ok ? validate(r.value as Dictionary) : r;
 }
+/** Serialize and validate a digest dictionary. */
 export function serializeDigest(value: unknown): Result<Uint8Array> {
   const r = sfSerialize(value, { schema });
   if (!r.ok) return r;
   const parsed = parseDigest(r.value);
   return parsed.ok ? r : parsed;
 }
+/** Compute a canonical digest field for the selected algorithms. */
 export async function digest(
   content: unknown,
   names: unknown,
@@ -172,11 +182,13 @@ const knownAnswers = Object.freeze({
   ]),
 });
 const states = new WeakSet<object>();
+/** Check the private brand of an incremental digest state. */
 export function isDigestState(value: unknown): value is DigestState {
   return typeof value === "object" && value !== null && states.has(value);
 }
 const token = Object.freeze({});
 const busySessions = new WeakSet<object>();
+/** A branded, bounded incremental digest computation. */
 export class DigestState {
   readonly kind: DigestKind;
   readonly maxBytes: number;
@@ -201,6 +213,7 @@ export class DigestState {
   get bytes(): number {
     return this.#bytes;
   }
+  /** Create a bounded digest state after validating the incremental hasher. */
   static async create(
     kind: unknown,
     names: unknown,
@@ -274,6 +287,7 @@ export class DigestState {
       return err(error(e, "invalid_state"));
     }
   }
+  /** Hash an owned chunk while enforcing state and total byte limits. */
   async update(chunk: unknown): Promise<Result<DigestState>> {
     try {
       ensure(
@@ -299,6 +313,7 @@ export class DigestState {
       return err(error(e, "invalid_state"));
     }
   }
+  /** Finalize the selected digest algorithms into a canonical digest field. */
   async finish(): Promise<Result<Uint8Array>> {
     try {
       ensure(
@@ -332,6 +347,7 @@ export class DigestState {
       return err(error(e, "invalid_state"));
     }
   }
+  /** Return a bounded public inspection view without retained cryptographic bytes. */
   toJSON(): unknown {
     return { kind: this.kind, bytes: this.#bytes, maxBytes: this.maxBytes };
   }
@@ -356,6 +372,7 @@ export function digestField(
       : r;
   return validate(r.value as Dictionary);
 }
+/** Check required digest fields against retained bytes or an incremental state. */
 export async function checkDigest(
   message: unknown,
   kind: unknown,
@@ -444,9 +461,14 @@ export async function checkDigest(
     return err(error(e, "invalid_state"));
   }
 }
+/** Content-digest computation, parsing, serialization, and checking. */
 export const Digest = Object.freeze({
+  /** Compute the selected content digests over owned body bytes. */
   content: digest,
+  /** Parse and validate the supported wire representation. */
   parse: parseDigest,
+  /** Serialize validated values to their canonical wire representation. */
   serialize: serializeDigest,
+  /** Check required content digests against retained body bytes. */
   check: checkDigest,
 });

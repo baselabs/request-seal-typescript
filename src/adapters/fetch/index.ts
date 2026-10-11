@@ -14,26 +14,31 @@ import { err, ok, type Result } from "../../result.ts";
 import { canVerify, runtime, signingRefusals } from "./runtime.ts";
 import * as S from "../support.ts";
 export { FETCH_VERIFICATION_RUNTIMES } from "./runtime.ts";
+/** A Fetch request and its signed lossless message. */
 export type SignedRequest = Readonly<{
   request: Request;
   message: HttpMessage;
 }>;
+/** A Fetch response and its signed lossless message. */
 export type SignedResponse = Readonly<{
   response: Response;
   message: HttpMessage;
 }>;
+/** Captured Fetch request bytes accompanied by verification facts. */
 export type VerifiedRequest = Readonly<{
   request: Request;
   message: HttpMessage;
   verification: Verification;
   bytes: Uint8Array;
 }>;
+/** Captured Fetch response bytes accompanied by verification facts. */
 export type VerifiedResponse = Readonly<{
   response: Response;
   message: HttpMessage;
   verification: Verification;
   bytes: Uint8Array;
 }>;
+/** A signed Fetch request, its response, and optional response verification. */
 export type SignedExchange = Readonly<{
   response: Response;
   request: SignedRequest;
@@ -238,6 +243,7 @@ function verifySupported(
     }
   }
 }
+/** Construct a signed Fetch request from an owned body snapshot. */
 export async function signRequest(
   request: unknown,
   input: unknown,
@@ -328,6 +334,7 @@ async function signRequestOperation(
     return S.caught(e, "fetch", "sign", "signing_failed");
   }
 }
+/** Construct a signed Fetch response from an owned body snapshot. */
 export async function signResponse(
   response: unknown,
   input: unknown,
@@ -389,6 +396,7 @@ function related(
   }
   throw S.failure("fetch", stage, "invalid_options");
 }
+/** Verify a Fetch request on an explicitly supported wire runtime. */
 export async function verifyRequest(
   request: unknown,
   policy: unknown,
@@ -490,6 +498,7 @@ export async function verifyRequest(
     return S.caught(e, "fetch", "verify", "request_rejected");
   }
 }
+/** Verify a Fetch response on an explicitly supported wire runtime. */
 export async function verifyResponse(
   response: unknown,
   policy: unknown,
@@ -569,6 +578,7 @@ export async function verifyResponse(
     return S.caught(e, "fetch", "verify", "response_rejected");
   }
 }
+/** Send a signed Fetch request with explicit redirect and response policies. */
 export async function signedFetch(
   input: unknown,
   init: unknown,

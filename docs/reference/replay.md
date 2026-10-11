@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** ADR 0005 and the shared v0.4.0 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
+**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** reference ADR 0005 (the atomic replay envelope) and the shared v0.4.0 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
 
 # Replay protection
 

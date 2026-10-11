@@ -14,6 +14,7 @@ import {
   type JoseError,
 } from "../errors/types.ts";
 import { err, ok, type Result } from "../result.ts";
+/** An ordered JOSE protected-header sequence of JSON members. */
 export type Header = readonly (readonly [string, JsonNode])[];
 export function fail(
   reason: JoseError["reason"],

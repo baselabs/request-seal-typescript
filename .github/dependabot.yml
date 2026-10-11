@@ -17,7 +17,7 @@ updates:
       development:
         patterns: ["*"]
   - package-ecosystem: npm
-    directories: ["/interop", "/interop/adapters", "/interop/browser"]
+    directories: ["/interop", "/interop/adapters", "/interop/browser", "/interop/migration"]
     schedule:
       interval: weekly
     groups:

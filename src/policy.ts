@@ -23,36 +23,44 @@ import type { PublicKey } from "./public_key.ts";
 import { boundedReplayBytes } from "./replay/claim.ts";
 import { createReplayStore } from "./replay/store.ts";
 import type { ReplayStore, ReplayFacts } from "./replay-port.ts";
+/** A caller-owned signature verification callback receiving a bounded context. */
 export type Verifier = (
   algorithm: SigningAlgorithm,
   base: Uint8Array,
   signature: Uint8Array,
   context: Context,
 ) => Result<boolean> | Promise<Result<boolean>>;
+/** A resolved algorithm and key or verification capability with optional identity. */
 export type ResolvedKey = Readonly<{
   algorithm: SigningAlgorithm;
   key?: PublicKey | KeyHandle | Verifier;
   verify?: Verifier;
   identity?: KeyIdentity;
 }>;
+/** Resolve a verification key from signature facts and an operation context. */
 export type KeyResolver = (
   facts: Readonly<{ keyid: string | null; label: string; tag: string | null }>,
   context: Context,
 ) => Result<ResolvedKey | null> | Promise<Result<ResolvedKey | null>>;
+/** Clock, age, skew, and expiration rules for signature freshness. */
 export type Freshness = Readonly<{
+  /** Return the current Unix time in seconds. */
   clock: () => number;
   maxAge: number | null;
   skew: number;
   requireExpires: boolean;
 }>;
+/** Digest algorithms and field section required for content verification. */
 export type ContentPolicy = Readonly<{
   kind: "content" | "representation";
   algorithms: readonly string[];
   section: "headers" | "trailers";
 }>;
+/** Nonce namespace, commitment, atomic store, and timeout rules. */
 export type ReplayPolicy = Readonly<{
   identifier: "nonce";
   namespace: Uint8Array;
+  /** Derive caller-owned replay commitment bytes from verified facts. */
   commitment: (
     facts: ReplayFacts,
     context: Context,
@@ -60,6 +68,7 @@ export type ReplayPolicy = Readonly<{
   store: ReplayStore;
   timeoutMs: number;
 }>;
+/** A branded verification policy with explicit key, freshness, content, and replay rules. */
 export type Policy = Readonly<{
   algorithms: readonly SigningAlgorithm[];
   components: InnerList;
@@ -140,6 +149,7 @@ export function fieldSchemas(
     return err(bounded(e, "invalid_policy", "input"));
   }
 }
+/** Check the private brand of a verification policy. */
 export function isPolicy(value: unknown): value is Policy {
   return typeof value === "object" && value !== null && policies.has(value);
 }
@@ -168,6 +178,7 @@ export function normalizeFreshness(input: unknown): Freshness | "not_evaluated" 
     requireExpires: f.requireExpires,
   });
 }
+/** Snapshot, validate, and brand an explicit verification policy. */
 export function createPolicy(input: unknown): Result<Policy> {
   try {
     const a = snapshot(input, [
@@ -290,4 +301,7 @@ export function createPolicy(input: unknown): Result<Policy> {
     return err(bounded(e, "invalid_policy", "input"));
   }
 }
-export const Policy = Object.freeze({ create: createPolicy });
+/** Verification policy construction. */
+export const Policy = Object.freeze({
+  /** Snapshot, validate, and brand an explicit verification policy. */
+  create: createPolicy });

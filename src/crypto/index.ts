@@ -28,6 +28,7 @@ function normalize<T>(r: Result<T>): Result<T> {
     ),
   );
 }
+/** Sign bounded bytes with a branded custody handle. */
 export async function sign(
   algorithm: unknown,
   key: unknown,
@@ -44,6 +45,7 @@ export async function sign(
   if (!c.ok) return err(cryptoError('invalid_key'));
   return normalize(await key.sign(algorithm, data, c.value, {maxBytes: maximum.value}));
 }
+/** Verify a signature using a branded key or custody handle. */
 export async function verify(
   algorithm: unknown,
   key: unknown,
@@ -83,5 +85,15 @@ export async function verify(
     bytes.value.fill(0);
   }
 }
+/** Return the fixed maximum cryptographic input byte limit. */
 export function maxBytesCeiling(): number {return CRYPTO_MAX_BYTES_CEILING;}
-export const Crypto = Object.freeze({algorithms, sign, verify, maxBytesCeiling});
+/** Bounded cryptographic signing and verification operations. */
+export const Crypto = Object.freeze({
+  /** List supported HTTP signature algorithm tokens. */
+  algorithms,
+  /** Sign bounded bytes with a branded custody handle. */
+  sign,
+  /** Verify a signature using a branded key or custody handle. */
+  verify,
+  /** Return the fixed maximum cryptographic input byte limit. */
+  maxBytesCeiling});

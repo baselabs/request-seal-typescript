@@ -1,19 +1,30 @@
 import { ERROR_PARITY, ERROR_RETRYABLE, type ErrorKind, type Reason, type Layer } from './parity.ts';
+/** The bounded detail vocabulary for core failures. */
 export type CoreDetail = Reason<'core'> | Reason<'signature_base'> | 'legacy_string' | 'invalid_dictionary' | 'duplicate_member' | 'invalid_member' | 'missing_member' | 'unsupported_type' | 'not_an_origin' | 'untrusted_agent' | 'source_mismatch' | 'revoked_key' | 'source_unavailable' | 'timeout';
+/** A core failure with layer, correlation, and optional bounded source. */
 export type CoreError = Readonly<{ kind: 'core'; reason: Reason<'core'>; layer: Layer<'core'>; correlation: string; retryable: false; detail: CoreDetail | null; message: string | null; source: CustodyError | null }>;
+/** Error families carrying only a reason. @inline */
 type SimpleKind = 'message' | 'structured_fields' | 'signature_base' | 'digest' | 'crypto';
+/** A reason-only error for message, field, digest, or crypto operations. */
 export type SimpleError<K extends SimpleKind> = Readonly<{kind: K; reason: Reason<K>}>;
+/** A custody failure with an explicit retryability flag. */
 export type CustodyError = Readonly<{kind: 'custody'; reason: Reason<'custody'>; retryable: boolean}>;
+/** A discovery failure with an explicit retryability flag. */
 export type DiscoveryError = Readonly<{kind: 'discovery'; reason: Reason<'discovery'>; retryable: boolean}>;
+/** A JOSE failure with layer and explicit retryability. */
 export type JoseError = Readonly<{kind: 'jose'; reason: Reason<'jose'>; layer: Layer<'jose'>; correlation: null; retryable: boolean}>;
+/** A nonretryable replay-store failure. */
 export type ReplayError = Readonly<{kind: 'replay'; reason: Reason<'replay'>; retryable: false}>;
+/** A bounded adapter failure with stage, attempt, and optional source. */
 export type AdapterError = Readonly<{kind: 'adapter'; reason: Reason<'adapter'>; adapter: 'req' | 'finch' | 'plug' | 'node-http' | 'fetch'; stage: 'attach' | 'capture' | 'sign' | 'verify'; attempt: number; source: CoreError | CustodyError | SimpleError<'message'> | null; correlation: string; retryable: false}>;
+/** The union of all branded, bounded public error families. */
 export type RequestSealError = CoreError | { [K in SimpleKind]: SimpleError<K> }[SimpleKind] | CustodyError | DiscoveryError | JoseError | ReplayError | AdapterError;
 const errors = new WeakSet<object>();
 const addError = errors.add.bind(errors), hasError = errors.has.bind(errors);
 const random = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
 function correlation(): string { return Array.from(random(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join(''); }
 function freeze<T extends object>(error: T): T { addError(error); return Object.freeze(error); }
+/** Check whether an error belongs to the private error brand. */
 export function isRequestSealError(value: unknown): value is RequestSealError { return typeof value === 'object' && value !== null && hasError(value); }
 function reasonFor<K extends ErrorKind>(kind: K, reason: Reason<K>): Reason<K> {
   if (!ERROR_PARITY.some(e => e.kind === kind && e.reason === reason)) throw new TypeError('Unknown error reason');
@@ -60,4 +71,5 @@ export function adapterError(reason: Reason<'adapter'>, adapter: AdapterError['a
   if (source !== null && (!isRequestSealError(source) || !['core', 'custody', 'message'].includes(source.kind))) throw new TypeError('Invalid adapter source');
   return freeze({kind: 'adapter', reason, adapter, stage, attempt, source, correlation: correlation(), retryable: false});
 }
+/** Format an error's family, layer when present, and reason as a rule ID. */
 export function ruleId(error: RequestSealError): string { return 'layer' in error ? `${error.kind}/${error.layer}.${error.reason}` : `${error.kind}/${error.reason}`; }

@@ -5,6 +5,7 @@ import type { ReplayReceipt } from '../replay-port.ts';
 import { validRetention } from './claim.ts';
 // Verification produces safe-number ends; share the claim bounds for those ends.
 const receipts = new WeakSet<object>();
+/** Check the private brand of a successful replay receipt. */
 export function isReplayReceipt(value: unknown): value is ReplayReceipt {
   return typeof value === 'object' && value !== null && receipts.has(value);
 }

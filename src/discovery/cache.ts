@@ -32,22 +32,30 @@ import {
   systemClock,
   inspectable,
 } from "./support.ts";
+/** A caller-owned discovery transport callback. */
 export type DiscoveryFetch = (
   source: DiscoverySource,
   options: { clock: () => number; context: Context },
 ) => Promise<Result<KeySet>>;
+/** A caller-owned bounded cache of discovery key sets and failures. */
 export type DiscoveryCache = Readonly<{
+  /** Refresh a source from an explicit snapshot or configured fetch callback. */
   refresh: (source: unknown, snapshot?: unknown) => Promise<Result<KeySet>>;
+  /** Resolve an eligible key through the bounded discovery cache. */
   resolve: (
     source: unknown,
     keyId: unknown,
     options?: unknown,
   ) => Promise<Result<Resolution>>;
+  /** Remove a key by thumbprint from a cached source. */
   remove: (source: unknown, thumbprint: unknown) => Result<true>;
+  /** Invalidate a source's cached key set. */
   invalidate: (source: unknown) => Result<true>;
+  /** Close this capability and release its retained state. */
   close: () => Result<true>;
 }>;
 const caches = new WeakSet<object>();
+/** Check the private brand of a discovery cache. */
 export function isDiscoveryCache(v: unknown): v is DiscoveryCache {
   return !!v && typeof v === "object" && caches.has(v);
 }
@@ -64,6 +72,7 @@ type Flight = {
   work: Promise<Result<KeySet>>;
   waiters: number;
 };
+/** Validate cache options and create a branded discovery cache. */
 export function createCache(input: unknown = {}): Result<DiscoveryCache> {
   try {
     const a = options(input, ["clock", "maxSources", "maxInFlight", "fetch"]);

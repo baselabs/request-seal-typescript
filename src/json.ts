@@ -3,12 +3,19 @@ import { snapshotOptions } from './brand.ts';
 import { JSON_LIMITS } from './constants.ts';
 import { err, ok, type Result } from './result.ts';
 import { joseError } from './errors/types.ts';
+/** An ordered JSON tree that retains numeric source text. */
 export type JsonNode = null | boolean | string | JsonNumber | JsonObject | JsonArray;
+/** A JSON number represented by its original lexeme. */
 export type JsonNumber = {readonly kind: 'number'; readonly lexeme: string};
+/** A JSON object represented by ordered key-value pairs. */
 export type JsonObject = {readonly kind: 'object'; readonly pairs: readonly (readonly [string, JsonNode])[]};
+/** A JSON array represented by an ordered sequence of nodes. */
 export type JsonArray = {readonly kind: 'array'; readonly items: readonly JsonNode[]};
+/** Byte, depth, and container limits for JSON decoding. */
 export type JsonLimits = {maxBytes: number; maxDepth: number; maxMembers: number; maxArrayLength: number; maxStringBytes: number};
+/** JSON limits and explicit duplicate and noncharacter policies. */
 export type JsonDecodeOptions = Partial<JsonLimits> & {rejectDuplicates?: boolean; acceptNoncharacters?: boolean};
+/** A decoded JSON tree and its duplicate member names. */
 export type DecodedJson = {readonly node: JsonNode; readonly duplicates: readonly string[]};
 type Frame = {kind: 'object'; pairs: [string, JsonNode][]; keys: Set<string>; key: string; state: 'first' | 'key' | 'colon' | 'value' | 'end'} | {kind: 'array'; items: JsonNode[]; state: 'first' | 'value' | 'end'};
 function fail(reason: 'invalid_header' | 'limit' | 'invalid_options' | 'duplicate_member'): never { throw reason; }

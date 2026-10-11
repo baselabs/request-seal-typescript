@@ -24,11 +24,13 @@ import {isContext, withDeadline, run} from "./context.ts";
 import {isRequestSealError} from "./errors/types.ts";
 import { Crypto } from "./crypto/index.ts";
 import { ok, err, type Result } from "./result.ts";
+/** A requested signature label, component list, and negotiation parameters. */
 export type SignatureRequest = Readonly<{
   label: string;
   components: InnerList;
   parameters: Readonly<Record<string, string | true>>;
 }>;
+/** A branded ordered collection of signature negotiation requests. */
 export type AcceptSignature = readonly SignatureRequest[];
 const requestsBrand = new WeakSet<object>();
 const names = ["keyid", "alg", "created", "expires", "nonce", "tag"] as const;
@@ -42,6 +44,7 @@ const requestDerived = [
   "@query",
   "@query-param",
 ];
+/** Check the private brand of parsed signature negotiation requests. */
 export function isAcceptSignature(v: unknown): v is AcceptSignature {
   return typeof v === "object" && v !== null && requestsBrand.has(v);
 }
@@ -68,6 +71,7 @@ export function applicable(
     return err(bounded(e, "invalid_accept_signature", "negotiation"));
   }
 }
+/** Parse and validate Accept-Signature fields into negotiation requests. */
 export function parseAcceptSignature(
   wire: unknown,
   options: unknown,
@@ -168,6 +172,7 @@ export function parseAcceptSignature(
     return err(bounded(e, "invalid_accept_signature", "negotiation"));
   }
 }
+/** Serialize branded negotiation requests as an Accept-Signature dictionary. */
 export function serializeAcceptSignature(
   requests: unknown,
 ): Result<Uint8Array> {
@@ -217,7 +222,9 @@ export function serializeAcceptSignature(
     return err(bounded(e, "invalid_accept_signature", "negotiation"));
   }
 }
+/** A chooser's selected algorithm and optional creation and expiration times. */
 export type SignatureChoice = Readonly<{algorithm: string; created: number | null; expires: number | null}>;
+/** Select signing parameters for a signature negotiation request. */
 export type SignatureChooser = (request: SignatureRequest) => Result<SignatureChoice> | Promise<Result<SignatureChoice>>;
 /** Fulfill atomically through caller-owned selection and the single-signature API. */
 export async function fulfillAcceptSignature(
@@ -276,8 +283,12 @@ export async function fulfillAcceptSignature(
     return ok(current);
   } catch (e) { return err(bounded(e, "negotiation_unfulfillable", "negotiation")); }
 }
+/** Signature negotiation parsing, serialization, and fulfillment. */
 export const AcceptSignature = Object.freeze({
+  /** Parse and validate the supported wire representation. */
   parse: parseAcceptSignature,
+  /** Serialize validated values to their canonical wire representation. */
   serialize: serializeAcceptSignature,
+  /** Select and add applicable requested signatures with caller-owned signing custody. */
   fulfill: fulfillAcceptSignature,
 });

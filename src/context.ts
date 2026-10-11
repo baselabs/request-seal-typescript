@@ -17,12 +17,15 @@ const removeAbortListener = AbortSignal.prototype.removeEventListener;
 function then<T, U>(promise: Promise<T>, fulfilled: (value: T) => U | PromiseLike<U>, rejected?: (reason: unknown) => U | PromiseLike<U>): Promise<U> {
   return apply(promiseThen, promise, [fulfilled, rejected]) as Promise<U>;
 }
+/** A branded deadline and cancellation signal for an operation. */
 export type Context = Readonly<{deadline: number; signal: AbortSignal}>;
 const contexts = new WeakSet<object>();
 const lifetimes = new WeakMap<Context, {attach: () => void; hold: () => () => void; abort: () => void; dispose: () => void}>();
+/** Check the private brand of an operation context. */
 export function isContext(value: unknown): value is Context {
   return typeof value === 'object' && value !== null && contexts.has(value);
 }
+/** Create a bounded context from timeout, parent, and cancellation options. */
 export function withDeadline(options: unknown = {}): Result<Context> {
   try {
     const snapshot = snapshotOptions(options, ['signal', 'timeoutMs', 'parent']);
@@ -94,6 +97,7 @@ export function withDeadline(options: unknown = {}): Result<Context> {
 export function releaseContext(context: Context): void {
   lifetimes.get(context)?.dispose();
 }
+/** Return the context's remaining time, or zero after cancellation. */
 export function remainingMs(context: Context): number {
   return isContext(context) && !context.signal.aborted ? Math.max(0, context.deadline - now()) : 0;
 }

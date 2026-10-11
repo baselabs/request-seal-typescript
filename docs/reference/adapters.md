@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
 
 # HTTP and custody adapters
 
@@ -82,8 +82,9 @@ Core policy and content-option validation occurs after reservation, as with
 content, and replay explicitly in `WebBotAuth.Policy`.
 
 OBSERVED: `test/adapters-node-web-bot-auth.test.ts` verifies signed captured HTTP
-bytes through a caller-configured, signed local TLS directory. It executes the
-`authenticateBot` example in [the README](../../README.md#http-adapters-and-ssh-custody).
+bytes through a caller-configured, signed local TLS directory. The Express program
+in [the README](../../README.md#express) runs the same `verifyWebBotAuth` call over
+a directory snapshot.
 Unsigned requests return adapter `request_rejected` with the bounded core source
 `missing_signature_input`, as the reference does; untrusted agents retain
 `agent_unresolved`. Both rejections consume the attempt and remain available

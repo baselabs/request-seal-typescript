@@ -28,7 +28,9 @@ function encode(bytes: Uint8Array, url: boolean): string {
   }
   return out.join('');
 }
+/** Encode bytes using the padded standard Base64 alphabet. */
 export const encodeBase64 = (bytes: Uint8Array): string => encode(bytes, false);
+/** Encode bytes using the unpadded URL-safe Base64 alphabet. */
 export const encodeBase64Url = (bytes: Uint8Array): string => encode(bytes, true);
 function decode(input: unknown, url: boolean): Result<Uint8Array<ArrayBuffer>> {
   const invalid = () => err<Uint8Array<ArrayBuffer>>(joseError('invalid_base64', 'input'));
@@ -46,5 +48,7 @@ function decode(input: unknown, url: boolean): Result<Uint8Array<ArrayBuffer>> {
   if (value !== 0) return invalid();
   return ok(bytes);
 }
+/** Decode canonical padded Base64 into owned bytes. */
 export const decodeBase64 = (input: unknown): Result<Uint8Array<ArrayBuffer>> => decode(input, false);
+/** Decode canonical unpadded Base64url into owned bytes. */
 export const decodeBase64Url = (input: unknown): Result<Uint8Array<ArrayBuffer>> => decode(input, true);

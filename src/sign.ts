@@ -40,16 +40,19 @@ import {
 import { coreError, isRequestSealError } from "./errors/types.ts";
 import { timeoutMs } from "./numbers.ts";
 import { ok, err, type Result } from "./result.ts";
+/** A caller-owned signing callback receiving the algorithm, base bytes, and context. */
 export type Signer = (
   algorithm: SigningAlgorithm,
   base: Uint8Array,
   context: Context,
 ) => Result<Uint8Array> | Promise<Result<Uint8Array>>;
+/** A label, signature-input value, and signing algorithm. */
 export type SignatureSpec = Readonly<{
   label: string;
   signatureInput: string | Uint8Array | InnerList;
   algorithm: SigningAlgorithm;
 }>;
+/** Explicit freshness, key identifier, nonce, and tag parameters for signing. */
 export type SigningParameters = Readonly<{
   created?: boolean;
   expiresIn: number | null;
@@ -58,6 +61,7 @@ export type SigningParameters = Readonly<{
   keyid?: string | null;
   tag?: string | null;
 }>;
+/** Components, algorithm, and optional digest and freshness settings for signing. */
 export type SigningSpec = Readonly<{
   label: string;
   components: string;
@@ -95,6 +99,7 @@ function append(m: HttpMessage, name: string, bytes: unknown): HttpMessage {
     result(FieldOccurrence.create({ name, value: bytes, section: "headers" })),
   ]);
 }
+/** Sign a lossless HTTP message with explicit components and caller-owned custody. */
 export async function sign(
   message: unknown,
   spec: unknown,

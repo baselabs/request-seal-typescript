@@ -1,6 +1,7 @@
 import {snapshotOptions} from '../brand.ts';
 import {ok, err, type Result} from '../result.ts';
 import {cryptoError} from '../errors/types.ts';
+/** Supported HTTP message signature algorithm tokens. */
 export type HttpAlgorithm =
   | 'rsa-pss-sha512'
   | 'rsa-v1_5-sha256'
@@ -8,6 +9,7 @@ export type HttpAlgorithm =
   | 'ecdsa-p256-sha256'
   | 'ecdsa-p384-sha384'
   | 'ed25519';
+/** Supported JOSE signing algorithm identifiers. */
 export type JwsAlgorithm =
   | 'RS256'
   | 'PS256'
@@ -17,8 +19,11 @@ export type JwsAlgorithm =
   | 'ES256'
   | 'ES384'
   | 'EdDSA';
+/** An HTTP algorithm token or an explicit JWS algorithm selector. */
 export type SigningAlgorithm = HttpAlgorithm | Readonly<{jws: JwsAlgorithm}>;
+/** An explicit RSA-OAEP JWE unwrapping selector. */
 export type UnwrapAlgorithm = Readonly<{jwe: 'RSA-OAEP' | 'RSA-OAEP-256'}>;
+/** A signing or key-unwrapping algorithm selector. */
 export type CustodyAlgorithm = SigningAlgorithm | UnwrapAlgorithm;
 export type Spec = Readonly<{
   id: string;

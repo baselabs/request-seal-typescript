@@ -34,9 +34,11 @@ import {
 } from "./support.ts";
 const branded = new WeakSet<object>(),
   token = Object.freeze({});
+/** Check the private brand of a verified JWS result. */
 export function isJwsResult(value: unknown): value is JwsResult {
   return typeof value === "object" && value !== null && branded.has(value);
 }
+/** A branded verified JWS result that confines payload bytes. */
 export class JwsResult {
   readonly algorithm: string;
   readonly header: Header;
@@ -63,6 +65,7 @@ export class JwsResult {
   get payload(): Uint8Array<ArrayBuffer> {
     return new Uint8Array(this.#payload);
   }
+  /** Return a bounded public inspection view without retained cryptographic bytes. */
   toJSON(): unknown {
     return Object.freeze({
       algorithm: this.algorithm,
@@ -137,6 +140,7 @@ async function signing(
     data.fill(0);
   }
 }
+/** Sign a compact JWS with an explicit algorithm and caller-owned signer. */
 export async function sign(
   protectedPairs: unknown,
   payload: unknown,
@@ -153,6 +157,7 @@ export async function sign(
     } finally {data.fill(0);}
   });
 }
+/** Sign a compact JWS while preserving the supplied protected-header bytes. */
 export async function signProtected(
   protectedBytes: unknown,
   payload: unknown,
@@ -169,6 +174,7 @@ export async function signProtected(
     } finally {data.fill(0);}
   });
 }
+/** Verify a compact JWS under an explicit algorithm and key policy. */
 export async function verify(
   input: unknown,
   inputPolicy: unknown,
@@ -245,9 +251,14 @@ export async function verify(
     );
   });
 }
+/** Compact JWS signing and verification operations. */
 export const JWS = Object.freeze({
+  /** Sign a compact JWS with an explicit algorithm and caller-owned signer. */
   sign,
+  /** Sign a compact JWS while preserving the supplied protected-header bytes. */
   signProtected,
+  /** Verify a compact JWS under an explicit algorithm and key policy. */
   verify,
+  /** Check the private brand of the operation result. */
   isResult: isJwsResult,
 });

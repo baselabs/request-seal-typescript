@@ -385,4 +385,7 @@ export function build(
     );
   }
 }
-export const SignatureBase = Object.freeze({ build });
+/** RFC 9421 signature-base construction operations. */
+export const SignatureBase = Object.freeze({
+  /** Build RFC 9421 signature-base bytes from a lossless message. */
+  build });

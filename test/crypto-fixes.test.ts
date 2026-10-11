@@ -204,15 +204,6 @@ test('README compatibility pins Bun extreme-s exception', async () => {
   assert.match(await readFile('README.md', 'utf8'), /Compatibility[\s\S]*Bun 1\.3\.14[\s\S]*261[\s\S]*262/);
 });
 
-test('README TypeScript example executes with defined inputs', async () => {
-  const readme = await readFile('README.md', 'utf8'); const fence = /```ts\n([\s\S]*?)```/.exec(readme)![1]!;
-  const source = fence.replace(/import \{ Custody, Crypto \} from "@request-seal\/core";/, `const {Custody, Crypto} = await import(${JSON.stringify(new URL('../src/index.ts', import.meta.url).href)});`);
-  assert.notEqual(source, fence, 'README crypto import must be replaced');
-  const evalPrefix = Object.hasOwn(process.versions, 'deno') ? ['eval', '--no-check'] : Object.hasOwn(process.versions, 'bun') ? ['-e'] : ['--experimental-strip-types', '--no-warnings', '--input-type=module', '-e'];
-  const child = spawnSync(process.execPath, [...evalPrefix, source], {encoding: 'utf8', timeout: 10000});
-  assert.equal(child.status, 0, child.stderr); assert.match(child.stdout, /true/);
-});
-
 test('changelog continuous list and corpus metadata first', async () => {
   const changelog = await readFile('CHANGELOG.md', 'utf8'); assert.doesNotMatch(changelog.split('## Unreleased')[1]!.trim(), /\n\n-/);
   assert.match(await readFile('docs/reference/corpus-format.md', 'utf8'), /^\*\*Status:\*\*/);

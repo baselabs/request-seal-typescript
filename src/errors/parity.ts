@@ -1,4 +1,5 @@
 // Derived from pinned Elixir constructors and call sites; regenerate with scripts/generate-parity.ts or scripts/render-parity.ts --update-table.
+/** The immutable reference release used for the error vocabulary. */
 export const ELIXIR_ERROR_PIN = '0a6568aa246326617f760e94e21b359285c6ddfc';
 const entries = [
   {
@@ -2116,13 +2117,19 @@ const retryableRules = {
 } as const;
 export const ERROR_RETRYABLE = Object.freeze(Object.fromEntries(Object.entries(retryableRules).map(([kind, rules]) => [kind, Object.freeze(Object.fromEntries(Object.entries(rules).map(([reason, rule]) => [reason, Object.freeze(rule)])))]))) as typeof retryableRules;
 
+/** The pinned reason, layer, and retryability table. */
 export const ERROR_PARITY = Object.freeze(entries.map(entry => Object.freeze(entry)));
+/** A pinned error reason and its layers and retryability metadata. */
 export type ParityEntry = typeof ERROR_PARITY[number];
+/** An error family present in the pinned parity table. */
 export type ErrorKind = ParityEntry["kind"];
+/** The allowed reason vocabulary for an error family. */
 export type Reason<K extends ErrorKind> = Extract<ParityEntry, { kind: K }>["reason"];
+/** The allowed layer vocabulary for an error family. */
 export type Layer<K extends "core" | "jose"> = Extract<ParityEntry, { kind: K }>["layer"];
 const rules = new Set(ERROR_PARITY.map(e => e.rule_id as string));
 // A frozen Set still exposes mutation methods; the facade keeps the backing Set private.
+/** The complete set of rule IDs derived from the parity table. */
 export const RULE_IDS: ReadonlySet<string> = Object.freeze({
   get size() { return rules.size; },
   has: (value: string) => rules.has(value),

@@ -39,9 +39,11 @@ import {
 import { random, wrapPublic } from "./key-management.ts";
 const branded = new WeakSet<object>(),
   token = Object.freeze({});
+/** Check the private brand of an authenticated JWE result. */
 export function isJweResult(value: unknown): value is JweResult {
   return typeof value === "object" && value !== null && branded.has(value);
 }
+/** A branded authenticated JWE result that confines plaintext bytes. */
 export class JweResult {
   readonly algorithm: string;
   readonly encryption: string;
@@ -72,6 +74,7 @@ export class JweResult {
   get plaintext(): Uint8Array<ArrayBuffer> {
     return new Uint8Array(this.#plaintext);
   }
+  /** Return a bounded public inspection view without retained cryptographic bytes. */
   toJSON(): unknown {
     return Object.freeze({
       algorithm: this.algorithm,
@@ -113,6 +116,7 @@ function encryptedKey(alg: string, ek: Uint8Array, h: Header): void {
   } else
     need(ek.length >= 256 && ek.length <= 1024, "decryption_failed", "crypto");
 }
+/** Encrypt content into compact JWE using explicit key-management and content algorithms. */
 export async function encrypt(
   protectedPairs: unknown,
   plaintext: unknown,
@@ -221,6 +225,7 @@ export async function encrypt(
     );
   });
 }
+/** Authenticate and decrypt compact JWE under an explicit policy. */
 export async function decrypt(
   input: unknown,
   inputPolicy: unknown,
@@ -353,4 +358,11 @@ export async function decrypt(
     );
   });
 }
-export const JWE = Object.freeze({ encrypt, decrypt, isResult: isJweResult });
+/** Compact JWE encryption and authenticated decryption operations. */
+export const JWE = Object.freeze({
+  /** Encrypt content into compact JWE using explicit key-management and content algorithms. */
+  encrypt,
+  /** Authenticate and decrypt compact JWE under an explicit policy. */
+  decrypt,
+  /** Check the private brand of the operation result. */
+  isResult: isJweResult });

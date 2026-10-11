@@ -1,4 +1,101 @@
-**Status:** maintained · **Kind:** design · **Updated:** October 9, 2026 · **Governed by:** WebCrypto, public standards, and executed boundary tests · **Review when:** custody mechanics or runtime behavior changes
+**Status:** maintained · **Kind:** design · **Updated:** October 11, 2026 · **Governed by:** the RequestSeal threat model at release 0.4.1, WebCrypto, public standards, and executed boundary tests · **Review when:** a trust boundary, profile, adapter, data shape, custody mechanic, or runtime behavior changes
+
+# RequestSeal threat model
+
+RequestSeal processes attacker-controlled wire data at an authentication boundary. Its primary security goal is to report exactly what was cryptographically established, by which trusted association, under which profile, without granting caller authorization or payment authority.
+
+This package and the RequestSeal library for Elixir are two native implementations of one contract. They share an independently sourced conformance corpus and an error vocabulary, and they share these invariants. The first part of this document restates the invariants and the threat table that both implementations answer to. The second part, [TypeScript boundaries](#typescript-boundaries), records what is specific to this package. The rest of the file records measurements and the detailed custody and JOSE boundaries.
+
+## Assets and trust boundaries
+
+Assets are private signing authority, private recipient keys, verified message bytes, content-integrity state, principal attribution, replay uniqueness, nested signature binding, and diagnostic confidentiality.
+
+Trust boundaries exist between wire input and the lossless message model; the model and a profile; a profile and key discovery; verification and the replay store; RequestSeal and each framework adapter; independent corpus data and each implementation; and an authenticated principal and caller authorization.
+
+The caller controls accepted profiles, trusted origins and proxies, trust anchors, discovery endpoints, key handles, clocks, the replay store, resource limits, and authorization. An input message controls none of those merely by naming a key, URL, label, algorithm, tag, or identity.
+
+## Security invariants
+
+1. **Verified means exact bytes under a named policy.** Verification covers exactly the selected bytes, validated under an explicitly selected source-bound profile. `verify` takes a `Policy` and a label; `WebBotAuth.verify` takes its own policy. Enforced in `test/sign-verify-contract.test.ts` and `test/web-bot-auth.test.ts`.
+2. **A signature covers only what it names.** A signed digest field authenticates body content only after digest recomputation succeeds. Enforced in `test/sign-verify.test.ts` (`digest_mismatch`) and `test/digest-policy-negotiation.test.ts`; the migration tests in `interop/migration/claims.test.ts` show the contrast with a library that never reads a body.
+3. **Key possession is not identity.** Identity needs a trusted, profile-valid key association with provenance. A generic verification records `principal: "unattributed"`; Web Bot Auth records an agent principal only when a configured source vouched for the key, and a held-key principal otherwise. Enforced in `test/sign-verify-contract.test.ts` and `test/web-bot-auth-discovery.test.ts`.
+4. **Authentication is not authorization.** Every verification, JWS result, and JWE result carries `authorization: "not_evaluated"`. RequestSeal never permits an application action.
+5. **Replay success needs one atomic claim over the complete authenticated envelope.** The claim runs last, after cryptography and required content checks, and it covers every selected signature. Enforced in `test/replay-verify.test.ts`, `test/replay-fixes.test.ts`, `test/web-bot-auth-replay.test.ts`, and the real PostgreSQL store tests.
+6. **Private keys stay behind custody handles.** No error, inspection, serialization, or telemetry path exports them. See [custody and cryptographic boundaries](#custody-and-cryptographic-boundaries).
+7. **Failed or incomplete verification never yields a partially trusted principal.** A verification is a frozen, branded value that exists only after every required layer succeeds; every other outcome is an error `Result`.
+8. **Profile labels do not weaken rules.** There is no generic or legacy fallback after a named-profile failure.
+
+## Threats and controls
+
+| Threat | Control | Proof in this package |
+| --- | --- | --- |
+| Canonicalization confusion | Preserve the raw target, ordered field occurrences, trailers, parameter order, and ordered JSON occurrences; derive every component through one source-bound rule set. | The published RFC 9421 vectors (`test/sign-corpus.test.ts`), `test/signature-base.test.ts`, and adapter tests that keep raw targets such as `/a%2Fb?` (`test/adapters-node-http.test.ts`, `test/adapters-fetch-wire.test.ts`). |
+| Algorithm and key confusion | Exact algorithm identifiers; a policy allowlist; key type, use, and operation checks; separate HTTP and JOSE registries. | `test/crypto-corpus.test.ts`, `test/crypto.test.ts`, `test/jose-conformance.test.ts`, and the algorithm-confusion comparison in `interop/migration/claims.test.ts`. |
+| Component omission | The policy requires coverage explicitly; results expose covered components; digest recomputation is independent. | `test/policy.test.ts`, `test/sign-verify.test.ts`, `test/digest.test.ts`. |
+| Multi-signature substitution | Count explicitly selected distinct keys, principals, or roles using trusted bindings; labels never count. Each signer's coverage is enforced independently, and composite coverage needs explicit obligations and cross-bindings. | `test/quorum-policy.test.ts`, `test/quorum-evaluation.test.ts`, `test/quorum-boundaries.test.ts`, and the differential checks against the reference assignment search. |
+| Replay race or poisoning | Validate the signature, profile, and linked objects before the caller commitment function or the atomic store runs. Bind the verified nonce to caller-defined scope. Reject ambiguous required input and required callback or store failures. | `test/replay-verify.test.ts`, `test/replay-memory.test.ts`, `test/replay-postgres.test.ts` against a real server, the twenty-way race in the [replay guide](../guides/replay-protection.md), and `test/replay-reciprocal.test.ts`. |
+| Discovery SSRF | Caller-configured sources only; HTTPS; manual, bounded, re-checked redirects; DNS and IP revalidation; denial of private, loopback, link-local, and other special-purpose ranges; response, decompression, key-count, and time bounds. | `test/discovery-node.test.ts` and `test/discovery-fixes.test.ts` against real TLS peers, IPv4 and IPv6 literals, redirects, oversized bodies, and cancellation. |
+| Stale or removed key acceptance | Source-bound cache expiry and fetch-time metadata; explicit removal that survives refresh; no stale resurrection. | `test/discovery-cache.test.ts` and `test/web-bot-auth-discovery.test.ts`, which rotate and remove keys on a real signed TLS directory. |
+| Key exfiltration | Opaque handles; signing and unwrapping inside custody; public-only serialization; redaction; no secret fields in inspection. | `test/custody.test.ts`, `test/crypto-fixes.test.ts`, and the allocation tracker in `test/support/zeroing.ts`. |
+| Forwarded-header spoofing | An explicit trusted-proxy policy and one authoritative external origin; ingress and reconstructed facts stay separate. | `test/adapters-node-http.test.ts` and `test/adapters-node-fixes.test.ts`, and the proxy program in the [Node HTTP guide](../guides/node-http.md). |
+| Retry or redirect reuse | Every hop and attempt signs afresh with new time and nonce; a cross-origin hop needs approval and drops credential fields; responses bind to the supplied request. | `test/adapters-node-fixes.test.ts`, `test/adapters-fetch-fixes.test.ts`, and the retry program in the [Fetch guide](../guides/fetch.md). |
+| Parser and resource exhaustion | Bounded bytes, members, depth, signature, component, and key counts, numeric magnitudes, deadlines, and streaming work. | `test/structured-fields.test.ts`, `test/json.test.ts`, `test/numbers.test.ts`, `test/discovery-core-fixes.test.ts`, and the context tests. |
+| Error oracle and data leak | Stable, bounded public reasons; redacted default inspection; one uniform decryption error. | `test/errors.test.ts`, `test/error-branding.test.ts`, `test/jose-uniform.test.ts`. |
+| Cross-profile replay | The trusted profile is part of the replay facts, and callers include it in the commitment. No fallback between profiles. | `test/web-bot-auth-replay.test.ts`, `test/profile.test.ts`. |
+| Corpus compromise | Immutable provenance, independent expected values, a pinned index digest, and a consumer that never regenerates expectations. | `test/conformance.test.ts`, `test/conformance-vendor.test.ts`, `test/upstream-integrity.test.ts`, and `npm run conformance`. |
+| Supply-chain substitution | Zero runtime dependencies, exact development pins, locked dependencies, a package file allowlist, CI actions pinned by commit, release provenance through the trusted publisher with human approval. | `scripts/pack-check.ts`, `test/ci-workflow.test.ts`, and the release workflow. |
+
+## Profile-specific hazards
+
+Web Bot Auth discovery can turn a signed field into a network capability. The selected draft permits more than one discovery type. Selection is configuration, not content negotiation by an attacker. Directory signatures and requests have their own profile rules; support for `req` in one does not imply support in the other. Nested signatures must independently satisfy required coverage before one whole-envelope replay claim.
+
+## Generic JOSE threats
+
+HTTP and JOSE use separate parsers and exact algorithm registries. Protected headers and finalized ciphertext bytes stay exact. Decryption withholds plaintext until complete authenticated-encryption validation. Recipient integrity alone establishes neither origin, identity, nor request association. Caller callbacks select keys and application trust explicitly; generic JOSE cannot infer them from wire data.
+
+## Failure behavior
+
+Malformed or unsupported input returns a stable error before cryptographic work when that is safe. Verification continues past a failure only when an explicit multi-signature policy needs it; it never silently accepts the first convenient label. Required digest, discovery, clock, custody, replay, or related-request data that is unavailable fails closed for that profile.
+
+Custody, discovery, JOSE callbacks, Web Bot Auth trust callbacks, and required replay receive bounded deadlines and caller cancellation. A timeout is distinct from invalid cryptography and from policy rejection, and none produces an authenticated principal. Replay errors are always nonretryable, because a timed-out claim may have committed. Discovery separates transient failures, such as a 5xx status, from nonretryable ones, such as a 4xx status. Callers own retry scheduling and whether repeating the whole operation is safe. Errors retain no attacker-controlled diagnostics.
+
+## Residual boundaries
+
+RequestSeal cannot establish that a caller's trust anchors, proxy configuration, authorization policy, payment decision, or external key-custody service are correct. It makes their inputs, provenance, and unevaluated state explicit so the caller cannot receive an accidental success signal. Assurance for a configured adapter comes from the real-substrate tests listed above, not from the existence of an interface.
+
+# TypeScript boundaries
+
+The invariants above hold in this package through the mechanisms below. Each is a decision a maintainer must not undo by accident, so each names the code that enforces it and the tests that fail without it. The [architecture decisions](../adr/README.md) give the reasoning.
+
+## The WebCrypto boundary
+
+All cryptography runs on WebCrypto. The core imports no Node module, which `npm run typecheck:web` enforces by compiling it against browser-style globals with no Node types; only the four files that need Node (`src/node_hasher.ts`, `src/discovery/node.ts`, `src/adapters/node-http/`, `src/custody/ssh-agent/`) are excluded, and each ships as its own subpath. `src/crypto/subtle.ts` captures `crypto.subtle` methods and `getRandomValues` once, at module load, so code that replaces those globals later cannot change a verdict. Verification accepts only a literal `true` from the runtime. The library implements no cryptographic primitive.
+
+This boundary trades portability for exposure to each runtime's WebCrypto behavior, which is why [runtime limitations](#runtime-limitations) are declared and not hidden. See [ADR 0002](../adr/0002-zero-runtime-dependencies-and-webcrypto.md).
+
+## Option snapshots are read once
+
+Every public function that takes an options object reads it through `snapshotOptions` (`src/brand.ts`). That function accepts only own, string-keyed properties from an allowlist, rejects the whole object if any other own key is present, reads each allowed value exactly once into a null-prototype snapshot, and freezes the snapshot. Inherited properties never become choices, a getter runs at most once, and a getter that throws, or an input that is an array or not an object, becomes `invalid_options` with no detail. This closes time-of-check to time-of-use gaps for options supplied by hostile or buggy callers. `test/options-probes.test.ts` and `test/brand.test.ts` count getter reads and pollute prototypes for every option key.
+
+## Branding uses private WeakSets
+
+Values that carry trust, such as policies, messages, verifications, key handles, public keys, contexts, replay claims, receipts and stores, and errors, are recognized by membership in a module-private `WeakSet`, not by their shape or a public symbol. A caller cannot forge a `Verification` or an error with a lookalike object, and a spread copy loses its brand. The consequences are visible in the API: `isVerification({...v})` is false, adapters reject foreign errors, and `Result` values carrying a foreign error payload throw a `TypeError`. `test/error-branding.test.ts`, `test/brand.test.ts`, and the brand checks in each subsystem's tests cover this.
+
+## Context deadlines
+
+Every operation that can wait takes a `Context`: an absolute deadline plus an `AbortSignal`. A run holds one referenced timer only while it is active, so a callback that never settles still ends with `deadline_exceeded`, and an idle context keeps nothing alive. Contexts with external signals keep one unreferenced timer so their listeners are released at the deadline. The race that decides the outcome uses an owned promise receiver, so replacing `Promise.race` or `Promise.resolve` later cannot forge a result. A callback that ignores the signal is abandoned, not stopped; cancellation cannot interrupt a native operation already submitted to the runtime. See [ADR 0004](../adr/0004-context-deadline-timer-design.md).
+
+## Runtime limitations
+
+Where a runtime's WebCrypto or `node:https` disagrees with a published vector or with the other runtimes, the package records the exact runtime version in `tools/conformance/runtime-limits.json` and reports the affected items as `runtime_limited`. It does not weaken the assertion or add a cryptographic fallback. Stale entries, a different rejection, and an unlisted divergence all fail the run. This keeps a green result meaningful. See [ADR 0006](../adr/0006-declared-runtime-limitations.md) and the [observed runtime conformance](#observed-runtime-conformance) results below.
+
+## The Fetch verification allowlist
+
+Fetch implementations differ in how they treat whitespace in repeated fields, cookies, `Set-Cookie`, unusual methods, and the exact request target. Because a signature covers those bytes, the Fetch adapter verifies only on runtimes whose behavior was measured in `test/fixtures/adapters-fetch-wire.json` and `test/adapters-fetch-wire.test.ts`. `FETCH_VERIFICATION_RUNTIMES` is that list, and it is currently `deno:2.5.6`. On any other runtime or version, `verifyRequest` and `verifyResponse` return `invalid_request` before they read the body, call a clock, or resolve a key. Even on an allowed runtime they refuse `@request-target`, `@target-uri`, `@path`, `@query`, `cookie`, and `bs` or `tr` parameters, because the `Request` object cannot reproduce the wire target. The runtime marker is checked against the runtime's own user agent, so a planted `Deno` global on Node does not enable verification.
+
+## Adapter capture
+
+The Node HTTP adapter captures a request before any parser runs and verifies against the capture, not against what a framework later exposes. Capture keeps the raw header occurrences in order, the exact request target, trailers after the body ends, and at most `maxBytes` of body, and it marks the connection facts it observed separately from anything declared. The captured body is handed to a parser only through a replay stream, and verification checks a digest of every byte the stream delivered, so a parser that read a partial or transformed stream is detected. One verification is allowed per request. Forwarded headers have no authority unless the socket peer matches an explicit `trustedProxies` list. See `test/adapters-node-http.test.ts`, `test/adapters-express.test.ts`, and `test/adapters-fastify.test.ts`, which run against real servers and the pinned Express and Fastify versions.
 
 # Custody and cryptographic boundaries
 
@@ -89,14 +186,20 @@ OBSERVED: published vectors and reciprocal OpenSSL commands execute in
 The pinned Wycheproof source is commit `12fd3aa`. Node 24.21.0, Node 22.12.0, and
 Deno 2.5.6 assert all 151 Ed25519 and all 262 ECDSA P-256 P1363 items.
 
-Bun 1.3.14 rejects valid ECDSA items 261 (`s = 2^128`) and 262 (`s = n - 2^128`).
+Bun 1.3.14 on `darwin-arm64` rejects valid ECDSA items 261 (`s = 2^128`) and 262 (`s = n - 2^128`).
 Direct WebCrypto calls reproduce both rejections through raw, SPKI, and JWK imports.
 Node and OpenSSL verify those same published signatures. The merged batch adapter asserts
 all 262 ECDSA items against their published verdicts. The CLI and crypto tests
 share the exact-version consumer policy in `tools/conformance/runtime-limits.json`,
-which reports these two divergences as `runtime_limited` only on Bun 1.3.14.
+which reports these two divergences as `runtime_limited` only on Bun 1.3.14 on `darwin-arm64`; Linux is outside this exception.
 Stale entries and other divergences fail. Corpus semantics stay unchanged;
 the core adds no cryptographic fallback or acceptance override.
+
+The Linux Bun CI lane runs without `--isolate`: Bun 1.3.14 per-file isolation
+intermittently recreates process stdio and returns `EEXIST` from `epoll_ctl`
+([upstream issue](https://github.com/oven-sh/bun/issues/37968)). The lane still
+runs every test file and its declared documentation fences. See the
+[runtime matrix](../reference/runtime-matrix.md) for the runtime and platform boundaries.
 
 # HMAC timing measurements
 

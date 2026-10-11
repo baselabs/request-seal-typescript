@@ -7,7 +7,9 @@ import { compact, headerValue, need, take } from "./header.ts";
 import {joseError} from "../errors/types.ts";
 import { publicSafe, ok } from "./support.ts";
 const branded = new WeakSet<object>();
+/** A branded pair of authenticated outer JWE and verified inner JWS results. */
 export type NestedResult = Readonly<{ jwe: JweResult; jws: JwsResult }>;
+/** Check the private brand of a nested JOSE result. */
 export function isNestedResult(value: unknown): value is NestedResult {
   return typeof value === "object" && value !== null && branded.has(value);
 }
@@ -15,6 +17,7 @@ export function innerCompact(input: Uint8Array): Result<readonly string[]> {
   const framed = compact(input, 3, false);
   return !framed.ok && framed.error.reason === 'invalid_serialization' ? err(joseError('nesting_depth', 'nesting')) : framed;
 }
+/** Authenticate an outer JWE and verify its inner compact JWS. */
 export async function decrypt(
   input: unknown,
   policy: unknown,
@@ -71,4 +74,9 @@ export async function decrypt(
     }
   });
 }
-export const Nested = Object.freeze({ decrypt, isResult: isNestedResult });
+/** One-level nested JWE decryption and JWS verification operations. */
+export const Nested = Object.freeze({
+  /** Authenticate an outer JWE and verify its inner compact JWS. */
+  decrypt,
+  /** Check the private brand of the operation result. */
+  isResult: isNestedResult });

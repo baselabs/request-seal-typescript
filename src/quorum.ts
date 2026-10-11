@@ -7,8 +7,11 @@ import {
   SIGNATURE_DEFAULT_MAX_MEMBERS,
   QUORUM_MAX_SIGNATURES,
 } from "./constants.ts";
+/** Require all, any, or a threshold number of successful signers. */
 export type QuorumMode = "all" | "any" | Readonly<{ threshold: number }>;
+/** Count quorum satisfaction by keys, principals, or roles. */
 export type QuorumUnit = "keys" | "principals" | "roles";
+/** A named quorum slot with a policy and optional signature and principal selectors. */
 export type SignerSlot = Readonly<{
   id: string;
   policy: Policy;
@@ -18,6 +21,7 @@ export type SignerSlot = Readonly<{
   principal: string | null;
   role: string | null;
 }>;
+/** A same-component or same-parameter constraint across quorum slots. */
 export type QuorumBinding =
   | Readonly<{ kind: "nested"; outer: string; inner: string }>
   | Readonly<{
@@ -25,6 +29,7 @@ export type QuorumBinding =
       name: "nonce" | "tag" | "created";
       slots: readonly string[];
     }>;
+/** A branded policy for bounded multi-signature verification. */
 export type Quorum = Readonly<{
   mode: QuorumMode;
   unit: QuorumUnit;
@@ -40,6 +45,7 @@ const text = (v: unknown): v is string =>
   typeof v === "string" &&
   encodeUtf8(v).length >= 1 &&
   encodeUtf8(v).length <= 256;
+/** Check the private brand of a quorum policy. */
 export function isQuorum(v: unknown): v is Quorum {
   return typeof v === "object" && v !== null && quorums.has(v);
 }
@@ -51,6 +57,7 @@ function snapshot(
   ensure(r.ok, "invalid_quorum", "input");
   return r.value;
 }
+/** Snapshot, validate, and brand a quorum policy. */
 export function createQuorum(input: unknown): Result<Quorum> {
   try {
     const a = snapshot(input, [
@@ -248,4 +255,7 @@ export function createQuorum(input: unknown): Result<Quorum> {
     return err(bounded(e, "invalid_quorum", "input"));
   }
 }
-export const Quorum = Object.freeze({ create: createQuorum });
+/** Quorum policy construction. */
+export const Quorum = Object.freeze({
+  /** Snapshot, validate, and brand a bounded quorum policy. */
+  create: createQuorum });

@@ -3,6 +3,7 @@ import { coreError } from "../errors/types.ts";
 import { verificationFacts, type Verification } from "../verification.ts";
 import type { QuorumMode, QuorumUnit, QuorumBinding } from "../quorum.ts";
 import type { Layer, Reason } from "../errors/parity.ts";
+/** Branded per-slot verification and quorum evaluation facts. */
 export type QuorumVerification = Readonly<{
   profile: Readonly<{ name: "rfc9421" }>;
   mode: QuorumMode;
@@ -31,6 +32,7 @@ export type QuorumVerification = Readonly<{
   authorization: "not_evaluated";
 }>;
 const results = new WeakSet<object>();
+/** Check the private brand of a quorum verification result. */
 export function isQuorumVerification(v: unknown): v is QuorumVerification {
   return typeof v === "object" && v !== null && results.has(v);
 }

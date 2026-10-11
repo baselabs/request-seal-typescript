@@ -21,15 +21,18 @@ import {dataBytes, boundedBinary, binaryByteLength} from './crypto/primitive.ts'
 import {isPublicKey, type PublicKey} from './public_key.ts';
 import {isKeyIdentity, type KeyIdentity} from './key_identity.ts';
 import {isUnwrappedKey, type UnwrappedKey} from './custody/content_key.ts';
+/** A branded algorithm-bound capability that confines private key operations. */
 export type KeyHandle = Readonly<{
   algorithm: CustodyAlgorithm;
   capabilities: readonly ('sign' | 'verify' | 'unwrap')[];
+  /** Sign bounded bytes with the algorithm-bound custody capability. */
   sign: (
     algorithm: unknown,
     data: unknown,
     context: Context,
     options?: unknown,
   ) => Promise<Result<Uint8Array<ArrayBuffer>>>;
+  /** Verify a signature through the algorithm-bound custody capability. */
   verify: (
     algorithm: unknown,
     signature: unknown,
@@ -37,22 +40,28 @@ export type KeyHandle = Readonly<{
     context: Context,
     options?: unknown,
   ) => Promise<Result<true>>;
+  /** Return the handle's branded public key. */
   publicKey: (context?: Context) => Promise<Result<PublicKey>>;
+  /** Return the handle's branded key identity. */
   identity: (context?: Context) => Promise<Result<KeyIdentity>>;
+  /** Unwrap an encrypted key into a confined decryption capability. */
   unwrap: (
     algorithm: unknown,
     wrappedKey: unknown,
     context: Context,
     options?: unknown,
   ) => Promise<Result<UnwrappedKey>>;
+  /** Release retained custody and invalidate the capability. */
   release: () => Promise<Result<true>>;
 }>;
+/** The caller-provided operation port wrapped by a branded key handle. */
 export type Custodian = Pick<
   KeyHandle,
   'sign' | 'verify' | 'publicKey' | 'identity' | 'unwrap' | 'release'
 >;
 const handles = new WeakSet<object>();
 const token = Object.freeze({});
+/** Check the private brand of a custody handle. */
 export function isKeyHandle(value: unknown): value is KeyHandle {
   return typeof value === 'object' && value !== null && handles.has(value);
 }

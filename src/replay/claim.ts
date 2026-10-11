@@ -21,9 +21,11 @@ export function boundedReplayBytes(v: unknown): v is Uint8Array {
   const length: number = apply(arrayLength, v, []);
   return length >= 1 && length <= KEY_IDENTITY_MAX_BYTES;
 };
+/** Check the private brand of an atomic replay claim. */
 export function isReplayClaim(value: unknown): value is ReplayClaim {
   return typeof value === 'object' && value !== null && claims.has(value);
 }
+/** Copy, validate, and brand a replay claim. */
 export function createClaim(input: unknown): Result<ReplayClaim> {
   try {
     const r = snapshotOptions(input, ['namespace', 'key', 'retainUntil']);
@@ -56,4 +58,9 @@ export function claimRow(input: unknown): Result<readonly [string, string, strin
   if (!isReplayClaim(input)) return err(replayError('invalid_claim'));
   return ok(Object.freeze([hex(input.namespace), hex(input.key), input.retainUntil.toString()] as const));
 }
-export const Claim = Object.freeze({create: createClaim, valid: isReplayClaim});
+/** Replay-claim construction and private-brand validation. */
+export const Claim = Object.freeze({
+  /** Copy, validate, and brand an atomic replay claim. */
+  create: createClaim,
+  /** Check the private brand of a replay claim. */
+  valid: isReplayClaim});

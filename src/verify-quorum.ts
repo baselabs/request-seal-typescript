@@ -24,6 +24,7 @@ import {
 import { custodyError, isRequestSealError } from "./errors/types.ts";
 import type { Verification } from "./verification.ts";
 import { ok, err, type Result } from "./result.ts";
+/** Verify bounded HTTP signatures and evaluate the configured quorum policy. */
 export async function verifyQuorum(
   message: unknown,
   quorum: unknown,

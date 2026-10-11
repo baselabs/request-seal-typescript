@@ -460,6 +460,7 @@ async function resource(
   remaining(context);
   return { fields: fs, encoded, decoded, location: url.href };
 }
+/** Fetch a discovery key set with bounded HTTPS, address, and redirect policies. */
 export async function fetch(
   source: unknown,
   input: unknown = {},
@@ -591,10 +592,14 @@ export async function fetch(
     return failure(error, "invalid_options");
   }
 }
-export const Discovery = Object.freeze({ ...CoreDiscovery, fetch });
+/** Discovery resolution with the explicit Node HTTPS transport. */
+export const Discovery = Object.freeze({ ...CoreDiscovery,
+  /** Fetch a discovery key set through the bounded Node HTTPS transport. */
+  fetch });
 /** Node source creation fails closed when the OS trust store is unavailable or empty. */
 export const DiscoverySource = Object.freeze({
   ...CoreSource,
+  /** Create a discovery source after validating Node transport options. */
   create(input: unknown): Result<import("./source.ts").DiscoverySource> {
     try {
       const result = CoreSource.create(input);

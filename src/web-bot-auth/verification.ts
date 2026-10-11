@@ -3,11 +3,14 @@ import type { ReplayReceipt } from "../replay-port.ts";
 import type { SigningAlgorithm } from "../crypto/algorithm.ts";
 import type { Proof } from "../discovery/body.ts";
 import { inspection } from "../brand.ts";
+/** Pinned Web Bot Auth profile metadata. */
 export const WEB_BOT_AUTH_PROFILE = Object.freeze({
   name: "web_bot_auth" as const,
   revision: "draft-ietf-webbotauth-httpsig-protocol-00" as const,
 });
+/** Profile name `web_bot_auth` and revision `draft-ietf-webbotauth-httpsig-protocol-00`. */
 export type WebBotAuthProfile = typeof WEB_BOT_AUTH_PROFILE;
+/** A verified agent identity with discovery provenance and key thumbprint. */
 export type AgentPrincipal = Readonly<{
   kind: "agent";
   identifier: string;
@@ -21,12 +24,15 @@ export type AgentPrincipal = Readonly<{
     revision: string | null;
   }>;
 }>;
+/** A verified held-key principal identified by its thumbprint. */
 export type HeldPrincipal = Readonly<{ kind: "key"; thumbprint: string }>;
+/** Single-signature verification facts narrowed to Web Bot Auth principals. */
 export type WebBotAuthSignature = Omit<Verification, "profile" | "principal"> &
   Readonly<{
     profile: WebBotAuthProfile;
     principal: AgentPrincipal | HeldPrincipal;
   }>;
+/** Verified Web Bot Auth envelope facts supplied to a replay commitment callback. */
 export type WebBotAuthReplayFacts = Readonly<{
   profile: WebBotAuthProfile;
   signatures: readonly Readonly<{
@@ -39,6 +45,7 @@ export type WebBotAuthReplayFacts = Readonly<{
     expires: number;
   }>[];
 }>;
+/** A branded Web Bot Auth envelope with per-label facts, evidence, and replay status. */
 export type WebBotAuthVerification = Readonly<{
   profile: WebBotAuthProfile;
   signatures: Readonly<Record<string, WebBotAuthSignature>>;
@@ -52,6 +59,7 @@ import { coreError } from "../errors/types.ts";
 import { verificationFacts, isVerification } from "../verification.ts";
 import { isReplayReceipt } from "../replay/receipt.ts";
 const envelopes = new WeakSet<object>();
+/** Check the private brand of a Web Bot Auth verification envelope. */
 export function isWebBotAuthVerification(
   v: unknown,
 ): v is WebBotAuthVerification {

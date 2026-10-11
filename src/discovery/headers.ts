@@ -4,6 +4,7 @@ import {
 } from "../message/index.ts";
 import { ensure, unwrap, list } from "./support.ts";
 import type { DiscoverySource } from "./source.ts";
+/** Ordered discovery response header names and string or byte values. */
 export type Headers = readonly (readonly [string, string | Uint8Array])[];
 export function fields(headers: unknown): readonly Field[] {
   let total = 0;

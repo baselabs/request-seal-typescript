@@ -1,5 +1,6 @@
 import { RUNTIME_MANAGED_FIELDS } from "../support.ts";
 // Evidence: test/fixtures/adapters-fetch-wire.json and adapters-fetch-wire.test.ts.
+/** Exact Deno releases permitted for Fetch wire verification. */
 export const FETCH_VERIFICATION_RUNTIMES = Object.freeze([
   "deno:2.5.6",
 ] as const);

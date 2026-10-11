@@ -14,23 +14,28 @@ import { ok, err } from "../result.ts";
 import { ensure, bounded } from "../signature-fields.ts";
 import { resolveAlgorithm } from "../crypto/algorithm.ts";
 import type { WebBotAuthReplayFacts } from "./verification.ts";
+/** Agent location, type, and deadline context passed to a trust callback. */
 export type AgentRequest = Readonly<{
   identifier: string;
   location: string;
   type: DiscoverySource["type"];
 }>;
+/** Resolve a trusted discovery key set for an agent request. */
 export type AgentTrust = (
   agent: AgentRequest,
 ) =>
   | Result<DiscoverySource | KeySet | null>
   | Promise<Result<DiscoverySource | KeySet | null>>;
+/** Replay rules with a commitment callback over the verified signature envelope. */
 export type WebBotAuthReplayPolicy = Omit<ReplayPolicy, "commitment"> &
   Readonly<{
+    /** Derive caller-owned replay commitment bytes from verified facts. */
     commitment: (
       facts: WebBotAuthReplayFacts,
       context: Context,
     ) => Result<Uint8Array> | Promise<Result<Uint8Array>>;
   }>;
+/** A branded agent-trust policy for Web Bot Auth verification. */
 export type WebBotAuthPolicy = Omit<
   GenericPolicy,
   "keyResolver" | "replay" | "freshness"
@@ -46,6 +51,7 @@ export type WebBotAuthPolicy = Omit<
     untagged: "reject" | "ignore";
   }>;
 const policies = new WeakSet<object>();
+/** Check the private brand of a Web Bot Auth policy. */
 export function isWebBotAuthPolicy(v: unknown): v is WebBotAuthPolicy {
   return !!v && typeof v === "object" && policies.has(v);
 }
@@ -174,4 +180,7 @@ export function createPolicy(input: unknown): Result<WebBotAuthPolicy> {
     return err(bounded(e, "invalid_policy", "input"));
   }
 }
-export const WebBotAuthPolicy = Object.freeze({ create: createPolicy });
+/** A branded agent-trust policy for Web Bot Auth verification. */
+export const WebBotAuthPolicy = Object.freeze({
+  /** Snapshot, validate, and brand a Web Bot Auth trust policy. */
+  create: createPolicy });

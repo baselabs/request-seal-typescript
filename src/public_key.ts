@@ -23,6 +23,7 @@ import {
 const verifiers = new WeakMap<object, (algorithm: unknown, signature: unknown, data: unknown, maximum: number) => Promise<Result<true>>>();
 const branded = new WeakSet<object>();
 const token = Object.freeze({});
+/** Check the private brand of a public key. */
 export function isPublicKey(value: unknown): value is PublicKey {
   return typeof value === 'object' && value !== null && branded.has(value);
 }
@@ -45,6 +46,7 @@ export class PublicKey {
     branded.add(this);
     Object.freeze(this);
   }
+  /** Import public JWK, PEM, or SPKI material without discarding metadata restrictions. */
   static async import(
     material: unknown,
     format: 'jwk' | 'pem' | 'spki' | 'der' = 'jwk',
@@ -95,22 +97,26 @@ export class PublicKey {
       return err(cryptoError('invalid_key'));
     }
   }
+  /** Export a defensive copy of the public JWK and its metadata restrictions. */
   jwk(): Result<Jwk> {
     return this.#pssOnly
       ? err(cryptoError('unsupported_format'))
       : ok(this.#jwk);
   }
+  /** Export public SPKI bytes when metadata restrictions permit a lossless export. */
   spki(): Result<Uint8Array<ArrayBuffer>> {
     return ['alg', 'use', 'key_ops'].some((k) => Object.hasOwn(this.#jwk, k))
       ? err(cryptoError('unsupported_format'))
       : ok(new Uint8Array(this.#spki));
   }
+  /** Export public SPKI PEM when metadata restrictions permit a lossless export. */
   pem(): Result<string> {
     const r = this.spki();
     if (!r.ok) return r;
     const p = writePem('PUBLIC KEY', r.value);
     return p.ok ? p : err(cryptoError('invalid_key'));
   }
+  /** Compute the public key thumbprint defined by RFC 7638. */
   async thumbprint(): Promise<Result<string>> {
     try {
       return ok(
@@ -135,6 +141,7 @@ export class PublicKey {
       encodeUtf8(JSON.stringify(publicMembers(this.#jwk))),
     );
   }
+  /** Check compatibility and metadata permission for the selected algorithm. */
   bind(algorithm: unknown): Result<true> {
     const resolved = resolveAlgorithm(algorithm, true);
     if (!resolved.ok) return resolved;
@@ -147,6 +154,7 @@ export class PublicKey {
       ? ok(true)
       : err(cryptoError('key_mismatch'));
   }
+  /** Verify a signature with bounded input and preserved key metadata restrictions. */
   async verify(algorithm: unknown, signature: unknown, data: unknown, options: unknown = {}): Promise<Result<true>> {
     const maximum = byteLimit(options);
     if (!maximum.ok) return maximum;
@@ -181,6 +189,7 @@ export class PublicKey {
       return err(cryptoError('invalid_key'));
     }
   }
+  /** Return a bounded public inspection view without retained cryptographic bytes. */
   toJSON(): Readonly<{kind: string; pssOnly: boolean}> {
     return Object.freeze({kind: 'PublicKey', pssOnly: this.#pssOnly});
   }

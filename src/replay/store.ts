@@ -5,6 +5,7 @@ import { ok, err, type Result } from '../result.ts';
 import type { ReplayStore, ReplayClaim } from '../replay-port.ts';
 import { isReplayClaim, validSeconds } from './claim.ts';
 const stores = new WeakSet<object>();
+/** Check the private brand of a replay store. */
 export function isReplayStore(value: unknown): value is ReplayStore {
   return typeof value === 'object' && value !== null && stores.has(value);
 }

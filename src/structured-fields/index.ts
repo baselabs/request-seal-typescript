@@ -7,6 +7,7 @@ import { parseDecimal, structuredInteger } from '../numbers.ts';
 import { structuredFieldsError, messageError, isRequestSealError } from '../errors/types.ts';
 import type { Reason } from '../errors/parity.ts';
 import { err, ok, type Result } from '../result.ts';
+/** A typed Structured Fields bare value. */
 export type Bare =
   | Readonly<{ kind: 'integer' | 'date'; value: number }>
   | Readonly<{ kind: 'decimal'; value: Readonly<{ scaled: number | bigint; scale: number }> }>
@@ -20,22 +21,32 @@ export function copyDecimalSource(from: Bare, to: Bare): void {
   const source = decimalSources.get(from);
   if (source !== undefined) decimalSources.set(to, source);
 }
+/** Ordered Structured Fields parameter names and bare values. */
 export type Parameters = readonly (readonly [string, Bare])[];
+/** A Structured Fields item and its ordered parameters. */
 export type Item = Readonly<{ kind: 'item'; value: Bare; parameters: Parameters }>;
+/** A Structured Fields inner list and its ordered parameters. */
 export type InnerList = Readonly<{
   kind: 'inner_list';
   value: readonly Item[];
   parameters: Parameters;
 }>;
+/** A Structured Fields item or inner list. */
 export type Member = Item | InnerList;
+/** An ordered Structured Fields list. */
 export type List = Readonly<{ kind: 'list'; value: readonly Member[] }>;
+/** An ordered Structured Fields dictionary. */
 export type Dictionary = Readonly<{
   kind: 'dictionary';
   value: readonly (readonly [string, Member])[];
 }>;
+/** A branded Structured Fields item, inner list, list, or dictionary. */
 export type Value = Item | InnerList | List | Dictionary;
+/** The supported Structured Fields root kinds. */
 export type FieldType = 'item' | 'list' | 'dictionary';
+/** The supported Structured Fields specification revisions. */
 export type Revision = 'rfc8941' | 'rfc9651';
+/** A branded field schema with revision, combination, and byte policies. */
 export type Schema = Readonly<{
   revision: Revision;
   type: FieldType;
@@ -43,7 +54,9 @@ export type Schema = Readonly<{
   parameterTypes: readonly Bare['kind'][];
   innerLists: boolean;
 }>;
+/** Structured Fields parser ceilings. @inline */
 export type Limits = typeof CEILINGS;
+/** Parser limits, schema selection, and duplicate policies. */
 export type Options = {
   schema: Revision | Schema;
   uniqueKeys?: 'all' | string[];
@@ -63,9 +76,11 @@ const allTypes: readonly Bare['kind'][] = [...baseTypes, 'date', 'display_string
 const schemas = new WeakMap<object, Schema>();
 const values = new WeakSet<object>();
 const schemaValues = new WeakSet<object>();
+/** Check the private brand of a Structured Fields value. */
 export function isStructuredFieldsValue(value: unknown): value is Value {
   return typeof value === 'object' && value !== null && values.has(value);
 }
+/** Check the private brand of a Structured Fields schema. */
 export function isStructuredFieldsSchema(value: unknown): value is Schema {
   return typeof value === 'object' && value !== null && schemaValues.has(value);
 }
@@ -76,6 +91,7 @@ function fail(reason: Reason<'structured_fields'>): never {
 function ensure(value: unknown, reason: Reason<'structured_fields'>): asserts value {
   if (!value) fail(reason);
 }
+/** Validate and brand a Structured Fields schema. */
 export function createSchema(input: unknown): Result<Schema> {
   try {
     const s = snapshotOptions(input, [
@@ -691,4 +707,13 @@ export function parseField(
     return err(error(e, 'invalid_message'));
   }
 }
-export const StructuredFields = Object.freeze({ parse, parseField, serialize, createSchema });
+/** Bounded parsing, serialization, and field-schema construction. */
+export const StructuredFields = Object.freeze({
+  /** Parse and validate the supported wire representation. */
+  parse,
+  /** Combine field occurrences according to a branded schema and parse them. */
+  parseField,
+  /** Serialize validated values to their canonical wire representation. */
+  serialize,
+  /** Validate and brand a Structured Fields schema. */
+  createSchema });

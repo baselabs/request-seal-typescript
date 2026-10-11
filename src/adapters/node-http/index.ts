@@ -36,6 +36,7 @@ import {
 import * as S from "../support.ts";
 import { deepFreeze } from "../../brand.ts";
 type Request = IncomingMessage | Http2ServerRequest;
+/** Lossless incoming Node HTTP method, target, field, and transport facts. */
 export type Ingress = Readonly<{
   evidence: "observed";
   httpVersion: string;
@@ -49,6 +50,7 @@ export type Ingress = Readonly<{
   scheme: string;
   declaredScheme: string | null;
 }>;
+/** Branded Node request capture with owned body bytes and replay access. */
 export type Capture = Readonly<{
   message: HttpMessage;
   ingress: Ingress;
@@ -57,23 +59,28 @@ export type Capture = Readonly<{
     authority: string;
     source: "connection" | "forwarded";
   }>;
+  /** Open a fresh readable stream over the retained request body. */
   replay: () => Result<Readable>;
 }>;
+/** Captured request bytes accompanied by a single-signature verification. */
 export type VerifiedRequest = Readonly<{
   capture: Capture;
   verification: Verification;
   bytes: Uint8Array;
 }>;
+/** Captured request bytes accompanied by a quorum verification. */
 export type VerifiedQuorumRequest = Readonly<{
   capture: Capture;
   verification: QuorumVerification;
   bytes: Uint8Array;
 }>;
+/** Captured request bytes accompanied by a Web Bot Auth verification. */
 export type VerifiedWebBotAuthRequest = Readonly<{
   capture: Capture;
   verification: WebBotAuthVerification;
   bytes: Uint8Array;
 }>;
+/** A signed Node client response with owned bytes and optional verification. */
 export type ClientResponse = Readonly<{
   request: HttpMessage;
   message: HttpMessage;
@@ -608,6 +615,7 @@ function prepare(
   });
   return capture;
 }
+/** Capture and retain a Node incoming request before body parsing. */
 export async function captureRequest(
   req: unknown,
   options: unknown = {},
@@ -681,10 +689,13 @@ export async function captureRequest(
     return S.caught(e, "node-http", "capture", "invalid_options");
   }
 }
+/** Install early Node request capture on a server with explicit limits. */
 export function capture(
   server: unknown,
   options: unknown = {},
-): Result<Readonly<{ close: () => Result<true> }>> {
+): Result<Readonly<{
+  /** Close this capability and release its retained state. */
+  close: () => Result<true> }>> {
   try {
     const a = captureOptions(
       options,
@@ -723,6 +734,7 @@ export function capture(
     return S.caught(e, "node-http", "attach", "invalid_options");
   }
 }
+/** Return a defensive copy of captured Node request body bytes. */
 export function captureBody(
   req: unknown,
   bytes: unknown,
@@ -772,6 +784,7 @@ function beginVerification(req: object, c: Capture) {
   state.verified = err(S.failure("node-http", "verify", "already_verified"));
   return state;
 }
+/** Verify a captured Node request once and retain its verification result. */
 export async function verifyRequest(
   req: unknown,
   policy: unknown,
@@ -951,6 +964,7 @@ export async function verifyWebBotAuth(
     );
   }
 }
+/** Read the verification result associated with a captured Node request. */
 export function verification(
   req: unknown,
 ): Result<Verification | QuorumVerification | WebBotAuthVerification> {
@@ -963,6 +977,7 @@ export function verification(
     ? s.verified
     : err(S.failure("node-http", "verify", "not_captured"));
 }
+/** Sign and write a Node HTTP response using retained body bytes. */
 export async function signResponse(
   res: unknown,
   input: unknown,
@@ -1114,6 +1129,7 @@ export async function signResponse(
     return S.caught(e, "node-http", "sign", "signing_failed");
   }
 }
+/** Verify a retained Node client response against its related request. */
 export async function verifyResponse(
   response: unknown,
   request: unknown,
@@ -1282,6 +1298,7 @@ async function send(
       }),
   );
 }
+/** Send a signed Node HTTP request with explicit redirect and response policies. */
 export async function signedRequest(
   options: unknown,
   input: unknown,

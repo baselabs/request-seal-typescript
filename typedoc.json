@@ -1,0 +1,33 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/node_hasher.ts",
+    "src/replay/postgres.ts",
+    "src/discovery/node.ts",
+    "src/adapters/node-http/index.ts",
+    "src/adapters/fetch/index.ts",
+    "src/custody/ssh-agent/index.ts"
+  ],
+  "tsconfig": "tsconfig.build.json",
+  "out": "site-dist",
+  "readme": "none",
+  "name": "@request-seal/core API",
+  "treatWarningsAsErrors": true,
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": true
+  },
+  "requiredToBeDocumented": [
+    "Variable",
+    "Function",
+    "Class",
+    "Interface",
+    "TypeAlias"
+  ],
+  "intentionallyNotExported": [
+    "WEB_BOT_AUTH_PROFILE",
+    "Proof"
+  ]
+}
