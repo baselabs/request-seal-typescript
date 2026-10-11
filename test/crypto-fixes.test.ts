@@ -200,8 +200,8 @@ test('CryptoKey clone behavior is version-pinned and documentation states confin
   t.diagnostic('CLONES: ' + (process.versions.deno === '2.5.6' ? 'Deno 2.5.6 copies lose the CryptoKey brand; both operations reject TypeError' : 'structuredClone and postMessage yield usable cryptographic copies'));
 });
 
-test('README compatibility pins Bun extreme-s exception', async () => {
-  assert.match(await readFile('README.md', 'utf8'), /Compatibility[\s\S]*Bun 1\.3\.14[\s\S]*261[\s\S]*262/);
+test('runtime reference pins Bun extreme-s exception', async () => {
+  assert.match(await readFile('docs/reference/runtime-matrix.md', 'utf8'), /Tested runtime lanes[\s\S]*Bun 1\.3\.14[\s\S]*261[\s\S]*262/);
 });
 
 test('changelog continuous list and corpus metadata first', async () => {

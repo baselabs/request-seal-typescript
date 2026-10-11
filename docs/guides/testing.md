@@ -40,6 +40,7 @@ const stranger = must(await Custody.local("ed25519", strangerPair.privateKey.exp
 
 const now = Math.floor(Date.now() / 1000);
 const components = '("@method" "@authority" "@path" "content-digest")';
+// Single sender: select by keyid when you have several.
 const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: trusted });
 const policy = (replay: unknown = "not_required") => must(Policy.create({
   algorithms: ["ed25519"], components, keyResolver,
@@ -101,7 +102,9 @@ npm ci --ignore-scripts
 npm run check
 ```
 
-`npm run check` runs, in order: the TypeScript check for Node and for web-standard globals, the test suite, the self-checks, the build, the conformance corpus, and a packaging check that packs the tarball, confirms it holds only the allowed files, and loads its exports and types from an unpacked copy. The suite includes the executed documentation: every `ts` fence in the README and the guides runs as a program under the runtime named above it.
+`npm run check` runs, in order: `typecheck`, `typecheck:web`, `build`, `test`, `self-checks`, `conformance`, and `pack:check`. The packaging check verifies the allowlist and loads exports and types from an unpacked tarball. TypeScript programs and byte-matched excerpts in repository Markdown run under their declared runtime: Node by default, or the exact `<!-- run: deno -->` or `<!-- run: bun -->` marker within two lines above the fence. API sketches are labeled `text` and need caller-supplied values.
+
+CI also runs `npm run docs` (warnings fail) and `node --experimental-strip-types --no-warnings --test interop/migration/claims.test.ts` after installing its dependencies. Build the [API reference](https://baselabs.github.io/request-seal-typescript/) locally with `npm run docs`; output is in `site-dist/`. Deno programs receive only cache/home/PATH settings, read access to the repository, and network access to loopback and JSR; they receive no environment permission.
 
 For focused work, run one file with `node --experimental-strip-types --no-warnings --test test/<name>.test.ts`. `npm run test:red` plants a failing test and must exit nonzero on every runtime; it proves the runner reports failures. `npm run conformance` runs the shared corpus.
 

@@ -46,7 +46,7 @@ test("decision records keep the reference format and are indexed", () => {
   }
 });
 
-test("the README status table maps every core reason and agrees with the signing guide", async () => {
+test("the README status table maps every reason and agrees with the signing guide", async () => {
   const readme = read("README.md");
   const section = /^## Reason to HTTP status \(recommendation\)\n([\s\S]*?)^## /m.exec(readme)![1]!;
   assert.match(section, /recommendation/);
@@ -61,21 +61,17 @@ test("the README status table maps every core reason and agrees with the signing
   assert.ok(fence, "the signing guide holds the status mapping program");
   const output = await executeFence(fence, "\nconsole.log(JSON.stringify(Object.fromEntries(ERROR_PARITY.map((e) => [e.rule_id, statusFor(e)]))));\n");
   const mapping = JSON.parse(output.trim().split("\n").pop()!) as Record<string, number>;
-  const covered = new Set<string>();
-  for (const [status, cell] of statuses) {
-    for (const match of cell.matchAll(/`([a-z_]+\.[a-z_]+)`( \(unless noted below\)| with detail)?/g)) {
-      const id = `core/${match[1]}`;
-      if (match[2]) continue; // Detail-dependent: key.agent_unresolved resolves per detail.
-      assert.ok(id in mapping, `${id} is a real core reason`);
-      assert.equal(mapping[id], status, `${id} is mapped to ${mapping[id]} by the guide but ${status} by the README`);
-      covered.add(id);
-    }
-  }
+  const patterns: {pattern: string; status: number}[] = [];
+  for (const [status, cell] of statuses)
+    for (const match of cell.matchAll(/`([^`]+)`/g)) patterns.push({pattern: match[1]!, status});
   for (const entry of ERROR_PARITY) {
-    if (entry.kind === "core" && entry.reason !== "agent_unresolved") assert.ok(covered.has(entry.rule_id), `${entry.rule_id} is missing from the README table`);
+    const matches = patterns.filter(({pattern}) => pattern.endsWith("*") ? entry.rule_id.startsWith(pattern.slice(0, -1)) : entry.rule_id === pattern);
+    assert.ok(matches.length, `${entry.rule_id} is missing from the README`);
+    const exact = matches.filter(({pattern}) => !pattern.endsWith("*"));
+    const chosen = exact.length ? exact : matches;
+    assert.equal(chosen.length, 1, `${entry.rule_id} has ambiguous README rows`);
+    assert.equal(mapping[entry.rule_id], chosen[0]!.status, entry.rule_id);
   }
-  for (const kind of ["message", "structured_fields", "signature_base", "digest", "custody", "discovery", "jose", "replay", "adapter"]) {
-    assert.ok(new RegExp(kind.replace("_", "[_ ]"), "i").test(section), `${kind} errors are covered by the README table`);
-  }
-  assert.ok(/agent_unresolved/.test(section));
+  for (const {pattern} of patterns)
+    assert.ok(ERROR_PARITY.some(e => pattern.endsWith("*") ? e.rule_id.startsWith(pattern.slice(0, -1)) : e.rule_id === pattern), `unknown pattern: ${pattern}`);
 });

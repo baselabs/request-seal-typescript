@@ -10,7 +10,9 @@ RequestSeal signs and verifies HTTP messages ([RFC 9421](https://www.rfc-editor.
 npm install @request-seal/core
 ```
 
-Version 0.1.0 is published; the next release is 0.2.0. The package is ESM. It needs Node 22.12.0 or newer, and the core API also runs on Deno and Bun (see Compatibility below). In TypeScript, use `nodenext` or `bundler` module resolution so subpath imports such as `@request-seal/core/fetch` resolve. Every example below is a complete program: it generates its own keys, starts any server on loopback, closes it, and asserts its result.
+See [CHANGELOG.md](CHANGELOG.md) for published versions and unreleased changes. The package is ESM. It needs Node 22.12.0 or newer, and the core API also runs on Deno and Bun (see Compatibility below). In TypeScript, use `nodenext` or `bundler` module resolution so subpath imports such as `@request-seal/core/fetch` resolve. Complete programs generate keys, close their loopback servers, and assert results; the labeled verification excerpts need the setup in their expanded programs.
+
+Save a complete program as `example.ts` in a project whose `package.json` has `"type": "module"`. On Node 22, run `node --experimental-strip-types example.ts`; on Node 24 and later, run `node example.ts`. For fences marked Deno, run `deno run --allow-read --allow-net=127.0.0.1,jsr.io example.ts`; for Bun, run `bun run example.ts`.
 
 ## Sign a request
 
@@ -21,6 +23,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { Custody } from "@request-seal/core";
 import { signedFetch } from "@request-seal/core/fetch";
+// In production, load persisted keys from your secret store.
 const key = await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) });
 const server = createServer((req, res) => res.end(String(req.headers["signature-input"]))).listen(0, "127.0.0.1");
 await new Promise((ready) => server.once("listening", ready));
@@ -29,15 +32,23 @@ const sent = await signedFetch(`http://127.0.0.1:${(server.address() as { port: 
 assert.ok(sent.ok && (await sent.value.response.text()).startsWith('sig=("@method" "@authority" "@path")')); server.close();
 ```
 
+Next: [getting started](docs/guides/getting-started.md) for a core sign/verify round trip, or [Node HTTP](docs/guides/node-http.md) for server verification. The Fetch adapter cannot verify `@path`; see the [Fetch guide](docs/guides/fetch.md#verify-incoming-requests).
+
+## Verify an RFC 9421 request
+
+Build an explicit policy, then call `verify(message, policy, { label: "sig" })`. The [strict RFC 9421 recipe](#strict-rfc-9421) below signs a body, checks its digest, and rejects a second use.
+
 ## Verify a Web Bot Auth request
 
-[Web Bot Auth](docs/guides/web-bot-auth.md) lets automated agents sign their requests so a site can tell who is calling. Verification trusts only the agent directories you configure, checks the signature against keys from them, and returns the verified agent. It never authorizes: that stays your decision.
+[Web Bot Auth](docs/guides/web-bot-auth.md) lets automated agents sign their requests so a site can tell who is calling. Web Bot Auth does not authenticate request bodies. Verification trusts only the agent directories you configure, checks the signature against keys from them, and returns the verified agent. It never authorizes: that stays your decision.
+
+`content: "not_required"` skips body digest checks; `replay: "not_required"` allows repeated signatures within their freshness window. These local test programs use unsigned snapshots with `requireSignedDirectory: false`; production directories should keep the signed-directory default. See the [signed directory program](docs/guides/web-bot-auth.md).
 
 Each verification excerpt below is at most fifteen lines and matches the code between the `----` markers in its complete runnable program. The documentation check compares the two byte-for-byte, so edits cannot silently drift. Expand the program to see key generation, the caller-owned offline directory snapshot, and signed and unsigned requests with asserted outcomes.
 
 ### Express
 
-`captureRequest` runs first so the exact request line, headers, and body are kept before any parser touches them. See [Node HTTP](docs/guides/node-http.md) for Fastify, proxies, and body parsers.
+This GET route accepts bodyless requests. `captureRequest` runs first so the exact request line, headers, and body are kept before any parser touches them. See [Node HTTP](docs/guides/node-http.md) for Fastify, proxies, and body parsers.
 
 Verification excerpt (14 lines):
 
@@ -52,7 +63,7 @@ const policy = must(WebBotAuth.Policy.create({
   replay: "not_required",
 }));
 const app = express();
-app.use(async (req: any, res: any) => {
+app.get("/", async (req: any, res: any) => {
   const captured = await captureRequest(req); // Before any body parser.
   const verified = captured.ok ? await verifyWebBotAuth(req, policy) : captured;
   res.status(verified.ok ? 200 : 401).end(verified.ok ? verified.value.verification.signatures.crawler!.principal.kind : "");
@@ -76,7 +87,7 @@ const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); retur
 const express = createRequire(new URL("../../interop/adapters/package.json", import.meta.url))("express");
 const now = () => Math.floor(Date.now() / 1000);
 
-// The crawler's key, published in a directory you trust. This example uses the offline snapshot API.
+// Test-only unsigned local snapshot. In production, keep the signed-directory default.
 const crawler = generateKeyPairSync("ed25519");
 const jwk = crawler.publicKey.export({ format: "jwk" });
 const source = must(DiscoverySource.create({ type: "directory", location: "https://crawler.example", requireSignedDirectory: false }));
@@ -93,7 +104,7 @@ const policy = must(WebBotAuth.Policy.create({
   replay: "not_required",
 }));
 const app = express();
-app.use(async (req: any, res: any) => {
+app.get("/", async (req: any, res: any) => {
   const captured = await captureRequest(req); // Before any body parser.
   const verified = captured.ok ? await verifyWebBotAuth(req, policy) : captured;
   res.status(verified.ok ? 200 : 401).end(verified.ok ? verified.value.verification.signatures.crawler!.principal.kind : "");
@@ -121,15 +132,16 @@ server.closeAllConnections();
 
 ### Hono on Deno
 
-The example runs under Deno and pins Hono from JSR at `jsr:@hono/hono@4.10.3`. Hono is your dependency, not RequestSeal's. The program builds a `Message` from the incoming request using the origin your service owns, never the request's own `Host`, and passes it to `WebBotAuth.verify`.
+The example runs under Deno and pins Hono from JSR at `jsr:@hono/hono@4.10.3`. Hono is your dependency, not RequestSeal's. Fetch Headers merges duplicate field occurrences; this excerpt cannot recover them. Use the Node adapter when separate occurrences matter. The program builds a `Message` from the incoming request using the origin your service owns, never the request's own `Host`, and passes it to `WebBotAuth.verify`.
 
 Verification excerpt (15 lines):
 
 <!-- verification-excerpt: hono -->
+<!-- run: deno -->
 ```typescript
 let origin = ""; // The public origin you serve. Take it from your configuration, never from the request.
 const policy = must(WebBotAuth.Policy.create({
-  algorithms: ["ed25519"],
+  algorithms: ["ed25519"], components: '("@method" "@path" "@query")',
   agents: ({ location }: AgentRequest) => ok(location === keys.origin ? keys : null), // Trust only the directory you configured.
   cache: null,
   freshness: { clock: now, maxAge: 60, skew: 5 },
@@ -138,7 +150,7 @@ const policy = must(WebBotAuth.Policy.create({
 }));
 const app = new Hono();
 app.get("/*", async (c) => {
-  const message = await Message.request("GET", origin + c.req.path, [...c.req.raw.headers], "");
+  const message = await Message.request("GET", origin + new URL(c.req.url).pathname + new URL(c.req.url).search, [...c.req.raw.headers.entries()], "");
   const verified = message.ok ? await WebBotAuth.verify(message.value, policy) : message;
   return verified.ok ? c.text(verified.value.signatures.crawler!.principal.kind) : c.text("denied", 401);
 });
@@ -158,7 +170,7 @@ import { Custody, Discovery, DiscoverySource, Message, PublicKey, WebBotAuth, ok
 const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
 const now = () => Math.floor(Date.now() / 1000);
 
-// The crawler's key, published in a directory you trust. This example uses the offline snapshot API.
+// Test-only unsigned local snapshot. In production, keep the signed-directory default.
 const crawler = generateKeyPairSync("ed25519");
 const jwk = crawler.publicKey.export({ format: "jwk" });
 const source = must(DiscoverySource.create({ type: "directory", location: "https://crawler.example", requireSignedDirectory: false }));
@@ -168,7 +180,7 @@ const keys = must(await Discovery.resolver.fromSnapshot(source, new TextEncoder(
 // ---- Your server: verify Web Bot Auth requests (15 lines) ----
 let origin = ""; // The public origin you serve. Take it from your configuration, never from the request.
 const policy = must(WebBotAuth.Policy.create({
-  algorithms: ["ed25519"],
+  algorithms: ["ed25519"], components: '("@method" "@path" "@query")',
   agents: ({ location }: AgentRequest) => ok(location === keys.origin ? keys : null), // Trust only the directory you configured.
   cache: null,
   freshness: { clock: now, maxAge: 60, skew: 5 },
@@ -177,7 +189,7 @@ const policy = must(WebBotAuth.Policy.create({
 }));
 const app = new Hono();
 app.get("/*", async (c) => {
-  const message = await Message.request("GET", origin + c.req.path, [...c.req.raw.headers], "");
+  const message = await Message.request("GET", origin + new URL(c.req.url).pathname + new URL(c.req.url).search, [...c.req.raw.headers.entries()], "");
   const verified = message.ok ? await WebBotAuth.verify(message.value, policy) : message;
   return verified.ok ? c.text(verified.value.signatures.crawler!.principal.kind) : c.text("denied", 401);
 });
@@ -185,12 +197,15 @@ app.get("/*", async (c) => {
 
 const server = Deno.serve({ hostname: "127.0.0.1", port: 0, onListen: ({ port }) => { origin = `http://127.0.0.1:${port}`; } }, app.fetch);
 const signer = must(await Custody.local("ed25519", crawler.privateKey.export({ type: "pkcs8", format: "pem" }) as string));
-const signed = must(await WebBotAuth.sign(must(await Message.request("GET", origin + "/", [], "")), {
-  label: "crawler", key: must(await PublicKey.import(jwk)), algorithm: "ed25519",
+const signed = must(await WebBotAuth.sign(must(await Message.request("GET", origin + "/page?x=1&x=2", [], "")), {
+  label: "crawler", components: '("@method" "@path" "@query")', key: must(await PublicKey.import(jwk)), algorithm: "ed25519",
   agent: { location: "https://crawler.example", type: "directory" }, created: now(), expires: now() + 60, nonce: null,
 }, signer));
 const headers = signed.fields.map((f) => [f.name, new TextDecoder().decode(f.value)] as [string, string]);
-assert.equal(await (await fetch(origin + "/", { headers })).text(), "agent");
+assert.equal(await (await fetch(origin + "/page?x=1&x=2", { headers })).text(), "agent");
+const changedQuery = await fetch(origin + "/page?x=1&x=3", { headers });
+assert.equal(changedQuery.status, 401);
+await changedQuery.body?.cancel();
 const refused = await fetch(origin + "/");
 assert.equal(refused.status, 401);
 await refused.body?.cancel();
@@ -226,7 +241,7 @@ const policy = must(Policy.create({
   extraComponents: "reject",                                  // ...and nothing else, so coverage cannot drift.
   maxSignatures: 4,                                           // Bound the work an attacker can request.
   keyResolver,                                                // Maps keyid to a key you trust; ok(null) for strangers.
-  freshness: { clock: () => Math.floor(Date.now() / 1000), maxAge: 300, skew: 30, requireExpires: true },
+  freshness: { clock: () => Math.floor(Date.now() / 1000), maxAge: 300, skew: 5, requireExpires: true },
   content: { kind: "content", algorithms: ["sha-256"], section: "headers" },  // Recompute the body digest.
   replay: {                                                   // Each signature works once.
     identifier: "nonce", namespace: new TextEncoder().encode("partner-api"), timeoutMs: 1000,
@@ -258,6 +273,7 @@ const now = () => Math.floor(Date.now() / 1000);
 const sha256 = async (text: string) => new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
 const agent = generateKeyPairSync("ed25519");
 const jwk = agent.publicKey.export({ format: "jwk" });
+// Test-only unsigned snapshot; use the signed-directory default in production.
 const source = must(DiscoverySource.create({ type: "directory", location: "https://agent.example", requireSignedDirectory: false }));
 const keys = must(await Discovery.resolver.fromSnapshot(source, new TextEncoder().encode(JSON.stringify({ keys: [jwk] })), now(),
   [["content-type", "application/http-message-signatures-directory+json"]]));
@@ -292,17 +308,19 @@ assert.ok(!again.ok && again.error.kind === "core" && again.error.reason === "re
 
 ## Reason to HTTP status (recommendation)
 
-Every failure is a `Result` with a bounded `error`; branch on `error.kind` and `error.reason`. This table is a recommendation, not a requirement. It is derived from the error vocabulary in [error parity](docs/reference/error-parity.md), and the [signing guide](docs/guides/signing-and-verifying.md#respond-to-a-rejection) holds the same mapping as a program that checks it covers every reason. Core reasons appear as `layer.reason`. Adapters wrap the underlying reason in `error.source`; map that.
+Every failure is a `Result` with a bounded `error`; branch on `error.kind` and `error.reason`. This table is a recommendation, not a requirement. It is derived from the error vocabulary in [error parity](docs/reference/error-parity.md), and the [signing guide](docs/guides/signing-and-verifying.md#respond-to-a-rejection) holds the same mapping as a program that checks it covers every reason. Selectors use `kind/layer.reason` or `kind/reason`; `*` covers that family. An exact reason overrides its family row. The guide program is authoritative. Adapters wrap the underlying reason in `error.source`; map that. Any `retryable: true` error overrides the table with 503. For `adapter/limit`, 413 is an optional alternative to 400.
 
 The reasoning, stated once: 400 means the message cannot be read, so resending the same bytes cannot help. 401 means the sender did not prove what your policy requires, and a fresh correct signature can. 403 means your configuration refuses a sender it understood. 500 means your own code or configuration is wrong. 503 means the failure is transient or the replay store is in trouble.
 
 | Status | Reasons |
 | --- | --- |
-| 400 | `fields.invalid_signature_input`, `fields.invalid_signature_field`, `fields.invalid_signature_agent`, `fields.duplicate_label`, `fields.duplicate_parameter`, `fields.label_mismatch`, `crypto.signature_base_failed`, `content.body_unavailable`, `content.digest_unsupported`, `input.invalid_message`, `input.invalid_request`, `input.limit`, `input.unsupported_component`, `negotiation.invalid_accept_signature`, `negotiation.inapplicable_component`, `negotiation.negotiation_unfulfillable`; adapter `invalid_request`, `limit`, `body_unavailable`, `digest_conflict`, `untrusted_proxy`; every `message`, `structured_fields`, `signature_base`, and `digest` error; malformed JOSE input and nesting |
-| 401 | `fields.missing_signature`, `fields.missing_signature_input`, `fields.no_web_bot_auth_signature`, `fields.unknown_label`, `crypto.invalid_signature`, `content.digest_mismatch`, `content.digest_not_covered`, `freshness.created_in_future`, `freshness.expired`, `freshness.lifetime_exceeded`, `freshness.missing_created`, `freshness.missing_expires`, `freshness.too_old`, `key.unknown_key`, `key.agent_unresolved` (unless noted below), `policy.algorithm_mismatch`, `policy.algorithm_not_permitted`, `policy.invalid_keyid`, `policy.missing_required_component`, `policy.nested_coverage_incomplete`, `policy.unexpected_component`, `policy.unexpected_signature`, `quorum.binding_unsatisfied`, `quorum.nonqualifying_signature`, `quorum.quorum_not_met`, `quorum.unexpected_signature`, `negotiation.negotiation_unfulfilled`, `replay.missing_replay_identifier`, `replay.replayed`, `replay.retention_exceeded`; invalid JOSE signatures and decryption failures; discovery failures other than those below |
-| 403 | `policy.test_key_rejected`, `binding.unattributed`, `binding.actor_unbound`, `binding.tenant_unbound`; discovery `revoked_key`; `key.agent_unresolved` with detail `untrusted_agent` or `revoked_key` |
-| 500 | `binding.invalid_binding`, `binding.invalid_verification`, `crypto.signer_failed`, `crypto.signing_failed`, `crypto.verifier_failed`, `fields.label_in_use`, `freshness.invalid_clock`, `input.algorithm_mismatch`, `input.invalid_options`, `input.invalid_policy`, `input.invalid_profile`, `input.invalid_quorum`, `input.signer_algorithm_mismatch`, `key.key_resolver_failed`, `quorum.ambiguous_key_identity`, `replay.commitment_failed`; an adapter used in the wrong order (`parser_order`, `not_captured`, `already_verified`); invalid options anywhere; `custody` and `crypto` errors other than an invalid signature or invalid data |
-| 503 | Any error with `retryable: true` (custody and discovery timeouts, unavailable sources); `replay.store_failed`, `replay.store_timeout`, `replay.store_unavailable`, and replay store errors; `key.agent_unresolved` with detail `timeout` or `source_unavailable` |
+| 400 | `core/fields.*`, `core/negotiation.*`, `message/*`, `structured_fields/*`, `signature_base/*`, `digest/*`, `jose/input.*`, `jose/nesting.*`, `core/content.body_unavailable`, `core/content.digest_unsupported`, `core/crypto.signature_base_failed`, `core/input.invalid_message`, `core/input.invalid_request`, `core/input.limit`, `core/input.unsupported_component`, `crypto/invalid_data`, `adapter/invalid_request`, `adapter/limit`, `adapter/body_unavailable`, `adapter/digest_conflict`, `adapter/untrusted_proxy` |
+| 401 | `core/content.*`, `core/freshness.*`, `core/key.*`, `core/policy.*`, `core/quorum.*`, `core/replay.*`, `discovery/*`, `jose/crypto.*`, `jose/key.*`, `core/crypto.invalid_signature`, `core/fields.missing_signature`, `core/fields.missing_signature_input`, `core/fields.no_web_bot_auth_signature`, `core/fields.unknown_label`, `core/negotiation.negotiation_unfulfilled`, `crypto/invalid_signature`, `custody/invalid_signature`, `custody/decryption_failed`, `adapter/request_rejected`, `adapter/response_rejected` |
+| 403 | `core/binding.*`, `core/policy.test_key_rejected`, `discovery/revoked_key` |
+| 500 | `core/crypto.*`, `core/input.*`, `crypto/*`, `custody/*`, `adapter/*`, `core/binding.invalid_binding`, `core/binding.invalid_verification`, `core/fields.label_in_use`, `core/freshness.invalid_clock`, `core/key.key_resolver_failed`, `core/quorum.ambiguous_key_identity`, `core/replay.commitment_failed`, `discovery/invalid_options`, `discovery/invalid_source`, `discovery/ambiguous_key_source`, `discovery/transport_unavailable`, `jose/crypto.entropy_failure`, `jose/crypto.signer_failed`, `jose/input.invalid_options`, `jose/input.invalid_policy`, `jose/key.key_resolver_failed`, `replay/invalid_claim`, `replay/invalid_options`, `replay/invalid_store` |
+| 503 | `replay/*`, `core/replay.store_failed`, `core/replay.store_timeout`, `core/replay.store_unavailable` |
+
+For core `agent_unresolved`, `timeout` and `source_unavailable` map to 503; `untrusted_agent` and `revoked_key` map to 403; other details map to 401.
 
 ## Standards
 
@@ -321,7 +339,7 @@ The reasoning, stated once: 400 means the message cannot be read, so resending t
 | Integration | Entry point | Proved by |
 | --- | --- | --- |
 | Node `http`, `https`, and `http2` | `@request-seal/core/node-http` | Real servers and clients on loopback. |
-| Express 5.2.1 | `captureBody`, `verifyRequest` | The [Node HTTP guide](docs/guides/node-http.md) program, and the framework tests. |
+| Express 5.2.1 | `captureRequest`, `verifyRequest` | The [Node HTTP guide](docs/guides/node-http.md) program, and the framework tests. |
 | Fastify 5.12.5 | `capture`, `captureRequest` | The Node HTTP guide program, and the framework tests. |
 | Fetch, signing on Node, Deno, and Bun; verification on Deno 2.5.6 | `@request-seal/core/fetch` | The [Fetch guide](docs/guides/fetch.md) programs, and wire tests on each runtime. |
 | Hono on Deno | `WebBotAuth.verify` | The Hono program above. |
@@ -348,37 +366,12 @@ RequestSeal reports what was cryptographically established and nothing more: the
 - [Testing](docs/guides/testing.md)
 - [Migrating from http-message-signatures](docs/guides/migrating-from-http-message-signatures.md)
 
+API: [generated reference](https://baselabs.github.io/request-seal-typescript/). Build it locally with `npm ci --ignore-scripts && npm run docs`, then open the generated `site-dist/index.html`.
+
 Reference: [signing and verification](docs/reference/sign-and-verify.md), [adapters](docs/reference/adapters.md), [Web Bot Auth](docs/reference/web-bot-auth.md), [replay](docs/reference/replay.md), [discovery](docs/reference/discovery.md), [JOSE](docs/reference/jose.md), [wire APIs](docs/reference/wire.md), [multiple signatures](docs/reference/quorum.md), [extension profiles](docs/reference/profiles.md), [error parity](docs/reference/error-parity.md), and [corpus format](docs/reference/corpus-format.md). Design records: the [threat model](docs/design/threat-model.md) and the [architecture decisions](docs/adr/README.md). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Compatibility
 
-Crypto and custody behavior and the error vocabulary follow RequestSeal `v0.4.1`. Compatibility is checked against the byte-preserved RequestSeal `v0.4.0` corpus. The pins differ because the corpus index is unchanged and v0.4.1 supplied no corpus release assets. See [the corpus pin and update command](CONTRIBUTING.md). Development reports pending surfaces; releases require complete coverage.
+The core runs on Node 22.12.0, 24.21.0, and 26.11.1, Deno 2.5.6, and Bun 1.3.14. Fetch signs on those runtimes, but Fetch verification supports only Deno 2.5.6. HTTPS discovery requires Node; use caller-owned snapshots elsewhere. In browsers (Chromium 156.0.8078.4, Firefox 157.0, WebKit 27.2), the Fetch adapter signs only; core verification is separate. See the [runtime matrix](docs/reference/runtime-matrix.md) for exact tested versions, permissions, and limitations.
 
-The CI lane set is exact. Browser versions come from the private Playwright
-1.64.0 workspace. The release workflow runs the same lanes.
-
-| Runtime lane | Version | Declared runtime limitations |
-| --- | --- | --- |
-| Node 22.12.0 | 22.12.0 | OS trust requires a nonempty system store; empty-query Fetch signing returns `adapter/invalid_request`. |
-| Node 24.21.0 | 24.21.0 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
-| Node 26.11.1 | 26.11.1 | Required check name: `Node 26`; same Fetch verification restriction. |
-| Deno 2.5.6 | 2.5.6 | `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
-| Deno 2.9.7 | 2.9.7 | Denied OS roots check only; without `--allow-sys=ca`, source creation and fetch return `discovery/transport_unavailable`. Full-suite support is not asserted. |
-| Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
-| Chromium | 156.0.8078.4 | Browser Fetch verification returns `adapter/invalid_request`. |
-| Firefox | 157.0 | Browser Fetch verification returns `adapter/invalid_request`. |
-| WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. Browser Fetch verification returns `adapter/invalid_request`. |
-
-The consumer policy in
-[`tools/conformance/runtime-limits.json`](tools/conformance/runtime-limits.json)
-asserts exact release, platform where listed, and rejection. A stale entry,
-different rejection, or unlisted divergence fails. Published corpus verdicts
-stay unchanged. Firefox signs requests through its materialized body reader.
-WebKit's empty-message Ed25519 failure is probed directly in real pages using
-RFC 8032 test 1; declared refusals count as executed limitation checks.
-See the [runtime matrix](docs/reference/runtime-matrix.md) for the Node floor,
-additional runtime observations, OS trust permissions, and local browser commands,
-and the [consumer limitation contract](docs/reference/corpus-format.md#consumer-runtime-limitations).
-
-See [replay protection](docs/reference/replay.md) for the memory store and the
-optional `@request-seal/core/replay-postgres` query adapter.
+Crypto, custody, and error vocabulary follow RequestSeal for Elixir 0.4.1; conformance uses its byte-preserved 0.4.0 corpus. See [the corpus pin](CONTRIBUTING.md) and [replay protection](docs/reference/replay.md).

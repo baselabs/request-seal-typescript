@@ -40,14 +40,14 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
     const limits = limitationBoundary(policy[engine][version]);
     expected.push([name, version, (limits ? limits + ' ' : '') + 'Browser Fetch verification returns `adapter/invalid_request`.']);
   }
-  const table = read('README.md').split('## Compatibility\n')[1]!.split('\n').filter(line => line.startsWith('|')).join('\n');
+  const table = read('docs/reference/runtime-matrix.md').split('## Tested runtime lanes\n')[1]!.split('## Node floor and engines')[0]!.split('\n').filter(line => line.startsWith('|')).join('\n');
   const rows = table.split('\n').slice(2).map(line => {
     assert.match(line, /^\|.*\|$/);
     const cells = line.slice(1, -1).split('|').map(cell => cell.trim());
     assert.equal(cells.length, 3, 'Every compatibility row has exactly three cells');
     return cells;
   });
-  assert.deepEqual(rows, expected, 'README runtime, version, and boundary must equal CI and declared limitations');
+  assert.deepEqual(rows, expected, 'Reference runtime, version, and boundary must equal CI and declared limitations');
   const pkg = JSON.parse(read('package.json'));
   assert.equal(pkg.engines.node, '>=' + tokens[0]);
   const browser = JSON.parse(read('interop/browser/package.json'));

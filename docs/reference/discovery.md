@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** RequestSeal v0.4.1 discovery behavior, RFC 7517, RFC 7638, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
+**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** RequestSeal v0.4.1 discovery behavior, RFC 7517, RFC 7638, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
 
 # Discovery
 
@@ -6,7 +6,9 @@ Core discovery validates caller-supplied snapshots. It starts no connection or
 background refresh. Callers who retrieve bytes themselves own DNS, address and
 redirect policy. A key ID never supplies a discovery URL.
 
-```ts
+API sketches below use caller-supplied values; runnable examples are in the [guides](../../README.md#guides).
+
+```text
 import { Discovery, DiscoverySource } from "@request-seal/core";
 
 const source = DiscoverySource.create({
@@ -80,7 +82,7 @@ bridge that accepts `keyid` and returns only the algorithm and public key.
 
 ## Explicit Node transport
 
-```ts
+```text
 import { Discovery, DiscoverySource } from "@request-seal/core/discovery-node";
 import { createCache } from "@request-seal/core";
 

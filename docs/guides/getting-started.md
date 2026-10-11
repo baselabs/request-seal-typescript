@@ -12,6 +12,8 @@ npm install @request-seal/core
 
 The package has no runtime dependencies and uses WebCrypto for every cryptographic operation. It targets Node 22.12.0 or newer, plus Deno and Bun for the core API. The ESM package needs the `nodenext` or `bundler` module resolution in TypeScript, because it exposes subpath exports such as `@request-seal/core/fetch`.
 
+Save a complete program as `example.ts` in a project whose `package.json` has `"type": "module"`. On Node 22, run `node --experimental-strip-types example.ts`; on Node 24 and later, run `node example.ts`. For fences marked Deno, run `deno run --allow-read --allow-net=127.0.0.1,jsr.io example.ts`; for Bun, run `bun run example.ts`.
+
 ## Sign and verify in one file
 
 ```ts
@@ -22,6 +24,7 @@ import { Custody, Message, Policy, PublicKey, ok, sign, verify, type KeyResolver
 const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
 
 // The sender holds the private key; the receiver trusts only the public key.
+// In production, load persisted keys from your secret store.
 const pair = generateKeyPairSync("ed25519");
 const signer = must(await Custody.local("ed25519", pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string));
 const trusted = must(await PublicKey.import(pair.publicKey.export({ format: "jwk" })));
@@ -67,7 +70,7 @@ Every function returns a `Result`: `{ ok: true, value }` or `{ ok: false, error 
 - Cover `@scheme` and `@authority` when scheme and host matter. Covering `@authority` alone accepts the same signature for `http` and `https`, because RFC 9421 omits default ports from the derived value.
 - Resolve keys from your own configuration. A `keyid` in a request selects among keys you already trust; it never tells the library where to fetch one.
 - Treat `verify` success as authentication only. Decide authorization after it.
-- Set `maxAge` and `skew` deliberately, and add [replay protection](replay-protection.md) when a repeated request would do harm.
+- Use a few seconds of `skew` on NTP-synchronized hosts. Set `maxAge` deliberately, and add [replay protection](replay-protection.md) when a repeated request would do harm.
 
 ## Where to go next
 

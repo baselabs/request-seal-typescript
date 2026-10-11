@@ -163,23 +163,33 @@ for (const stage of ['startup', 'ready']) test(`watchdog ends an EOF-ignoring pe
 });
 
 test('watchdog rejects a living owner that is no longer its parent', {timeout: 5000}, async () => {
+  const program = 'process.stdin.resume(); console.log("READY"); setInterval(()=>{},1000)';
+  // Positive control: the same real child reaches readiness with its actual owner.
+  const owned = spawnPeer('node', ['-e', program]);
+  try {assert.equal(await owned.waitLine(line => line === 'READY', 2500), 'READY');}
+  finally {await owned.stop();}
+
   process.kill(process.ppid, 0); // The claimed owner exists, but is not the watchdog's parent.
-  const p = spawn('node', [fileURLToPath(new URL('./support/peer-watchdog.mjs', import.meta.url)), String(process.ppid), 'node', '-e', 'process.stdin.resume(); console.log("READY"); setInterval(()=>{},1000)'], {detached: true, stdio: 'pipe'});
+  const p = spawn('node', [fileURLToPath(new URL('./support/peer-watchdog.mjs', import.meta.url)), String(process.ppid), 'node', '-e', program], {detached: true, stdio: 'pipe'});
   if (process.env.REQUESTSEAL_PEER_LEDGER && p.pid) appendFileSync(process.env.REQUESTSEAL_PEER_LEDGER, JSON.stringify({pid: p.pid, group: p.pid}) + '\n');
-  let output = '';
-  p.stdout.setEncoding('utf8'); p.stdout.on('data', chunk => {output += chunk;});
+  p.stdout.resume(); p.stderr.resume();
   const closed = new Promise<number | null>(done => p.once('close', done));
   let exceeded = false;
   const bound = setTimeout(() => {exceeded = true; try {process.kill(-p.pid!, 'SIGKILL');} catch {}}, 2500);
   try {
-    await closed;
-    assert.match(output, /READY/, 'the real child started');
+    await new Promise<void>((done, reject) => {p.once('spawn', done); p.once('error', reject);});
+    process.kill(-p.pid!, 0); // Known-positive group probe before observing termination.
+    const code = await closed;
+    // An invalid parent can be rejected before the child initializes; readiness is not required here.
+    assert.notEqual(code, 0);
     assert.equal(exceeded, false, 'the watchdog detects parent mismatch while the recorded owner is still alive');
+    assert.throws(() => process.kill(-p.pid!, 0), /ESRCH/, 'the invalid owner process group was reaped');
   } finally {
     clearTimeout(bound); p.stdin.destroy();
     try {process.kill(-p.pid!, 'SIGKILL');} catch {}
   }
 });
+
 
 for (const stream of ['stdout', 'stderr'] as const) test(`peer ${stream} capture retains at most the last 1 MiB`, {timeout: 20000}, async () => {
   const p = spawnPeer('node', ['-e', `process.${stream}.write("😀".repeat(400000)); process.${stream}.write("TAIL");`]);

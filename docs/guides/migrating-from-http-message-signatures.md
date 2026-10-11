@@ -47,7 +47,7 @@ const policy = (clock: () => number) => must(Policy.create({
 
 // Inside the signature's lifetime the other library's signature verifies.
 must(await verify(message, policy(() => 1_700_669_100), { label: "sig" }));
-// After `expires` RequestSeal refuses it, which is the same decision the original library makes.
+// After `expires` RequestSeal refuses it.
 const late = await verify(message, policy(() => 1_700_669_400), { label: "sig" });
 assert.ok(!late.ok && late.error.kind === "core" && late.error.reason === "expired");
 ```
@@ -58,17 +58,17 @@ The older package is a signing and verification toolkit that leaves most securit
 
 | Topic | `http-message-signatures` 1.0.6 | RequestSeal | Proved by |
 | --- | --- | --- | --- |
-| Compared standard | Its README says it was last updated against revision 13 of the HTTP working group draft, and it also ships a module for the older Cavage draft. | RFC 9421 only. A Cavage `Signature` header is not parsed and is refused. | pinned-version test, claim 12 |
+| Compared standard | Its README says it was last updated against revision 13 of the HTTP working group draft, and it also ships a module for the older Cavage draft. | RFC 9421 only. A Cavage-only request is refused with `missing_signature_input`. | pinned-version test, claim 12 |
 | Missing signature or unknown key | `verifyMessage` resolves `null` ("indeterminate"), which is neither `true` nor `false`. | An error with a named reason: `missing_signature_input`, `unknown_key`. | claim 5 |
-| Failures | Throws typed errors such as `ExpiredError`, or returns `false`. | Returns a `Result` and never throws for a bad message. | claim 10 |
+| Failures | Throws typed errors such as `ExpiredError`, or returns `false`. | `verify` resolves a `Result` for malformed messages/options, invalid policies, expired signatures, and throwing key-resolver callbacks. | claim 10 |
 | Several signatures | Returns the verdict of the last signature it processes, so a forged first signature beside a good second one still returns `true`. | `verify` checks exactly the label you name. | claim 11 |
 | Body integrity | It signs and compares header values only and never sees a body. A signed `Content-Digest` header proves nothing about the bytes. | With `content` required, it recomputes the digest over the retained bytes and rejects `digest_mismatch`. | claim 6 |
 | Replay | No replay check; the same signed request verifies again. | A required replay policy claims each nonce once and rejects the second use with `replayed`. | claim 7 |
-| Algorithm confusion | A key without an `algs` list accepts any `alg` parameter, so an HMAC signature that claims `ed25519` verifies. | The policy lists the allowed algorithms (`algorithm_not_permitted`), and the resolver's algorithm must match the signature's (`algorithm_mismatch`). | claim 8 |
+| Declared algorithm is not checked | A key without an `algs` list uses its configured verifier without checking the declared `alg`: the tested HMAC signature declares `ed25519` and verifies. | The policy lists the allowed algorithms (`algorithm_not_permitted`), and the resolver's algorithm must match the signature's (`algorithm_mismatch`). | claim 8 |
 | Coverage and freshness | Accepts a signature with no `created` or `expires` under `maxAge`, and one that covers no components, unless you set `requiredFields`. | The policy states the required components and refuses missing coverage (`missing_required_component`) and missing times (`missing_created`). | claim 9 |
 | Generated parameters | Defaults to `keyid`, `alg`, `created`, and `expires` five minutes after creation. No nonce. | `expiresIn` is required, a random `nonce` is on by default, and `alg` is on. | claim 4 |
-| HMAC secrets | Any length. | Key handles need 32 to 16,384 bytes. A verification callback accepts any length. | claim 13 |
-| Algorithms | The six HTTP algorithms and also `rsa-v1_5-sha1`. | `ed25519`, `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `rsa-pss-sha512`, `rsa-v1_5-sha256`, `hmac-sha256`. No SHA-1. | claim 12 |
+| HMAC secrets | The 12-byte published example signs. | A key handle refuses that short secret; an application verification callback can verify it. | claim 13 |
+| Algorithms | `ed25519`, `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `rsa-pss-sha512`, `rsa-v1_5-sha256`, `hmac-sha256`, and `rsa-v1_5-sha1`. | `ed25519`, `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `rsa-pss-sha512`, `rsa-v1_5-sha256`, `hmac-sha256`. No SHA-1. | claim 12 |
 
 The package's README describes its own examples as "minimal" signatures: they prove the sender holds the key and give no integrity over the message, and callers add the fields and checks they need. RequestSeal's policy is where those choices become code.
 
@@ -137,7 +137,7 @@ assert.ok(!unsigned.ok && unsigned.error.kind === "core" && unsigned.error.reaso
 ## Migration steps
 
 1. **Install RequestSeal** beside the old package and keep both while you move.
-2. **Move receivers first, or senders first; either order works.** The headers are compatible (claims 1 to 3). A RequestSeal receiver accepts existing senders as long as their signatures carry `created` and `expires`, which the old package adds by default (claim 4).
+2. **Move receivers first, or senders first; either order works.** The headers are compatible (claims 1 to 3). Match the receiver policy to the sender's algorithms, keys, coverage, and timestamps. The old package adds `created` and `expires` by default (claim 4).
 3. **Write the policy from what you accept today.** List the components your senders cover and make them required. Choose `maxAge` and `skew`. If you relied on a signed `Content-Digest` header, set `content` so the body is checked. If a repeated request would do harm, add [replay protection](replay-protection.md).
 4. **Replace "falsy means reject" with explicit branching.** Branch on `result.ok`, and map the reason to a status as the [signing guide](signing-and-verifying.md#respond-to-a-rejection) shows.
 5. **Retire the old package** once no sender or receiver uses it. If something still signs with SHA-1 RSA or a Cavage header, it needs to change algorithm or draft first, because RequestSeal accepts neither.

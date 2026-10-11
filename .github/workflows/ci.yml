@@ -119,7 +119,7 @@ jobs:
           REQUESTSEAL_REPLAY_PG_URL: postgresql://postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/requestseal_replay
         if: matrix.runtime == 'deno'
         run: |
-          deno test --no-check --allow-read --allow-write --allow-env --allow-net --allow-run=deno,node,npm,sh,gh,openssl,cc,pkg-config,elixir,mix,ssh-agent,ssh-keygen,ssh-add test/*.test.ts
+          deno test --no-check --allow-read --allow-write --allow-env --allow-net --allow-run=deno,node,npm,sh,gh,git,openssl,cc,pkg-config,elixir,mix,ssh-agent,ssh-keygen,ssh-add test/*.test.ts
           deno run --allow-read tools/conformance/cli.ts --corpus test/fixtures/corpus-smoke --smoke
           deno run --allow-read tools/conformance/cli.ts --corpus conformance --pending-ok
       # Bun 1.3.14 --isolate intermittently recreates stdio with epoll_ctl EEXIST on Linux.

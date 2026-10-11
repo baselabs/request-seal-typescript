@@ -11,10 +11,10 @@
 Three behaviors matter in production.
 
 - **Every attempt is signed afresh.** A retry or redirect builds a new signature with a new `created` time and a new nonce, so a retried request is never a replay of the first one.
-- **Redirects and retries are off by default.** `maxRedirects` and `maxRetries` each default to 0 and accept up to 10. Only 5xx responses are retried. A redirect that leaves the original origin needs that origin in `allowedOrigins`, and the adapter then removes `Authorization`, `Cookie`, `Proxy-Authorization`, and any `credentialHeaders` you list.
+- **Redirects and retries are off by default.** `maxRedirects` and `maxRetries` each default to 0 and accept up to 10. Only 5xx responses are retried. Retries resend the body. Enable `maxRetries` only for idempotent operations or with application-level deduplication: a 5xx does not prove the request was not processed. A redirect that leaves the original origin needs that origin in `allowedOrigins`, and the adapter then removes `Authorization`, `Cookie`, `Proxy-Authorization`, and any `credentialHeaders` you list.
 - **One deadline covers the exchange.** Pass `context: withDeadline({ timeoutMs })` to bound every body read, signature, redirect, retry, and delivery together. The default is five seconds.
 
-The program signs a POST, receives a 503, retries once, and checks that the two attempts carry different nonces.
+The program signs an idempotent GET, receives a 503, retries once, and checks that the two attempts carry different nonces.
 
 ```ts
 import assert from "node:assert/strict";
@@ -37,15 +37,15 @@ const server = createServer((req, res) => {
 await once(server, "listening");
 const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/orders`;
 
-const spec = { label: "sig", components: '("@method" "@authority" "@path" "content-digest")', algorithm: "hmac-sha256", expiresIn: 60, digest: ["sha-256"] };
-const sent = must(await signedFetch(url, { method: "POST", body: "hello" }, { spec, signer }, { maxRetries: 1 }));
+const spec = { label: "sig", components: '("@method" "@authority" "@path")', algorithm: "hmac-sha256", expiresIn: 60 };
+const sent = must(await signedFetch(url, { method: "GET" }, { spec, signer }, { maxRetries: 1 }));
 assert.equal(sent.response.status, 200);
 assert.equal(seen.length, 2);
 // Each attempt is signed afresh: the nonce differs, so a retry never replays an old signature.
 const nonce = (input: string) => /nonce="([^"]+)"/.exec(input)![1];
 assert.notEqual(nonce(seen[0]!), nonce(seen[1]!));
 // The exact request that went out is returned for logging or inspection.
-assert.equal(sent.request.request.method, "POST");
+assert.equal(sent.request.request.method, "GET");
 server.close();
 server.closeAllConnections();
 ```
@@ -85,6 +85,7 @@ const pair = generateKeyPairSync("ed25519");
 const signer = must(await Custody.local("ed25519", pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string));
 const trusted = must(await PublicKey.import(pair.publicKey.export({ format: "jwk" })));
 const components = '("@method" "@scheme" "@authority" "content-digest")';
+// Single sender: select by keyid when you have several.
 const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: trusted });
 const policy = must(Policy.create({
   algorithms: ["ed25519"], components, keyResolver,

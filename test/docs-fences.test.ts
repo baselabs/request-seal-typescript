@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { documentationFences, executeFence, extractFences, runtime } from "./support/docs-fences.ts";
@@ -9,11 +9,11 @@ const fences = documentationFences();
 const selected = fences.filter(fence => fence.runtime === runtime);
 test("README verification excerpts match their complete programs and stay within fifteen lines", async () => {
   const readme = await readFile("README.md", "utf8");
-  const snippets = [...readme.matchAll(/<!-- verification-excerpt: (express|hono) -->\n```typescript\n([\s\S]*?)\n```/g)];
+  const snippets = [...readme.matchAll(/<!-- verification-excerpt: (express|hono) -->\n(?:<!-- run: deno -->\n)?```typescript\n([\s\S]*?)\n```/g)];
   assert.deepEqual(snippets.map(match => match[1]), ["express", "hono"]);
   for (const snippet of snippets) {
     const expectedRuntime = snippet[1] === "hono" ? "deno" : "node";
-    const program = fences.find(fence => fence.file === "README.md" && fence.runtime === expectedRuntime && fence.source.includes("// ---- Your server:"));
+    const program = fences.find(fence => fence.file === "README.md" && fence.runtime === expectedRuntime && !fence.excerpt && fence.source.includes("// ---- Your server:"));
     assert.ok(program);
     const excerpt = /\/\/ ---- Your server:[^\n]*\n([\s\S]*?)\n\/\/ ---- End of the verification code ----/.exec(program.source)?.[1];
     assert.ok(excerpt);
@@ -23,6 +23,7 @@ test("README verification excerpts match their complete programs and stay within
 });
 test("documentation fences are assigned to their declared runtime", t => {
   assert.ok(fences.some(fence => fence.file === "README.md"), "README must contain TypeScript programs");
+  for (const declared of ["node", "deno", "bun"]) assert.ok(fences.some(f => f.runtime === declared), `${declared} must execute examples`);
   t.diagnostic(`${runtime}: ${selected.length} TypeScript fences`);
 });
 // Register programs separately so the native runner's per-test timeout never
@@ -30,9 +31,62 @@ test("documentation fences are assigned to their declared runtime", t => {
 for (const fence of selected)
   test(`${fence.file}: fence ${fence.index} (${runtime})`, async () => { await executeFence(fence); });
 
-test("fence extraction honors runtime annotations and ignores shell blocks", () => {
-  const source = "```sh\n```ts\nthrow Error('shell');\n```\n<!-- run: deno -->\n```ts\nconsole.log('deno');\n```\n<!-- run: bun -->\n```ts\nconsole.log('bun');\n```\n```ts\nconsole.log('node');\n```";
-  assert.deepEqual(extractFences("example.md", source).map(fence => fence.runtime), ["deno", "bun", "node"]);
+test("fence extraction accepts both TypeScript spellings and CommonMark containers", () => {
+  const source = "~~~typescript\nconsole.log('tilde');\n~~~\n> <!-- run: deno -->\n> ```ts\n> console.log('quote');\n> ```\n- item\n\n  ```ts\n  console.log('list');\n  ```";
+  assert.deepEqual(extractFences("example.md", source).map(f => f.runtime), ["node", "deno", "node"]);
+  assert.equal(extractFences("example.md", "```sh\necho hello\n```\n").length, 0);
+});
+
+for (const marker of ["<!-- Run: deno -->", "<!-- run: Deno -->", "<!-- run : bun -->", "<!-- runtime: deno -->", "<!-- run: node -->", "<!-- run:deno -->", "<!--\nrun: deno -->", "<!-- run: deno > -->"])
+  for (const gap of ["\n", "\n\n"])
+    test(`invalid runtime annotation rejects: ${marker}, gap ${gap.length}`, () => {
+      assert.throws(() => extractFences("example.md", marker + gap + "```ts\nconsole.log('bad');\n```"), /runtime annotation/);
+    });
+for (const info of ["TS", "TypeScript", "tsx", "ts extra", "typescript title=example", "mts", "cts", "application/typescript", "language-ts"])
+  test(`invalid TypeScript info string rejects: ${info}`, () => {
+    assert.throws(() => extractFences("example.md", "```" + info + "\nconsole.log('bad');\n```"), /TypeScript info/);
+  });
+for (const wrapper of ["````", "~~~"])
+  test(`nested TypeScript fence is rejected inside ${wrapper}`, () => {
+    assert.throws(() => extractFences("example.md", wrapper + "text\n```ts\nthrow Error('nested');\n```\n" + wrapper), /nested TypeScript fence/);
+  });
+test("unclosed TypeScript fences reject", () => {
+  assert.throws(() => extractFences("example.md", "~~~ts\nthrow Error('unclosed');"), /unclosed TypeScript fence/);
+});
+test("fence collection includes Markdown outside the guides", async () => {
+  const copy = await mkdtemp(join(tmpdir(), "request-seal-doc-coverage-"));
+  try {
+    await writeFile(join(copy, "README.md"), "# Example\n");
+    await mkdir(join(copy, "other/nested"), {recursive: true});
+    await writeFile(join(copy, "other/nested/example.md"), "```typescript\nthrow Error('outside guides');\n```\n");
+    await writeFile(join(copy, "CHANGELOG.md"), "```ts\nthrow Error('record');\n```\n");
+    const found = documentationFences(copy);
+    assert.equal(found.length, 1);
+    assert.equal(found[0]?.file, "other/nested/example.md");
+    await assert.rejects(executeFence(found[0]!), /outside guides/);
+  } finally { await rm(copy, {recursive: true, force: true}); }
+});
+
+test("new repository Markdown cannot bypass fence collection before staging", async () => {
+  const file = `test/docs-coverage-${crypto.randomUUID()}.md`;
+  try {
+    await writeFile(file, "```typescript\nthrow Error('new repository fence');\n```\n");
+    const found = documentationFences().find(f => f.file === file);
+    assert.ok(found);
+    await assert.rejects(executeFence(found), /new repository fence/);
+  } finally { await rm(file, {force: true}); }
+});
+
+test("runtime-looking comments reject even on shell fences", () => {
+  assert.throws(() => extractFences("example.md", "<!-- Run: deno -->\n```sh\necho hi\n```"), /runtime annotation/);
+});
+
+test("longer closing markers and four-backtick TypeScript fences execute", async () => {
+  for (const [open, close] of [["````typescript", "`````"], ["~~~ts", "~~~~"]]) {
+    const [fence] = extractFences("example.md", `${open}\nthrow Error('CommonMark program');\n${close}\n`);
+    assert.ok(fence);
+    await assert.rejects(executeFence(fence), /CommonMark program/);
+  }
 });
 
 test("a planted failing fence in a temporary documentation copy is rejected", async () => {

@@ -114,7 +114,9 @@ option forwarded fields have no authority.
 OBSERVED: `test/adapters-express.test.ts`, Express 5.2.1, exercises this body-parser
 hook before URL rewriting and checks parsed JSON against authenticated bytes:
 
-```ts
+API sketches below use caller-supplied values; runnable examples are in the [guides](../../README.md#guides).
+
+```text
 import {captureBody, verifyRequest} from '@request-seal/core/node-http';
 
 app.use(express.json({
@@ -130,7 +132,7 @@ app.use(async (req, res) => {
 });
 ```
 
-Use this hook instead of server-level body consumption. Capture must precede
+This JSON hook needs body framing and a matching JSON content type. Requests without framing and non-JSON requests skip it; use `captureRequest` first and parse verified bytes as shown in the [Node HTTP guide](../guides/node-http.md#express). Capture must precede
 rewriting; `originalUrl` supplies the original target when middleware already
 rewrote `url`. Only identity body-parser input belongs in this recipe: set
 `inflate: false` to prevent decoding before capture.
@@ -142,7 +144,7 @@ request event and returns the replay from preParsing. UTF-8 string consumption
 retains the original bytes; decoding that replaces malformed bytes rejects before
 key resolution.
 
-```ts
+```text
 const registration = capture(fastify.server);
 fastify.addHook('preParsing', async (request, reply, payload) => {
   const result = await captureRequest(request.raw);

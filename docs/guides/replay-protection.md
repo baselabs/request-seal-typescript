@@ -41,6 +41,7 @@ const trusted = must(await PublicKey.import(pair.publicKey.export({ format: "jwk
 // One store per process. A multi-process service needs a shared store (see the PostgreSQL section).
 const store = must(createMemoryStore({ maxEntries: 10_000 }));
 const components = '("@method" "@authority" "@path")';
+// Single sender: select by keyid when you have several.
 const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: trusted });
 // The commitment decides what "the same request" means. Here: the same key and the same nonce.
 const commitment = async (facts: ReplayFacts) => ok(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([facts.profile, facts.keyid, facts.identifier])))));

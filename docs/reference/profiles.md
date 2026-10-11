@@ -7,7 +7,9 @@ and replay with independently maintained extension packages. This surface is uns
 pin `@request-seal/core` exactly. Extensions enforce their source-specific predicates
 and select their profile name as a constant in their code.
 
-```ts
+API sketches below use caller-supplied values; runnable examples are in the [guides](../../README.md#guides).
+
+```text
 import { Profile, type ProfileStamp } from "@request-seal/core";
 
 const stamp: ProfileStamp<"revision"> = Object.freeze({

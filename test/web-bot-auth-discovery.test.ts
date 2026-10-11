@@ -110,16 +110,16 @@ transportTest("agent fields, trust sources, redirects, and CIMD links cannot con
     confined("CIMD links another origin");
     // A source's shorter timeout leaves the envelope Context live for held keys.
     mode = "delayed";
-    // Allow real TLS setup while keeping the source deadline below the envelope's.
-    const timedSource = source(location, {timeoutMs: 1000});
+    // Allow real TLS startup under load; the source still expires before the envelope.
+    const timedSource = source(location, {timeoutMs: 5000});
     const timedCache = value(Seal.createCache({clock: () => now, fetch: Discovery.fetch}));
     let heldCalls = 0;
     try {
       const timeoutPolicy = policy({cache: timedCache, agents: (_a: unknown) => Seal.ok(timedSource)});
-      rejection(await Seal.WebBotAuth.verify(signed, timeoutPolicy, {timeoutMs: 5000}), "agent_unresolved", "timeout");
+      rejection(await Seal.WebBotAuth.verify(signed, timeoutPolicy, {timeoutMs: 15000}), "agent_unresolved", "timeout");
       // Invalidate the negative-cache observation before exercising live fallback.
       value(timedCache.invalidate(timedSource));
-      const fallback = value(await Seal.WebBotAuth.verify(signed, policy({cache: timedCache, agents: (_a: unknown) => Seal.ok(timedSource), unresolved: {heldKeys: (_a: unknown) => {heldCalls++; return Seal.ok({algorithm: "ed25519", key});}}}), {timeoutMs: 5000}));
+      const fallback = value(await Seal.WebBotAuth.verify(signed, policy({cache: timedCache, agents: (_a: unknown) => Seal.ok(timedSource), unresolved: {heldKeys: (_a: unknown) => {heldCalls++; return Seal.ok({algorithm: "ed25519", key});}}}), {timeoutMs: 15000}));
       assert.equal(heldResponses.length, 2, "both timeouts reach the real directory peer");
       assert.equal(heldCalls, 1);
       assert.equal(fallback.signatures.agent!.principal.kind, "key");

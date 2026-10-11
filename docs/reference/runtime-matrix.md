@@ -1,14 +1,27 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** exact CI pins, package engines, public standards, and executed runtime probes · **Review when:** runtime lanes, permissions, Playwright, or declared limitations change
+**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** exact CI pins, package engines, public standards, and executed runtime probes · **Review when:** runtime lanes, permissions, Playwright, or declared limitations change
 
 # Runtime matrix
 
 CI runs on Linux (`ubuntu-24.04`). Development supports macOS and Linux;
-Windows developers use WSL2. The [README table](../../README.md#compatibility)
-equals the CI lane set: Node 22.12.0, 24.21.0, and 26.11.1; Deno 2.5.6;
+Windows developers use WSL2. The table below equals the CI lane set: Node 22.12.0, 24.21.0, and 26.11.1; Deno 2.5.6;
 Bun 1.3.14; the denied-roots-only check on Deno 2.9.7; Chromium 156.0.8078.4, Firefox 157.0, and WebKit 27.2 from
 Playwright 1.64.0. Releases call the same workflow, including `browsers`.
 The Node 26 job remains named `Node 26`; all Node pins and installed-version
 assertions use exact patch versions.
+
+## Tested runtime lanes
+
+| Runtime lane | Version | Declared runtime limitations |
+| --- | --- | --- |
+| Node 22.12.0 | 22.12.0 | OS trust requires a nonempty system store; empty-query Fetch signing returns `adapter/invalid_request`. |
+| Node 24.21.0 | 24.21.0 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
+| Node 26.11.1 | 26.11.1 | Required check name: `Node 26`; same Fetch verification restriction. |
+| Deno 2.5.6 | 2.5.6 | `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
+| Deno 2.9.7 | 2.9.7 | Denied OS roots check only; without `--allow-sys=ca`, source creation and fetch return `discovery/transport_unavailable`. Full-suite support is not asserted. |
+| Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
+| Chromium | 156.0.8078.4 | Browser Fetch verification returns `adapter/invalid_request`. |
+| Firefox | 157.0 | Browser Fetch verification returns `adapter/invalid_request`. |
+| WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. Browser Fetch verification returns `adapter/invalid_request`. |
 
 ## Node floor and engines
 
@@ -193,7 +206,7 @@ to the exact Ed25519 custody limitation, all five JWE key-management algorithms
 with both content ciphers, nested JOSE, and Fetch signing in every engine. It checks changed signatures/tags and refuses verification.
 
 Each engine uses separate regular and planted-failure contexts. Console records
-tie out with executed counts. Running browser versions must match the declared releases and README. Every
+tie out with executed counts. Running browser versions must match the declared releases in the table above. Every
 selected limitation must execute with its exact reason; an improvement, changed reason, or unlisted failure is red.
 The planted assertion comes from the shared native planted-failure file and
 must produce one failure with its intentional marker. `test:red` exits nonzero;

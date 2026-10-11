@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 10, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
+**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
 
 # Contributing
 
@@ -9,6 +9,8 @@ local tests print a skip reason when it is absent, and CI requires it. The OpenS
 npm ci --ignore-scripts
 npm run check
 ```
+
+`npm run check` runs, in order: `typecheck`, `typecheck:web`, `build`, `test`, `self-checks`, `conformance`, and `pack:check`. CI also runs `npm run docs` and the migration claims test after `npm ci --prefix interop/migration --ignore-scripts`: `node --experimental-strip-types --no-warnings --test interop/migration/claims.test.ts`. Build the [API reference](https://baselabs.github.io/request-seal-typescript/) locally with `npm run docs` and open `site-dist/index.html`; warnings fail the build.
 
 Write behavior tests before implementation and retain the failing and passing output. Use `node:test` and fast-check properties. Test actual cryptography and published vectors; no substitutes for an external peer. `npm run test:red` deliberately fails and verifies the runner's exit status.
 

@@ -92,8 +92,8 @@ A signed directory carries a proof that its publisher holds the keys in it. By d
 `@request-seal/core/discovery-node` adds `Discovery.fetch`, which retrieves a source under network rules meant for fetching from untrusted places:
 
 - It checks every literal address and every DNS answer against the IANA special-purpose registries and refuses private, loopback, link-local, and other reserved ranges. `permittedAddresses` lists up to 16 exact exceptions you choose.
-- It connects to the vetted numeric address, verifies the TLS certificate and host name against the CA list you gave it, and checks the connected peer before it sends any HTTP bytes. It ignores proxy environment variables.
-- Redirects are manual, bounded, and checked again. The default scope is the same origin.
+- It connects to the vetted numeric address, verifies the TLS certificate and host name against the CA list you gave it, and checks the connected peer before it sends any HTTP bytes. It ignores proxy environment variables. Behind an egress proxy, fetch with your own client and validate snapshots instead.
+- Redirects are manual, bounded, and checked again. The default scope is the same origin. `redirectScope: "any_https"` permits cross-origin HTTPS redirects: for SSRF protection, allow only destinations your application intends to contact, especially if you configured private `permittedAddresses`.
 - Context cancellation and the deadline destroy the sockets it owns. Errors carry only bounded facts, such as the reason and whether a retry may help.
 
 `cacerts` takes DER certificates, or `"os"` for the operating system trust store. `"os"` needs a Node that exposes a non-empty system store (22.15 or newer on the 22 line, or 24 and newer); otherwise source creation and fetch both refuse, and you should supply DER roots.

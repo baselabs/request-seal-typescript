@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { generateKeyPairSync, randomBytes } from "node:crypto";
+import { createHmac, generateKeyPairSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
   Crypto,
@@ -100,6 +100,8 @@ test("claim 1: the same message, components, parameters and Ed25519 key give byt
   const ours = must(await sign(message, { label: "sig", signatureInput: input, algorithm: "ed25519" }, handle));
   assert.deepEqual(wire(ours, "signature-input"), [theirs.headers["Signature-Input"]]);
   assert.deepEqual(wire(ours, "signature"), [theirs.headers.Signature]);
+  const repeated = must(await Message.request("GET", url, [["X-Example", "first"], ["x-example", "second"]], ""));
+  assert.deepEqual(repeated.fields.map(f => [f.name, text(f.value)]), [["X-Example", "first"], ["x-example", "second"]]);
 });
 
 test("claim 2: RequestSeal verifies a signature made by http-message-signatures", async () => {
@@ -150,7 +152,13 @@ test("claim 5: a missing signature or an unknown key is null (indeterminate) in 
 test("claim 6: the library never reads a body, so a signed Content-Digest header proves nothing about the bytes; RequestSeal recomputes it", async () => {
   const digestHeader = `sha-256=:${Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode('{"amount":1}'))).toString("base64")}:`;
   const theirs = await libSigned(["@method", "content-digest"], { "content-digest": digestHeader }, { params: ["created", "expires", "keyid", "alg"] });
-  assert.equal(await verifyMessage(libKeys("k1"), theirs), true);
+  assert.equal(await verifyMessage(libKeys("k1"), { ...theirs, body: '{"amount":1000000}' } as LibMessage), true);
+  const withBody = { method: "POST", url, headers: { "content-digest": digestHeader }, body: '{"amount":1}' };
+  const config = { key: createSigner(edKeys.privateKey, "ed25519", "k1"), name: "sig", fields: ["@method", "content-digest"], paramValues: { created, expires }, params: ["created", "expires", "keyid", "alg"] };
+  const first = await signMessage(config, withBody);
+  const second = await signMessage(config, { ...withBody, body: '{"amount":1000000}' });
+  assert.equal(first.headers.Signature, second.headers.Signature);
+  assert.equal(first.headers["Signature-Input"], second.headers["Signature-Input"]);
   const forgedBody = await asRequestSeal(theirs, '{"amount":1000000}');
   const rejected = await verify(forgedBody, policy('("@method" "content-digest")', {
     content: { kind: "content", algorithms: ["sha-256"], section: "headers" },
@@ -225,6 +233,25 @@ test("claim 10: failures are exceptions in the library and Results in RequestSea
     freshness: { clock: () => now, maxAge: 600, skew: 0, requireExpires: true }, content: "not_required", replay: "not_required",
   })), { label: "sig" });
   assert.ok(!late.ok && late.error.kind === "core" && late.error.reason === "expired");
+  const live = await asRequestSeal(await libSigned(["@method"], {}, { params: ["created", "expires", "keyid", "alg"] }));
+  const cases: [unknown, unknown, unknown, string][] = [
+    [null, policy('("@method")'), { label: "sig" }, "invalid_message"],
+    [live, policy('("@method")'), { label: "sig", unknown: true }, "invalid_options"],
+    [live, null, { label: "sig" }, "invalid_policy"],
+    [live, policy('("@method")', { keyResolver: () => { throw new Error("resolver failure"); } }), { label: "sig" }, "key_resolver_failed"],
+  ];
+  const choices = {algorithms: ["ed25519"], components: '("@method")', keyResolver: () => ok(null), freshness: fresh, content: "not_required", replay: "not_required"};
+  for (const name of Object.keys(choices)) {
+    const incomplete = {...choices} as Record<string, unknown>;
+    delete incomplete[name];
+    const refused = Policy.create(incomplete);
+    assert.ok(!refused.ok && refused.error.reason === "invalid_policy");
+  }
+  for (const [message, configured, options, reason] of cases) {
+    let result: Result<unknown> | undefined;
+    await assert.doesNotReject(async () => { result = await verify(message, configured, options); });
+    assert.ok(result && !result.ok && result.error.reason === reason);
+  }
 });
 
 test("claim 11: the library reports the verdict of the last signature it processes; RequestSeal verifies exactly the label you name", async () => {
@@ -246,7 +273,22 @@ test("claim 11: the library reports the verdict of the last signature it process
 });
 
 test("claim 12: algorithm support differs: the library also signs rsa-v1_5-sha1 and ships a Cavage draft module; RequestSeal supports RFC 9421 and the six registered algorithms it lists", async () => {
-  assert.equal(typeof createSigner("secret", "rsa-v1_5-sha1"), "object");
+  const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const p256 = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const p384 = generateKeyPairSync("ec", { namedCurve: "secp384r1" });
+  const supported = [
+    ["hmac-sha256", randomBytes(32), null], ["ed25519", edKeys.privateKey, edKeys.publicKey],
+    ["ecdsa-p256-sha256", p256.privateKey, p256.publicKey], ["ecdsa-p384-sha384", p384.privateKey, p384.publicKey],
+    ["rsa-pss-sha512", rsa.privateKey, rsa.publicKey], ["rsa-v1_5-sha256", rsa.privateKey, rsa.publicKey], ["rsa-v1_5-sha1", rsa.privateKey, rsa.publicKey],
+  ] as const;
+  const implementation = readFileSync(new URL("./node_modules/http-message-signatures/lib/algorithm/index.js", import.meta.url), "utf8");
+  const declared = new Set([...implementation.matchAll(/case '([^']+)':/g)].map(m => m[1]));
+  assert.deepEqual([...declared].sort(), supported.map(([algorithm]) => algorithm).sort());
+  for (const [algorithm, privateKey, publicKey] of supported) {
+    const signed = await signMessage({ key: createSigner(privateKey, algorithm, "k1"), fields: ["@method"], paramValues: { created, expires } }, { method: "GET", url, headers: {} });
+    assert.ok(String(signed.headers.Signature).length > 10);
+    assert.equal(await verifyMessage({ async keyLookup() { return { id: "k1", algs: [algorithm], verify: createVerifier(publicKey ?? privateKey, algorithm) }; } }, signed), true, algorithm);
+  }
   assert.equal(typeof lib.cavage.signMessage, "function");
   const algorithms = must(Crypto.algorithms());
   assert.deepEqual([...algorithms].sort(), ["ecdsa-p256-sha256", "ecdsa-p384-sha384", "ed25519", "hmac-sha256", "rsa-pss-sha512", "rsa-v1_5-sha256"]);
@@ -256,10 +298,17 @@ test("claim 12: algorithm support differs: the library also signs rsa-v1_5-sha1 
     { method: "GET", url, headers: { host: "example.com", date: "Tue, 14 Nov 2023 22:13:20 GMT" } });
   assert.ok(Object.keys(cavage.headers).some((name) => name.toLowerCase() === "signature" || name.toLowerCase() === "authorization"));
   const result = await verify(await asRequestSeal(cavage), policy('("@method")'), { label: "sig" });
-  assert.equal(result.ok, false);
+  assert.ok(!result.ok && result.error.kind === "core" && result.error.reason === "missing_signature_input");
 });
 
-test("claim 13: the library signs with any HMAC secret length; RequestSeal handles require 32 bytes, and a verifier callback accepts any length", async () => {
+test("claim 13: the published short HMAC secret signs; RequestSeal handles refuse it, and a verifier callback verifies it", async () => {
+  assert.equal(new TextEncoder().encode("sharedsecret").length, 12);
+  for (const size of [31, 32]) {
+    const result = await Custody.local("hmac-sha256", {hmac: new Uint8Array(randomBytes(size))});
+    assert.equal(result.ok, size >= 32);
+    if (result.ok) must(await result.value.release());
+    else assert.equal(result.error.reason, "invalid_key");
+  }
   const refused = await Custody.local("hmac-sha256", { hmac: new TextEncoder().encode("sharedsecret") });
   assert.ok(!refused.ok && refused.error.kind === "custody" && refused.error.reason === "invalid_key");
   // The same inputs as the library README example reproduce its published headers, which the guide verifies with a callback.
@@ -268,4 +317,23 @@ test("claim 13: the library signs with any HMAC secret length; RequestSeal handl
     { method: "POST", url: "https://example.com", headers: { "content-type": "application/json" } });
   assert.equal(signed.headers.Signature, "sig=:RkplfaUzQ4xIkSVP9hT+Y55yAYX9VwSeHmjS5X7d0fE=:");
   assert.equal(signed.headers["Signature-Input"], 'sig=();keyid="my-key-id";alg="hmac-sha256";created=1700669009;expires=1700669309');
+  const shortSecret = "sharedsecret";
+  const shortPolicy = (at: number) => must(Policy.create({
+    algorithms: ["hmac-sha256"], components: "()",
+    keyResolver: ({ keyid }: {keyid: string | null}) => ok(keyid === "my-key-id" ? {
+      algorithm: "hmac-sha256",
+      verify: async (_algorithm: unknown, base: Uint8Array, signature: Uint8Array) => {
+        const expected = createHmac("sha256", shortSecret).update(base).digest();
+        return ok(signature.length === expected.length && timingSafeEqual(expected, signature));
+      },
+    } : null),
+    freshness: {clock: () => at, maxAge: 600, skew: 0, requireExpires: true}, content: "not_required", replay: "not_required",
+  }));
+  const message = await asRequestSeal(signed);
+  must(await verify(message, shortPolicy(1_700_669_100), {label: "sig"}));
+  const expired = await verify(message, shortPolicy(1_700_669_400), {label: "sig"});
+  assert.ok(!expired.ok && expired.error.reason === "expired");
+  const wrong = must(Message.create({...message, fields: message.fields.map(f => f.name.toLowerCase() === "signature" ? {...f, value: new TextEncoder().encode(`sig=:${Buffer.alloc(32, 1).toString("base64")}:`)} : f)}));
+  const invalid = await verify(wrong, shortPolicy(1_700_669_100), {label: "sig"});
+  assert.ok(!invalid.ok && invalid.error.reason === "invalid_signature");
 });

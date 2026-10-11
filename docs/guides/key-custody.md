@@ -21,6 +21,7 @@ Import checks the key before the runtime sees it: RSA moduli, exponents, and CRT
 
 The program below imports a key, signs under a deadline, checks that nothing secret appears in the handle's printed forms, applies a per-call byte bound, and releases the handle.
 
+<!-- run: bun -->
 ```ts
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
@@ -108,6 +109,7 @@ try {
   const components = '("@method" "@authority")';
   const request = must(await Message.request("GET", "https://api.example.com/", [], ""));
   const signed = must(await sign(request, { label: "sig", components, algorithm: "ed25519", expiresIn: 60, keyid: "agent-key" }, handle));
+  // Single sender: select by keyid when you have several.
   const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: publicKey });
   const policy = must(Policy.create({
     algorithms: ["ed25519"], components, keyResolver,

@@ -106,6 +106,7 @@ const signed = must(await sign(request, { label: "sig", components, algorithm: "
 // The receiving side keeps the headers but not the body bytes.
 const received = must(Message.create({ ...signed, body: { state: "consumed", bytes: null, source: null, ownership: "caller", maxBytes: 1_048_576 } }));
 
+// Single sender: select by keyid when you have several.
 const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: trusted });
 const policy = must(Policy.create({
   algorithms: ["ed25519"], components, keyResolver,
@@ -133,7 +134,9 @@ A message can carry more than one signature, for example one from the sender and
 
 Every failure is a `Result` with a bounded `error`. Branch on `error.kind` and `error.reason`; never on message text. The adapters wrap the underlying reason in `error.source`.
 
-The function below maps any error to an HTTP status. It is a recommendation, not a requirement; change a status if your service has a reason to. The reasoning, stated once:
+On NTP-synchronized hosts, a few seconds of `skew` accommodates small clock differences; a wider window accepts older signatures.
+
+The function below maps any error to an HTTP status. It is a recommendation, not a requirement; change a status if your service has a reason to. For `adapter/limit`, 413 is an optional alternative to 400. The reasoning, stated once:
 
 - **400** when the message cannot be read: malformed signature fields, a covered component the message lacks, an unreadable body, or input over a limit. Retrying the same bytes cannot succeed.
 - **401** when the sender did not prove what your policy requires: no signature, a bad signature, a stale or replayed one, an unknown key, or coverage your policy refuses. A fresh, correct signature can succeed.
