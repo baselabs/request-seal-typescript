@@ -66,6 +66,17 @@
           "darwin-arm64"
         ],
         "reason": "Observed with Playwright 1.64.0 on darwin-arm64: WebKit 27.2 subtle.sign(\"Ed25519\", key, new Uint8Array()) produces a signature that subtle.verify returns false for. Generated keys and PKCS8/JWK imports have the same outcome; one-byte and 257-byte messages verify true. Local custody refuses its required empty-message key health check as invalid_key."
+      },
+      {
+        "id": "custody/ed25519_pkcs8_leading_zero_seed",
+        "items": [
+          1
+        ],
+        "observed": "custody/invalid_key",
+        "platforms": [
+          "linux-x64"
+        ],
+        "reason": "Observed with Playwright 1.64.0 on linux-x64: WebKit 27.2 importKey(\"pkcs8\") rejects every Ed25519 private key whose 32-byte seed begins with 0x00 (DataError; 100 of 100 controlled seeds, all 25 failures among 5,000 random keys). JWK import of the same keys succeeds. Local custody refuses the PKCS8 form as invalid_key."
       }
     ]
   },

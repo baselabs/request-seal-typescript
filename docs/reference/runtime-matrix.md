@@ -21,7 +21,7 @@ assertions use exact patch versions.
 | Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Chromium | 156.0.8078.4 | Browser Fetch verification returns `adapter/invalid_request`. |
 | Firefox | 157.0 | Browser Fetch verification returns `adapter/invalid_request`. |
-| WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. Browser Fetch verification returns `adapter/invalid_request`. |
+| WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. `custody/ed25519_pkcs8_leading_zero_seed` item 1 on linux-x64: `custody/invalid_key`. Browser Fetch verification returns `adapter/invalid_request`. |
 
 ## Node floor and engines
 
@@ -142,6 +142,7 @@ limitations fail rather than being skipped silently.
 | Bun 1.3.14 | All configured platforms | Vetted existing TLS socket passed to HTTPS discovery returns `discovery/invalid_response`; the two discovery transport files declare this prerequisite and the real-peer limitation test executes it. |
 | Deno 2.5.6 | All configured platforms | The same vetted-socket HTTPS discovery returns `discovery/invalid_response`; the real-peer limitation test executes it. |
 | WebKit 27.2 | macOS arm64 | `subtle.sign("Ed25519", key, new Uint8Array())` produces a signature that verifies false; custody's empty-message key health check returns `custody/invalid_key`. |
+| WebKit 27.2 | Linux x64 | `importKey("pkcs8")` rejects an Ed25519 private key whose seed begins with `0x00`; `Custody.local` given that PKCS8 form returns `custody/invalid_key`. The JWK form of the same key is accepted. |
 
 OBSERVED with `npm test --prefix interop/browser`: Firefox 157.0 lacks the
 `Request.body` accessor. Its Requests cannot carry a `ReadableStream`; the body
@@ -154,9 +155,9 @@ An undefined body is absent for the GET/HEAD guard, which still rejects a
 positive declared content length. All three engines sign plain GET, bodyless
 POST, POST with body, and `signedFetch`; they also reject oversized bodies.
 
-OBSERVED in WebKit's real page: generated Ed25519 keys and both PKCS8 and JWK
-imports verify their one-byte and 257-byte signatures, but their empty-message
-signatures verify false. Import itself succeeds; changing import format does not
+OBSERVED in WebKit's real page on macOS arm64: generated Ed25519 keys and both
+PKCS8 and JWK imports verify their one-byte and 257-byte signatures, but their
+empty-message signatures verify false. Import itself succeeds; changing import format does not
 repair this engine defect. The page asserts all three message sizes and both
 custody construction forms. It also verifies the independent empty-message
 signature in [RFC 8032 test 1](https://www.rfc-editor.org/rfc/rfc8032.html#section-7.1).
@@ -164,6 +165,26 @@ The `darwin-arm64` declaration is retained. OBSERVED in CI run 38169787602
 (commit ce16e5e, `ubuntu-24.04`): WebKit 27.2 on linux-x64 selected no limitation
 and passed 62 of 62, so its empty-message signatures and RFC 8032 test 1 verify
 on Linux. Chromium and Firefox verify all three sizes.
+
+OBSERVED with Playwright 1.64.0 WebKit 27.2 on linux-x64, October 11, 2026:
+
+- `importKey("pkcs8")` rejected 100 of 100 Ed25519 seeds beginning with `0x00`
+  (`DataError`), including seeds beginning with `0x00 0x00`. Among 5,000 random
+  keys, all 25 rejections had that leading byte. JWK import of every key succeeded.
+- Through the built package, `Custody.local` returned `custody/invalid_key` for 50
+  of 50 leading-zero seeds in PKCS8 form and accepted the same 50 keys as JWK.
+  Callers on this engine can pass Ed25519 private keys as JWK.
+- Ed25519 `generateKey` threw `OperationError` in 34 of 5,000 calls. CI run
+  38173205551 failed once this way. The page therefore imports RFC 8032 test 1
+  instead of generating Ed25519 keys, and the discovery test uses the RFC 8032
+  test 2 public key.
+- ECDSA P-256 and P-384 generated, exported, imported and verified 3,000 keys
+  each without a failure, including 13 private keys per curve beginning with `0x00`.
+
+The page executes the declared PKCS8 limitation with the seed `0x00` through
+`0x1f`. Where PKCS8 import succeeds, it checks the exported public key against the
+fixed value; the JWK custody form signs and verifies in every engine without the
+empty-message limitation.
 The [WebCrypto Ed25519 contract](https://w3c.github.io/webcrypto/#ed25519-operations)
 permits empty messages. Custody's rejection is retained.
 

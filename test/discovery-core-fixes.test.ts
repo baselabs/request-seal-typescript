@@ -43,9 +43,8 @@ test('a late body cannot begin key import or parsing after cancellation',async()
 for (const discarded of ['no-store', 'expiry', 'invalidate'] as const) test(`cache rollback history survives ${discarded}`, async () => {
   let now = 150;
   const s = source(), c = value(createCache({clock:()=>now}));
-  const pair = await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify']) as unknown as {publicKey:CryptoKey;privateKey:CryptoKey};
-  const exported = await crypto.subtle.exportKey('jwk',pair.publicKey);
-  const rotated = {kty:exported.kty,crv:exported.crv,x:exported.x};
+  // RFC 8032 test 2 public key: a published rotation target, not a generated key.
+  const rotated = {kty:'OKP',crv:'Ed25519',x:'PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw'};
   const set = async (keys: unknown[], at: number, freshness: string) => value(await Discovery.resolver.fromSnapshot(s,bytes(JSON.stringify({keys})),at,[...headers,['cache-control',freshness]]));
   try {
     const old = await set([jwk],100,'max-age=5000');

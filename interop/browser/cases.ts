@@ -5,8 +5,15 @@ import * as Seal from '../../dist/index.js';
 
 function value<T>(r: Seal.Result<T>): T { if (!r.ok) assert.fail(`${r.error.kind}/${r.error.reason}`); return r.value; }
 const payload = () => crypto.getRandomValues(new Uint8Array(257));
-const keyPair = (name: string, hash = 'SHA-256') => name === 'Ed25519'
-  ? crypto.subtle.generateKey({name}, true, ['sign', 'verify'])
+const hex = (text: string) => new Uint8Array(text.match(/../g)!.map(byte => parseInt(byte, 16)));
+// RFC 8410 Ed25519 PKCS8 framing before the 32-byte seed.
+const ed25519Pkcs8 = (seed: string) => hex('302e020100300506032b657004220420' + seed);
+// RFC 8032 test 1. Linux WebKit 27.2 Ed25519 generateKey intermittently throws
+// OperationError, so the page imports this published key instead of generating one.
+const rfc8032Test1 = {seed: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60', publicKey: 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'};
+const keyPair = async (name: string, hash = 'SHA-256'): Promise<CryptoKeyPair> => name === 'Ed25519'
+  ? {privateKey: await crypto.subtle.importKey('pkcs8', ed25519Pkcs8(rfc8032Test1.seed), 'Ed25519', true, ['sign']),
+    publicKey: await crypto.subtle.importKey('raw', hex(rfc8032Test1.publicKey), 'Ed25519', true, ['verify'])}
   : name === 'ECDSA'
     ? crypto.subtle.generateKey({name, namedCurve: hash === 'SHA-384' ? 'P-384' : 'P-256'}, true, ['sign', 'verify'])
     : crypto.subtle.generateKey({name, modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash}, true, name === 'RSA-OAEP' ? ['encrypt', 'decrypt'] : ['sign', 'verify']);
@@ -33,8 +40,7 @@ for (const algorithm of ['HS256', 'RS256', 'PS256', 'PS384', 'PS512', 'ES256', '
     if (algorithm === 'EdDSA' && pair) {
       // RFC 8032 test 1: the published empty-message signature is independent
       // of this engine's signing implementation.
-      const hex = (text: string) => new Uint8Array(text.match(/../g)!.map(byte => parseInt(byte, 16)));
-      const publishedKey = await crypto.subtle.importKey('raw', hex('d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'), 'Ed25519', false, ['verify']);
+      const publishedKey = await crypto.subtle.importKey('raw', hex(rfc8032Test1.publicKey), 'Ed25519', false, ['verify']);
       const publishedSignature = hex('e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b');
       const verified = await crypto.subtle.verify('Ed25519', publishedKey, publishedSignature, new Uint8Array());
       assert.equal(verified, !limitation('custody/ed25519_empty_message'), 'RFC 8032 test 1');
@@ -76,6 +82,30 @@ for (const algorithm of ['HS256', 'RS256', 'PS256', 'PS384', 'PS512', 'ES256', '
       }
     } finally {await owner.release();}
   });
+
+test('Ed25519 PKCS8 custody accepts a seed with a leading zero byte or its exact declared limitation', async () => {
+  // The seed is 0x00 through 0x1f; x is its public key, checked below wherever PKCS8 import succeeds.
+  const seed = '000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f', x = 'A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg';
+  const pkcs8Limit = limitation('custody/ed25519_pkcs8_leading_zero_seed'), emptyMessage = limitation('custody/ed25519_empty_message');
+  const imported = await crypto.subtle.importKey('pkcs8', ed25519Pkcs8(seed), 'Ed25519', true, ['sign']).catch(() => undefined);
+  assert.equal(imported !== undefined, !pkcs8Limit, 'engine PKCS8 import of a leading-zero seed');
+  if (imported) assert.equal((await crypto.subtle.exportKey('jwk', imported)).x, x);
+  const fromJwk = await Seal.Custody.local({jws: 'EdDSA'}, {kty: 'OKP', crv: 'Ed25519', x, d: Seal.encodeBase64Url(hex(seed))});
+  const fromPkcs8 = await Seal.Custody.local({jws: 'EdDSA'}, ed25519Pkcs8(seed), {format: 'pkcs8'});
+  if (emptyMessage) {
+    // Custody's empty-message key health check refuses every Ed25519 key in this engine first.
+    for (const result of [fromJwk, fromPkcs8]) assert.equal(!result.ok && result.error.kind + '/' + result.error.reason, emptyMessage.observed);
+    return;
+  }
+  const owner = value(fromJwk);
+  try {
+    const policy = {algorithms: ['EdDSA'], timeout: 5000, key_resolver: () => Seal.ok({algorithm: 'EdDSA', key: owner})};
+    const wire = value(await Seal.JWS.sign([['alg', 'EdDSA']], new Uint8Array([0]), owner));
+    assert.deepEqual(value(await Seal.JWS.verify(wire, policy)).payload, new Uint8Array([0]));
+  } finally {await owner.release();}
+  assertOutcome('custody/ed25519_pkcs8_leading_zero_seed', fromPkcs8);
+  if (fromPkcs8.ok) await fromPkcs8.value.release();
+});
 
 for (const algorithm of ['RSA-OAEP', 'RSA-OAEP-256', 'A128GCMKW', 'A256GCMKW', 'dir'] as const)
   for (const encryption of ['A128GCM', 'A256GCM'] as const)

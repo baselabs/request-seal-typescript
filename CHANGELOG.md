@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Declare a WebKit 27.2 limitation on Linux x64: the engine rejects PKCS8 import of an Ed25519 private key whose seed begins with `0x00`, so `Custody.local` returns `custody/invalid_key` for that form; pass such keys as JWK. The browser suite executes it with a fixed seed and uses published RFC 8032 keys instead of generating Ed25519 keys, which this engine intermittently fails to do. Correct the runtime matrix: Node 22.12.0 and Deno 2.5.6 refuse `cacerts: "os"`, Node 22.12.0 and Bun 1.3.14 refuse Fetch verification, and WebKit verifies empty-message Ed25519 signatures on Linux.
 
 ## 0.2.0 - October 11, 2026
 - Rewrite the README and add eleven usage guides, architecture decisions, and threat-model documentation. Every complete TypeScript example runs in CI; README verification excerpts are checked against the programs they come from. Generate the API reference with TypeDoc and publish it to GitHub Pages at https://baselabs.github.io/request-seal-typescript/. The migration guide compares behavior with `http-message-signatures` 1.0.6 using executed examples.
