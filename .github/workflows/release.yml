@@ -23,9 +23,10 @@ jobs:
       - name: Install the trusted-publishing npm toolchain
         run: npm install --global npm@11.19.0 --ignore-scripts
       - run: npm ci --ignore-scripts
-      - run: npm run check
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # The verify job above runs the complete CI battery on this exact commit.
+      # This job builds the artifact it stages and checks that artifact.
+      - run: npm run build
+      - run: npm run pack:check
       - name: Require complete release corpus coverage
         run: node --experimental-strip-types --no-warnings tools/conformance/cli.ts --corpus conformance
       - run: npm audit --audit-level=high
