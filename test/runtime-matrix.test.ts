@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {selectRuntimeLimits} from '../tools/conformance/runtime-limits.ts';
+import {FETCH_VERIFICATION_RUNTIMES} from '../src/adapters/fetch/index.ts';
 const read = (file: string) => readFileSync(new URL('../' + file, import.meta.url), 'utf8');
 
 test('documented runtime lanes equal the exact CI lanes and the package floor', () => {
@@ -22,16 +23,23 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   type Limit = {id: string; observed: string; items: number[]; platforms?: string[]};
   const limitationBoundary = (entries: Limit[]) => entries.map(entry =>
     `\`${entry.id}\` ${entry.items.length === 1 ? 'item' : 'items'} ${entry.items.join(', ')}${entry.platforms ? ' on ' + entry.platforms.join(', ') : ''}: \`${entry.observed}\`.`).join(' ');
-  const nativeBoundary: Record<string, string> = {
-    '22.12.0': 'OS trust requires a nonempty system store; empty-query Fetch signing returns `adapter/invalid_request`.',
-    '24.21.0': 'Fetch verification returns `adapter/invalid_request` outside the measured allowlist.',
-    '26.11.1': 'Fetch verification returns `adapter/invalid_request` outside the measured allowlist.',
+  // Runtime facts without a repository source; Fetch verification derives from the allowlist.
+  const noSystemStore = 'No `tls.getCACertificates`, so `cacerts: "os"` returns `custody/unsupported_format`.';
+  const nativeFacts: Record<string, string> = {
+    'node:22.12.0': noSystemStore + ' Empty-query Fetch signing returns `adapter/invalid_request`.',
+    'deno:2.5.6': noSystemStore,
   };
-  const expected: string[][] = tokens.map(version => [`Node ${version}`, version, nativeBoundary[version]!]);
+  const nativeBoundary = (runtime: string, limits: Limit[] = []) => [
+    nativeFacts[runtime],
+    limitationBoundary(limits),
+    (FETCH_VERIFICATION_RUNTIMES as readonly string[]).includes(runtime)
+      ? undefined : 'Fetch verification returns `adapter/invalid_request` outside the measured allowlist.',
+  ].filter(Boolean).join(' ');
+  const expected: string[][] = tokens.map(version => [`Node ${version}`, version, nativeBoundary(`node:${version}`)]);
   for (const version of denos) expected.push([`Deno ${version}`, version, version === '2.9.7'
     ? 'Denied OS roots check only; without `--allow-sys=ca`, source creation and fetch return `discovery/transport_unavailable`. Full-suite support is not asserted.'
-    : limitationBoundary(policy.deno[version])]);
-  for (const version of buns) expected.push([`Bun ${version}`, version, limitationBoundary(policy.bun[version])]);
+    : nativeBoundary(`deno:${version}`, policy.deno[version])]);
+  for (const version of buns) expected.push([`Bun ${version}`, version, nativeBoundary(`bun:${version}`, policy.bun[version])]);
   for (const engine of browsers) {
     const name = engine === 'webkit' ? 'WebKit' : engine[0]!.toUpperCase() + engine.slice(1);
     const versions = Object.keys(policy[engine]);

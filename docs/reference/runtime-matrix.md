@@ -13,12 +13,12 @@ assertions use exact patch versions.
 
 | Runtime lane | Version | Declared runtime limitations |
 | --- | --- | --- |
-| Node 22.12.0 | 22.12.0 | OS trust requires a nonempty system store; empty-query Fetch signing returns `adapter/invalid_request`. |
+| Node 22.12.0 | 22.12.0 | No `tls.getCACertificates`, so `cacerts: "os"` returns `custody/unsupported_format`. Empty-query Fetch signing returns `adapter/invalid_request`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Node 24.21.0 | 24.21.0 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Node 26.11.1 | 26.11.1 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
-| Deno 2.5.6 | 2.5.6 | `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
+| Deno 2.5.6 | 2.5.6 | No `tls.getCACertificates`, so `cacerts: "os"` returns `custody/unsupported_format`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
 | Deno 2.9.7 | 2.9.7 | Denied OS roots check only; without `--allow-sys=ca`, source creation and fetch return `discovery/transport_unavailable`. Full-suite support is not asserted. |
-| Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
+| Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Chromium | 156.0.8078.4 | Browser Fetch verification returns `adapter/invalid_request`. |
 | Firefox | 157.0 | Browser Fetch verification returns `adapter/invalid_request`. |
 | WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. Browser Fetch verification returns `adapter/invalid_request`. |
@@ -90,10 +90,12 @@ OBSERVED using `deno run` on Deno 2.9.7:
   A downloaded runtime must be selected in that command's PATH so the permitted
   `deno` child is the same binary as the parent.
 
-OBSERVED in direct `node:tls` probes on macOS arm64: Node 24.21.0 and
-Bun 1.3.14 return an empty system-store array; an invalid store name throws
-`TypeError` with code `ERR_INVALID_ARG_VALUE`. Node 22.12.0 and Deno 2.5.6
-have no `getCACertificates` function; calling it directly throws `TypeError`
+OBSERVED in direct `node:tls` probes on macOS arm64: Node 24.21.0, 26.11.1, and
+Bun 1.3.14 return an empty system-store array, so `cacerts: "os"` returns
+`custody/unsupported_format` there. Through the built `discovery-node` module on
+October 11, 2026, all five native lane versions returned that result on macOS
+arm64. An invalid store name throws `TypeError` with code
+`ERR_INVALID_ARG_VALUE`. Node 22.12.0 and Deno 2.5.6 have no `getCACertificates` function; calling it directly throws `TypeError`
 without a code, while the adapter checks availability before calling it.
 A Deno 2.9.7 `deno run` without system permission throws `NotCapable` without
 a code for the real system-store read; its invalid-store argument instead
@@ -158,8 +160,10 @@ signatures verify false. Import itself succeeds; changing import format does not
 repair this engine defect. The page asserts all three message sizes and both
 custody construction forms. It also verifies the independent empty-message
 signature in [RFC 8032 test 1](https://www.rfc-editor.org/rfc/rfc8032.html#section-7.1).
-The `darwin-arm64` declaration is retained; the first hosted Linux WebKit run
-will decide Linux behavior. No Linux outcome is claimed here. Chromium and Firefox verify all three sizes.
+The `darwin-arm64` declaration is retained. OBSERVED in CI run 38169787602
+(commit ce16e5e, `ubuntu-24.04`): WebKit 27.2 on linux-x64 selected no limitation
+and passed 62 of 62, so its empty-message signatures and RFC 8032 test 1 verify
+on Linux. Chromium and Firefox verify all three sizes.
 The [WebCrypto Ed25519 contract](https://w3c.github.io/webcrypto/#ed25519-operations)
 permits empty messages. Custody's rejection is retained.
 
