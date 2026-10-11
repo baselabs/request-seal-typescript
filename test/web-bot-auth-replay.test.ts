@@ -44,7 +44,7 @@ test("documented profile commitment separates equal nonces while nonce-only comm
       const nonces = "signatures" in facts ? facts.signatures.map(s => s.identifier).sort() : [facts.identifier];
       identifiers.push(nonces);
       const encoded = JSON.stringify(scoped
-        ? [facts.profile.name, "revision" in facts.profile ? facts.profile.revision : null, nonces]
+        ? [facts.profile, nonces]
         : nonces);
       const expected = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(encoded)));
       if (!scoped) return Seal.ok(expected);

@@ -105,21 +105,20 @@ async function freshness(
 }
 /** Internal coverage/freshness pipeline shared by selected verification and preflight. */
 export async function authenticationPreflight(input: InnerList, components: InnerList, extra: Policy["extraComponents"], freshnessPolicy: Policy["freshness"] | (() => Policy["freshness"]), context: Context): Promise<Verification["freshness"]> {
-    const covered = new Set(identities(input)),
-      needed = new Set(identities(components));
-    ensure(
-      [...needed].every((id) => covered.has(id)),
-      "missing_required_component",
-      "policy",
-    );
-    ensure(
-      extra === "allow" ||
-        [...covered].every((id) => needed.has(id)),
-      "unexpected_component",
-      "policy",
-    );
-    return freshness(parameters(input), typeof freshnessPolicy === "function" ? freshnessPolicy() : freshnessPolicy, context);
-
+  const covered = new Set(identities(input)),
+    needed = new Set(identities(components));
+  ensure(
+    [...needed].every((id) => covered.has(id)),
+    "missing_required_component",
+    "policy",
+  );
+  ensure(
+    extra === "allow" ||
+      [...covered].every((id) => needed.has(id)),
+    "unexpected_component",
+    "policy",
+  );
+  return freshness(parameters(input), typeof freshnessPolicy === "function" ? freshnessPolicy() : freshnessPolicy, context);
 }
 async function content(
   m: HttpMessage,

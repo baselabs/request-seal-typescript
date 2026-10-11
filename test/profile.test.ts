@@ -8,6 +8,7 @@ import type { InnerList, Item } from "../src/structured-fields/index.ts";
 import type { FreshnessFacts } from "../src/verification.ts";
 import { signatureSchema } from "../src/signature-fields.ts";
 import { verificationFacts } from "../src/verification.ts";
+import { verifyLabel as authenticateLabel } from "../src/verify.ts";
 
 type Surface = Readonly<{
   validSignatureInput(input: unknown): boolean;
@@ -177,9 +178,9 @@ test("helpers: preflight shares coverage and freshness checks before resolution"
   rejection(await p.preflight(c.input,"()","allow",{...fresh,unknown:true}),"invalid_policy","input");
   rejection(await p.preflight(c.input,"()","allow",{clock:()=>0,maxAge:null,requireExpires:false}),"invalid_policy","input");
 });
-test("facts: canonical extension profile matches reference conversion and retains metadata spelling", async () => {
+test("canonical extension profile matches reference conversion and retains metadata spelling", async () => {
   surface(); const v=value(await check({...stamp,revision:"one",counter:-1,enabled:true,disabled:false,absent:null,maxAge:2}));
-  const expected={name:["test_pkg","synthetic"],revision:"one",counter:-1,enabled:"true",disabled:"false",absent:"nil",maxAge:2};
+  const expected={name:["test_pkg","synthetic"],revision:"one",counter:-1,enabled:"true",disabled:"false",absent:"",maxAge:2};
   const serialized=JSON.parse(new TextDecoder().decode(value(api.serializeVerification(v))));
   assert.deepEqual(serialized.profile,expected); assert.deepEqual((value(verificationFacts(v)) as {profile:unknown}).profile,expected);
   assert.equal(serialized.signature.crypto,"valid"); assert.equal(serialized.principal,"unattributed");
@@ -230,4 +231,154 @@ test("helpers: preflight coverage rejects before malformed freshness or its cloc
   const reads:Record<string,number>={clock:0,maxAge:0,skew:0,requireExpires:0};
   const raw={get clock(){reads.clock!++;return ()=>1618884473;},get maxAge(){reads.maxAge!++;return 60;},get skew(){reads.skew!++;return 0;},get requireExpires(){reads.requireExpires!++;return false;}};
   value(await p.preflight(c.input,"()","allow",raw)); assert.deepEqual(reads,{clock:1,maxAge:1,skew:1,requireExpires:1});
+});
+
+for (const metadata of ["é", "😀", "\u2028", "\ufffd"]) test(`S1: stamp metadata ${JSON.stringify(metadata)} serializes as strict UTF-8`, async () => {
+  const verified = value(await check({...stamp, metadata}));
+  const bytes = value(api.serializeVerification(verified));
+  const text = new TextDecoder("utf-8", {fatal: true}).decode(bytes);
+  assert.equal(JSON.parse(text).profile.metadata, metadata);
+  assert.deepEqual(bytes, new TextEncoder().encode(text));
+});
+
+test("name parts and keys use the 255-code-point atom bound", async () => {
+  for (const character of ["a", "é", "😀"]) {
+    for (const position of ["package", "kind", "key"]) {
+      const profile = (n: number) => position === "key"
+        ? {...stamp, [character.repeat(n)]: true}
+        : {name: [position === "package" ? character.repeat(n) : "test_pkg", position === "kind" ? character.repeat(n) : "synthetic"]};
+      value(await check(profile(255)));
+      rejection(await check(profile(256)), "invalid_profile", "input");
+    }
+  }
+});
+
+test("every stamp string rejects lone surrogates", async () => {
+  for (const malformed of ["\ud800", "\udfff", "a\ud800b", "a\udfffb"]) {
+    for (const profile of [{name: [malformed, "synthetic"]}, {name: ["test_pkg", malformed]}, {...stamp, [malformed]: true}, {...stamp, metadata: malformed}]) {
+      rejection(await check(profile), "invalid_profile", "input");
+    }
+  }
+});
+
+test("preflight components failures use authentication reasons", async () => {
+  const c = await fixture();
+  for (const components of ["(", 5]) rejection(await surface().preflight(c.input, components, "allow", "not_evaluated"), "invalid_signature_input", "fields");
+  rejection(await surface().preflight(c.input, " ".repeat(65_537), "allow", "not_evaluated"), "limit", "input");
+});
+
+test("selected decimal clones compare raw fields and parsed nodes compare source scale", async () => {
+  const c = await fixture();
+  const key = value(await api.Custody.local("ed25519", readFileSync("conformance/sources/rfc9421/keys/ed25519_private.pem", "utf8")));
+  try {
+    const unsigned = value(await api.Message.request("GET", "https://example.com/", [], ""));
+    const signed = value(await api.sign(unsigned, {label: "s", algorithm: "ed25519", signatureInput: '("@method");x=1.50'}, key));
+    const [entries, signatures] = value(surface().dictionaries(signed, 16));
+    const input = entries[0]![1];
+    value(await surface().verifyLabel(signed, c.policy, "s", structuredClone(input), signatures.s, stamp));
+    const changed = structuredClone(input);
+    const decimal = changed.parameters[0]![1];
+    assert.equal(decimal.kind, "decimal");
+    if (decimal.kind !== "decimal") throw new Error("expected decimal");
+    const different = {...changed, parameters: [["x", {...decimal, value: {...decimal.value, scaled: 1501}}]]};
+    rejection(await surface().verifyLabel(signed, c.policy, "s", different, signatures.s, stamp), "invalid_signature_input", "fields");
+    const parse = (wire: string) => (value(api.StructuredFields.parse("list", wire, {schema: signatureSchema})) as api.List).value[0];
+    const tens = value(await api.sign(unsigned, {label: "s", algorithm: "ed25519", signatureInput: '("@method");x=10.0'}, key));
+    const tensSignature = value(surface().dictionaries(tens, 16))[1].s;
+    rejection(await surface().verifyLabel(tens, c.policy, "s", parse('("@method");x=1.00'), tensSignature, stamp), "invalid_signature_input", "fields");
+    // Equal coefficients with different scales must remain unequal.
+    const scaled = structuredClone(input);
+    const d = scaled.parameters[0]![1];
+    assert.equal(d.kind, "decimal");
+    if (d.kind !== "decimal") throw new Error("expected decimal");
+    const differentScale = {...scaled, parameters: [["x", {...d, value: {...d.value, scale: 2}}]]};
+    rejection(await surface().verifyLabel(signed, c.policy, "s", differentScale, signatures.s, stamp), "invalid_signature_input", "fields");
+  } finally { await key.release(); }
+});
+
+test("stamp snapshot normalizes negative zero", async () => {
+  const verified = value(await check({...stamp, metadata: -0}));
+  assert.equal(Object.is((verified.profile as api.ProfileStamp<"metadata">).metadata, 0), true);
+});
+
+test("dictionaries invalid arguments use protect's invalid_policy reason", async () => {
+  const c = await fixture();
+  for (const max of [0, NaN, 100000, "16"]) rejection(surface().dictionaries(c.message, max as number), "invalid_policy", "input");
+  rejection(surface().dictionaries({}, 16), "invalid_policy", "input");
+  value(surface().dictionaries(c.message, 1024));
+  rejection(surface().dictionaries(c.message, 1025), "invalid_policy", "input");
+});
+
+test("selected signature 1025-byte rejection precedes dictionaries", async () => {
+  const c = await fixture();
+  const missing = value(api.Message.create({...c.message, fields: c.message.fields.filter(f => f.name.toLowerCase() !== "signature")}));
+  rejection(await check(stamp, {message: missing, signature: {kind: "item", value: {kind: "bytes", value: new Uint8Array(1025)}, parameters: []}}), "invalid_signature_field", "fields");
+});
+
+test("extension pipeline unexpected faults retain invalid_policy", async () => {
+  const c = await fixture();
+  rejection(await authenticateLabel(c.message, c.policy, {label: "sig-b26"}, () => {throw new Error("CANARY");}, undefined, stamp), "invalid_policy", "input");
+});
+
+test("reordered stamps agree in serialization and replay commitment input; the name tuple resists callback mutation", async () => {
+  const c = await fixture(), store = value(api.createMemoryStore({maxEntries: 16}));
+  const key = value(await api.Custody.local("ed25519", readFileSync("conformance/sources/rfc9421/keys/ed25519_private.pem", "utf8")));
+  try {
+    const now = Math.floor(Date.now() / 1000), seen: string[] = [];
+    const p = value(api.Policy.create({...c.policy, freshness: {clock: () => now, maxAge: null, skew: 0, requireExpires: true}, replay: {
+      identifier: "nonce", namespace: new TextEncoder().encode("stamp-order"), store, timeoutMs: 1000,
+      commitment: async (facts: api.ReplayFacts) => {
+        seen.push(JSON.stringify(facts.profile));
+        if (Array.isArray(facts.profile.name)) {
+          assert.equal(Reflect.set(facts.profile.name, "0", "changed"), false);
+          assert.deepEqual(facts.profile.name, stamp.name);
+        }
+        return api.ok(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([facts.profile, facts.identifier])))));
+      },
+    }}));
+    const unsigned = value(await api.Message.request("GET", "https://example.com/", [], ""));
+    const signed = value(await api.sign(unsigned, {label: "s", algorithm: "ed25519", signatureInput: `("@method");created=${now};expires=${now + 60};nonce="same"`}, key));
+    const [entries, signatures] = value(surface().dictionaries(signed, 16));
+    const a = {...stamp, m: "one", z: true, "2": false, "10": null, "𐀀": 1, "": 2}, b = {"": 2, "𐀀": 1, "10": null, "2": false, z: true, name: stamp.name, m: "one"};
+    const va = value(await check(a)), vb = value(await check(b));
+    assert.deepEqual(value(api.serializeVerification(va)), value(api.serializeVerification(vb)));
+    assert.deepEqual(Object.keys(va.profile), ["2", "10", "name", "m", "z", "𐀀", ""]);
+    assert.deepEqual(structuredClone(va.profile), {...va.profile});
+    assert.match(new TextDecoder().decode(value(api.serializeVerification(va))), /"profile":\{"2":"false","10":"","name":\["test_pkg","synthetic"\],"m":"one","z":"true","𐀀":1,"":2\}/);
+    const verified = value(await surface().verifyLabel(signed, p, "s", entries[0]![1], signatures.s, a));
+    assert.deepEqual(verified.profile.name, stamp.name);
+    rejection(await surface().verifyLabel(signed, p, "s", entries[0]![1], signatures.s, b), "replayed", "replay");
+    assert.equal(seen.length, 2); assert.equal(seen[0], seen[1]);
+  } finally { await key.release(); }
+});
+
+test("Deno.inspect exposes only the four redacted verification fields", {skip: !(globalThis as unknown as {Deno?: object}).Deno}, async () => {
+  const deno = (globalThis as unknown as {Deno?: {inspect(value: unknown, options?: {colors: boolean; depth: number}): string}}).Deno;
+  assert.ok(deno, "Deno.inspect requires Deno");
+  let observed: string[] = [];
+  assert.equal(deno.inspect({[Symbol.for("Deno.customInspect")](...args: unknown[]) {
+    observed = args.map(arg => typeof arg);
+    return "redacted";
+  }}), "redacted");
+  console.log(`Deno.customInspect arguments: ${JSON.stringify(observed)}`);
+  assert.deepEqual(observed, ["function", "object"]);
+  const verified = value(await check({...stamp, revision: "visible"}));
+  const printed = deno.inspect(verified, {colors: false, depth: 10});
+  console.log(printed);
+  const redacted = {label: verified.label, profile: verified.profile, replay: verified.replay, authorization: verified.authorization};
+  assert.equal(printed, deno.inspect(redacted, {colors: false, depth: 10}));
+  assert.doesNotMatch(printed, /signature|parameters|principal|freshness|content|test-key-ed25519/);
+});
+
+test("extension docs describe whole-stamp replay binding and public type widening", () => {
+  const profiles = readFileSync("docs/reference/profiles.md", "utf8");
+  const replay = readFileSync("docs/reference/replay.md", "utf8");
+  const signing = readFileSync("docs/reference/sign-and-verify.md", "utf8");
+  const changelog = readFileSync("CHANGELOG.md", "utf8");
+  assert.match(profiles, /whole stamp/);
+  assert.match(replay, /facts\.profile,\s*identifiers/);
+  assert.match(signing, /extension stamps/);
+  assert.match(changelog, /Verification\.profile.*ReplayFacts\.profile/s);
+  assert.match(changelog, /exhaustive narrowing/);
+  assert.match(changelog, /Render Deno inspection of Verifications/);
 });

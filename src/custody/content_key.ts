@@ -1,3 +1,4 @@
+import {denoInspection} from '../brand.ts';
 import {snapshotOptions} from '../brand.ts';
 import {isContext, remainingMs, run, type Context} from '../context.ts';
 import {
@@ -109,8 +110,8 @@ class ContentKey implements UnwrappedKey {
   [Symbol.for('nodejs.util.inspect.custom')](): unknown {
     return this.toJSON();
   }
-  [Symbol.for('Deno.customInspect')](): unknown {
-    return this.toJSON();
+  [Symbol.for('Deno.customInspect')](render?: unknown): unknown {
+    return denoInspection(render, this.toJSON());
   }
 }
 export function confineContentKey(key: CryptoKey): UnwrappedKey {

@@ -17,8 +17,10 @@ uniqueness scope; include additional authenticated facts when their scope needs 
 The library passes the profile to commitment but does not prefix the namespace
 or commitment output. This matches the reference: a nonce-only commitment in a
 shared namespace collides across generic verification and Web Bot Auth. Separate
-profiles with distinct caller namespaces or encode the profile name and revision
-inside the commitment. For a scope defined by authenticated nonces, this recipe
+profiles with distinct caller namespaces or encode the whole stamp inside the
+commitment, including every extension metadata key and value. Name and revision
+alone omit metadata that can define an extension's security scope. For a scope
+defined by authenticated nonces, this recipe
 works with both fact shapes and separates equal nonces in the same namespace:
 
 ```js
@@ -28,8 +30,7 @@ const commitment = async (facts) => {
     ? facts.signatures.map((signature) => signature.identifier).sort()
     : [facts.identifier];
   const encoded = JSON.stringify([
-    facts.profile.name,
-    "revision" in facts.profile ? facts.profile.revision : null,
+    facts.profile,
     identifiers,
   ]);
   return ok(new Uint8Array(await crypto.subtle.digest(
@@ -37,6 +38,14 @@ const commitment = async (facts) => {
   )));
 };
 ```
+
+Extension stamps already have one key order for equal stamps: keys are inserted in
+UTF-16 code-unit order, and as for every JavaScript object, array-index keys are
+listed first in ascending order. Zero is normalized and tuples are frozen. Preserve
+that order in the encoding. Cross-language verifiers must agree on the same
+whole-stamp encoding, including boolean and null handling; this recipe uses JSON
+values from the authenticated stamp, rather than the conversion in
+`serializeVerification`.
 
 Include stable authenticated key and agent identities in that encoding when they
 define the caller's uniqueness scope. Use the same encoding and namespace for

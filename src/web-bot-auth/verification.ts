@@ -2,6 +2,7 @@ import type { Verification } from "../verification.ts";
 import type { ReplayReceipt } from "../replay-port.ts";
 import type { SigningAlgorithm } from "../crypto/algorithm.ts";
 import type { Proof } from "../discovery/body.ts";
+import { inspection } from "../brand.ts";
 export const WEB_BOT_AUTH_PROFILE = Object.freeze({
   name: "web_bot_auth" as const,
   revision: "draft-ietf-webbotauth-httpsig-protocol-00" as const,
@@ -85,8 +86,7 @@ export function completedEnvelope(
     });
   Object.defineProperties(result, {
     toJSON: { value: inspect },
-    [Symbol.for("nodejs.util.inspect.custom")]: { value: inspect },
-    [Symbol.for("Deno.customInspect")]: { value: inspect },
+    ...inspection(inspect),
   });
   envelopes.add(result);
   return ok(Object.freeze(result));

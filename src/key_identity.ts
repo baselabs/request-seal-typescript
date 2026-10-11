@@ -1,3 +1,4 @@
+import {denoInspection} from './brand.ts';
 import {ok, err, type Result} from './result.ts';
 import {custodyError} from './errors/types.ts';
 import {KEY_IDENTITY_MAX_BYTES} from './constants.ts';
@@ -73,8 +74,8 @@ export class KeyIdentity {
   [Symbol.for('nodejs.util.inspect.custom')](): unknown {
     return this.toJSON();
   }
-  [Symbol.for('Deno.customInspect')](): unknown {
-    return this.toJSON();
+  [Symbol.for('Deno.customInspect')](render?: unknown): unknown {
+    return denoInspection(render, this.toJSON());
   }
 }
 

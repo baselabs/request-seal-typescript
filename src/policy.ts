@@ -146,27 +146,27 @@ export function isPolicy(value: unknown): value is Policy {
 /** Internal shared freshness boundary for policies and extension preflight. */
 export function normalizeFreshness(input: unknown): Freshness | "not_evaluated" {
   if (input === "not_evaluated") return input;
-      const f = snapshot(input, [
-        "clock",
-        "maxAge",
-        "skew",
-        "requireExpires",
-      ]);
-      ensure(
-        Object.keys(f).length === 4 &&
-          typeof f.clock === "function" &&
-          (f.maxAge === null || integer(f.maxAge, 1, CLOCK_MAX_SECONDS)) &&
-          integer(f.skew, 0, FRESHNESS_MAX_SKEW_SECONDS) &&
-          typeof f.requireExpires === "boolean",
-        "invalid_policy",
-        "input",
-      );
-      return Object.freeze({
-        clock: f.clock as () => number,
-        maxAge: f.maxAge as number | null,
-        skew: f.skew,
-        requireExpires: f.requireExpires,
-      });
+  const f = snapshot(input, [
+    "clock",
+    "maxAge",
+    "skew",
+    "requireExpires",
+  ]);
+  ensure(
+    Object.keys(f).length === 4 &&
+      typeof f.clock === "function" &&
+      (f.maxAge === null || integer(f.maxAge, 1, CLOCK_MAX_SECONDS)) &&
+      integer(f.skew, 0, FRESHNESS_MAX_SKEW_SECONDS) &&
+      typeof f.requireExpires === "boolean",
+    "invalid_policy",
+    "input",
+  );
+  return Object.freeze({
+    clock: f.clock as () => number,
+    maxAge: f.maxAge as number | null,
+    skew: f.skew,
+    requireExpires: f.requireExpires,
+  });
 }
 export function createPolicy(input: unknown): Result<Policy> {
   try {

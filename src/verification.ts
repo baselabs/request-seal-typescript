@@ -1,7 +1,7 @@
 import {isWebBotAuthVerification, webBotAuthFacts} from './web-bot-auth/verification.ts';
 import {isQuorumVerification,quorumFacts} from './quorum/verification.ts';
-import { deepFreeze } from "./brand.ts";
-import { byteString } from "./bytes.ts";
+import { deepFreeze, inspection } from "./brand.ts";
+import { encodeUtf8 } from "./runtime.ts";
 import { decimalSource, copyDecimalSource, type Bare, type Parameters } from "./structured-fields/index.ts";
 import type { DigestFacts } from "./digest.ts";
 import { isReplayReceipt } from "./replay/receipt.ts";
@@ -92,9 +92,7 @@ export function completed(value: Verification): Result<Verification> {
   });
   Object.defineProperties(result, {
     toJSON: { value: inspect },
-    [Symbol.for("nodejs.util.inspect.custom")]: { value: inspect },
-    [Symbol.for("Deno.customInspect")]: { value: (render?: (value: unknown) => string) =>
-      typeof render === "function" ? render(inspect()) : inspect() },
+    ...inspection(inspect),
   });
   Object.freeze(result);
   verifications.add(result);
@@ -157,7 +155,7 @@ export function verificationFacts(value: unknown): Result<unknown> {
       crypto: "valid",
     },
     profile: Array.isArray(value.profile.name)
-      ? Object.fromEntries(Object.entries(value.profile).map(([k, v]) => [k, typeof v === "boolean" ? String(v) : v === null ? "nil" : v]))
+      ? Object.fromEntries(Object.entries(value.profile).map(([k, v]) => [k, typeof v === "boolean" ? String(v) : v === null ? "" : v]))
       : value.profile,
     content:
       value.content === "not_required"
@@ -184,6 +182,6 @@ export function serializeVerification(value: unknown): Result<Uint8Array> {
               Object.entries(v).map(([k, x]) => [k, encode(x)]),
             )
           : v;
-  return byteString(JSON.stringify(encode(r.value)));
+  return ok(encodeUtf8(JSON.stringify(encode(r.value))));
 }
 import { encodeBase64Url as base64url } from "./bytes.ts";

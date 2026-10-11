@@ -1,3 +1,4 @@
+import {denoInspection} from './brand.ts';
 import {byteLimit} from './crypto/options.ts';
 import {snapshotOptions} from './brand.ts';
 import {
@@ -281,8 +282,8 @@ class ManagedHandle implements KeyHandle {
   [Symbol.for('nodejs.util.inspect.custom')](): unknown {
     return this.toJSON();
   }
-  [Symbol.for('Deno.customInspect')](): unknown {
-    return this.toJSON();
+  [Symbol.for('Deno.customInspect')](render?: unknown): unknown {
+    return denoInspection(render, this.toJSON());
   }
 }
 /** Wrap trusted custodian code under deadline, result validation, and fault containment. */

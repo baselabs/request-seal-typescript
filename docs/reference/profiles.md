@@ -10,7 +10,7 @@ and select their profile name as a constant in their code.
 ```ts
 import { Profile, type ProfileStamp } from "@request-seal/core";
 
-const stamp: ProfileStamp = Object.freeze({
+const stamp: ProfileStamp<"revision"> = Object.freeze({
   name: Object.freeze(["example_pkg", "example"] as const),
   revision: "1",
 });
@@ -38,17 +38,25 @@ Empty coverage is allowed; policy chooses the required components.
 
 `Profile.dictionaries(message, max)` returns a Result containing ordered
 `[label, input]` pairs and a frozen null-prototype signature lookup. It checks paired
-labels and preserves encounter order. `Profile.preflight(input, components, extra,
+labels and preserves encounter order. A non-Message or a max outside the integer
+range 1–1,024 returns `invalid_policy` at `input`. `Profile.preflight(input, components, extra,
 freshness)` asynchronously checks coverage and freshness before discovery or key
 resolution. Components use the signature-input inner-list form; extra is `"allow"`
 or `"reject"`; freshness is `"not_evaluated"` or the four explicit clock, maxAge,
 skew, and requireExpires choices used by Policy. Unknown freshness keys reject.
+Components parse limits return `limit` at `input`; other components parse failures
+return `invalid_signature_input` at `fields`.
 
 `Profile.verifyLabel(message, policy, label, input, signature, stamp)` reparses under
 `policy.maxSignatures`, requires the supplied nodes to structurally equal that label's
 parsed entries, then uses the shared authentication pipeline. Component and parameter
 order, bare value types, and decoded signature bytes matter; parser object identity
-does not. It has no representation or digest-state options. Required content checks
+does not. A selected decimal with parser provenance compares the source coefficient
+and fractional scale against the authoritative parsed decimal's source fields.
+Without provenance, including after `structuredClone`, it compares its own
+`{scaled, scale}` against the authoritative node's own `{scaled, scale}`.
+Both fields must match; decimals from separate parses retain source-scale
+distinctions, so `1.0` and `1.00` differ. It has no representation or digest-state options. Required content checks
 use retained message body bytes. Generic `verify` retains its explicit content options.
 
 A stamp is a plain object with at most eight own string keys including name. Name is
@@ -57,9 +65,24 @@ exactly `[package, kind]`, both strings. Bare string names reject. Packages
 reserved; those strings can be kinds under an independent package. Metadata accepts
 booleans, null, safe integers from -999,999,999,999,999 through 999,999,999,999,999,
 and strings through 256 UTF-8 bytes. JavaScript strings cannot distinguish atoms from
-binaries; all metadata strings use that byte limit. Class instances, symbol keys,
+binaries; all metadata strings use that byte limit. Name parts and metadata keys
+have at most 255 Unicode code points, matching the reference's atom keys and
+names and the [BEAM atom limit](https://www.erlang.org/doc/system/system_limits.html).
+Every stamp string must contain Unicode scalar values; lone surrogates reject.
+Class instances, symbol keys,
 compound values, and additional tuple keys reject. Own values and tuple elements are
-read once into owned snapshots. Returned stamp objects and tuples are frozen.
+read once into owned null-prototype snapshots. Keys are inserted in UTF-16 code-unit
+order, so equal stamps share one key order; as for every JavaScript object,
+array-index keys are listed first in ascending order. Metadata
+negative zero normalizes to zero. Returned stamp objects and tuples are frozen.
+
+`ProfileStamp<MetadataKey>` types the two-string name tuple and named metadata
+keys with `ProfileMetadataValue` (`string | boolean | null | number`). For example,
+use `ProfileStamp<"revision" | "enabled">` for those two metadata keys. The default
+type describes name alone. TypeScript cannot express the integer range, byte and
+code-point bounds, or reserved package names in an arbitrary string; runtime
+validation remains authoritative. `verifyLabel` accepts typed stamps and unknown
+input through overloads; both execute the same validation.
 
 Rejection precedence is stamp, policy, label, message, signature shape, paired
 fields, unknown label, selected input, selected signature, and input semantics.
@@ -67,12 +90,13 @@ Failures return bounded Results without caller bytes or callback diagnostics;
 unexpected boundary faults become `invalid_policy` at `input`.
 
 Successful verification carries the stamp in `Verification.profile` and in replay
-commitment `facts.profile`. Commitments must bind the profile name to distinguish
+commitment `facts.profile`. Commitments must bind the whole stamp to distinguish
 security scopes. Default JSON and inspection include public profile metadata along
 with label, replay, and authorization; signature parameters require explicit access.
 `serializeVerification` uses `{name: [package, kind], ...metadata}` for extension
-facts, preserves metadata spelling and integers, and encodes boolean/null metadata
-as `"true"`, `"false"`, and `"nil"`, matching the reference profile conversion.
+facts as UTF-8 canonical JSON, preserves metadata spelling and integers, and encodes
+boolean/null metadata as `"true"`, `"false"`, and `""`, matching the reference
+atom-to-string conversion (`to_string(nil)` is the empty string).
 Core profile facts retain their existing string names and revision fields.
 
 A stamp records selection; it does not establish that extension predicates ran.

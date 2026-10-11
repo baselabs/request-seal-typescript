@@ -2,7 +2,7 @@ import { encodeUtf8 } from "./runtime.ts";
 import { isMessage, Message } from "./message/index.ts";
 import { isPolicy, normalizeFreshness } from "./policy.ts";
 import { withDeadline, releaseContext } from "./context.ts";
-import { SF_MAX_INTEGER, SIGNATURE_MAX_BYTES } from "./constants.ts";
+import { SF_MAX_INTEGER, SIGNATURE_MAX_BYTES, STRUCTURED_FIELDS_LIMITS, PROFILE_MAX_ATOM_CODE_POINTS, PROFILE_MAX_MEMBERS, PROFILE_MAX_VALUE_BYTES } from "./constants.ts";
 import { dictionaries as parseDictionaries, validInner, inner, label, ensure } from "./signature-fields.ts";
 import { verifyLabel as authenticateLabel, authenticationPreflight } from "./verify.ts";
 import { coreError, isRequestSealError } from "./errors/types.ts";
@@ -11,15 +11,24 @@ import { decimalSource, type Bare, type InnerList, type Item, type Member } from
 import type { Verification, FreshnessFacts } from "./verification.ts";
 
 /** Descriptive extension selection; source-specific enforcement belongs to the extension. */
-export type ProfileStamp = Readonly<{
+export type ProfileMetadataValue = string | boolean | null | number;
+export type ProfileStamp<MetadataKey extends string = never> = Readonly<{
   name: readonly [packageName: string, kind: string];
-  [key: string]: string | boolean | null | number | readonly [string, string];
-}>;
+}> & Readonly<Record<Exclude<MetadataKey, "name">, ProfileMetadataValue>>;
 export type SignatureDictionaries = readonly [
   readonly (readonly [string, InnerList])[],
   Readonly<Record<string, Item>>,
 ];
 const reserved = new Set(["request_seal", "request-seal", "rfc9421", "web_bot_auth", "web-bot-auth"]);
+function stampString(value: string, max: number): boolean {
+  if (value.length > max * 2) return false;
+  let count = 0;
+  for (const point of value) {
+    const code = point.codePointAt(0)!;
+    if (code >= 0xd800 && code <= 0xdfff || ++count > max) return false;
+  }
+  return true;
+}
 function plain(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
@@ -29,23 +38,26 @@ function plain(value: unknown): value is Record<string, unknown> {
 function snapshotStamp(value: unknown): ProfileStamp {
   ensure(plain(value), "invalid_profile", "input");
   const keys = Reflect.ownKeys(value);
-  ensure(keys.length <= 8 && keys.includes("name") && keys.every(k => typeof k === "string"), "invalid_profile", "input");
+  ensure(keys.length <= PROFILE_MAX_MEMBERS && keys.includes("name") && keys.every(k => typeof k === "string" && stampString(k, PROFILE_MAX_ATOM_CODE_POINTS)), "invalid_profile", "input");
+  const ordered = ["name", ...(keys as string[]).filter(k => k !== "name").sort()];
   const owned = Object.create(null) as Record<string, unknown>;
-  for (const key of keys as string[]) owned[key] = value[key];
+  for (const key of ordered) owned[key] = value[key];
   const name = owned.name;
   ensure(Array.isArray(name), "invalid_profile", "input");
   const nameKeys = Reflect.ownKeys(name);
   ensure(nameKeys.length === 3 && nameKeys.includes("length") && nameKeys.includes("0") && nameKeys.includes("1") && name.length === 2, "invalid_profile", "input");
   const packageName: unknown = name[0], kind: unknown = name[1];
-  ensure(typeof packageName === "string" && typeof kind === "string" && !reserved.has(packageName), "invalid_profile", "input");
+  ensure(typeof packageName === "string" && stampString(packageName, PROFILE_MAX_ATOM_CODE_POINTS) && typeof kind === "string" && stampString(kind, PROFILE_MAX_ATOM_CODE_POINTS) && !reserved.has(packageName), "invalid_profile", "input");
   for (const key of keys as string[]) {
     if (key === "name") continue;
     const v = owned[key];
     ensure(v === null || typeof v === "boolean" ||
       (typeof v === "number" && Number.isSafeInteger(v) && Math.abs(v) <= SF_MAX_INTEGER) ||
-      (typeof v === "string" && v.length <= 256 && encodeUtf8(v).length <= 256), "invalid_profile", "input");
+      (typeof v === "string" && stampString(v, PROFILE_MAX_VALUE_BYTES) && encodeUtf8(v).length <= PROFILE_MAX_VALUE_BYTES), "invalid_profile", "input");
+    if (typeof v === "number" && Object.is(v, -0)) owned[key] = 0;
   }
   owned.name = Object.freeze([packageName, kind]);
+  // Sorted insertion gives equal stamps one key order; JavaScript lists array-index keys first.
   return Object.freeze(owned) as ProfileStamp;
 }
 function protectedError(e: unknown) {
@@ -57,6 +69,7 @@ function validSignatureInput(input: unknown): boolean {
 }
 function dictionaries(message: unknown, max: number): Result<SignatureDictionaries> {
   try {
+    ensure(isMessage(message) && Number.isSafeInteger(max) && max >= 1 && max <= STRUCTURED_FIELDS_LIMITS.maxMembers, "invalid_policy", "input");
     const [inputs, signatures] = paired(message, max);
     const entries = Object.freeze([...inputs].map(([k, v]) => Object.freeze([k, v] as const)));
     const lookup = Object.create(null) as Record<string, Item>;
@@ -73,7 +86,7 @@ function paired(message: unknown, max: number) {
 async function preflight(input: unknown, components: unknown, extra: "allow" | "reject", freshness: unknown): Promise<Result<FreshnessFacts | "not_evaluated">> {
   try {
     const required = inner(components);
-    if (!required.ok) throw required.error;
+    if (!required.ok) throw required.error.reason === "limit" ? coreError("limit", "input") : coreError("invalid_signature_input", "fields");
     ensure(extra === "allow" || extra === "reject", "invalid_policy", "input");
     const context = withDeadline();
     if (!context.ok) throw context.error;
@@ -109,7 +122,7 @@ function equalParsed(actual: unknown, expected: unknown): boolean {
   if (parsed.kind === "decimal") {
     if (fields.kind !== "decimal") return false;
     const selected = decimalParts(actual as unknown as Bare, fields.value);
-    const authoritative = decimalParts(expected as Bare, parsed.value);
+    const authoritative = decimalParts(expected as Bare, parsed.value, decimalSource(actual as unknown as Bare) !== undefined);
     return selected !== null && authoritative !== null && selected[0] === authoritative[0] && selected[1] === authoritative[1];
   }
   for (const key of expectedKeys) if (!equalParsed(fields[key], parsed[key])) return false;
@@ -118,13 +131,13 @@ function equalParsed(actual: unknown, expected: unknown): boolean {
 /** Parsed decimals retain source coefficient/scale separately from numeric normalization.
  * Leading zero and negative-zero spellings do not change the reference integer coefficient.
  */
-function decimalParts(node: Bare, value: unknown): readonly [bigint, number] | null {
+function decimalParts(node: Bare, value: unknown, useSource = true): readonly [bigint, number] | null {
   if (!plain(value)) return null;
   const keys = Reflect.ownKeys(value);
   if (keys.length !== 2 || !keys.includes("scaled") || !keys.includes("scale")) return null;
   const scaled = value.scaled, scale = value.scale;
   if (!(typeof scaled === "bigint" || typeof scaled === "number" && Number.isSafeInteger(scaled)) || typeof scale !== "number" || !Number.isSafeInteger(scale) || scale < 1 || scale > 3) return null;
-  const source = decimalSource(node);
+  const source = useSource ? decimalSource(node) : undefined;
   return source === undefined ? [BigInt(scaled), scale] : [BigInt(source.replace(".", "")), source.length - source.indexOf(".") - 1];
 }
 function signatureSnapshot(value: unknown): Item {
@@ -139,6 +152,8 @@ function signatureSnapshot(value: unknown): Item {
   ensure(bareKind === "bytes" && bytes instanceof Uint8Array && bytes.length >= 1 && bytes.length <= SIGNATURE_MAX_BYTES, "invalid_signature_field", "fields");
   return {kind: "item", value: {kind: "bytes", value: new Uint8Array(bytes)}, parameters: parameters as Item["parameters"]};
 }
+function verifyLabel<K extends string>(message: unknown, policy: unknown, selectedLabel: unknown, input: unknown, signature: unknown, stamp: ProfileStamp<K>): Promise<Result<Verification>>;
+function verifyLabel(message: unknown, policy: unknown, selectedLabel: unknown, input: unknown, signature: unknown, stamp: unknown): Promise<Result<Verification>>;
 async function verifyLabel(message: unknown, policy: unknown, selectedLabel: unknown, input: unknown, signature: unknown, stamp: unknown): Promise<Result<Verification>> {
   try {
     const profile = snapshotStamp(stamp);

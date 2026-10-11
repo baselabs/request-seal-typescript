@@ -1,3 +1,4 @@
+import {denoInspection} from "../brand.ts";
 import { encodeJson } from "../json.ts";
 import { encodeUtf8 } from "../runtime.ts";
 import { encodeBase64Url, decodeBase64Url } from "../bytes.ts";
@@ -84,8 +85,8 @@ export class JweResult {
   [Symbol.for("nodejs.util.inspect.custom")](): unknown {
     return this.toJSON();
   }
-  [Symbol.for("Deno.customInspect")](): unknown {
-    return this.toJSON();
+  [Symbol.for("Deno.customInspect")](render?: unknown): unknown {
+    return denoInspection(render, this.toJSON());
   }
 }
 Object.freeze(JweResult.prototype);

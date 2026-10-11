@@ -110,7 +110,8 @@ transportTest("agent fields, trust sources, redirects, and CIMD links cannot con
     confined("CIMD links another origin");
     // A source's shorter timeout leaves the envelope Context live for held keys.
     mode = "delayed";
-    const timedSource = source(location, {timeoutMs: 300});
+    // Allow real TLS setup while keeping the source deadline below the envelope's.
+    const timedSource = source(location, {timeoutMs: 1000});
     const timedCache = value(Seal.createCache({clock: () => now, fetch: Discovery.fetch}));
     let heldCalls = 0;
     try {

@@ -1,3 +1,4 @@
+import {denoInspection} from "../brand.ts";
 import { now } from "../runtime.ts";
 import { isContext, withDeadline, type Context } from "../context.ts";
 import { Custody } from "../custody/index.ts";
@@ -293,8 +294,8 @@ export class KeyManagementHandle {
   [Symbol.for("nodejs.util.inspect.custom")](): unknown {
     return this.toJSON();
   }
-  [Symbol.for("Deno.customInspect")](): unknown {
-    return this.toJSON();
+  [Symbol.for("Deno.customInspect")](render?: unknown): unknown {
+    return denoInspection(render, this.toJSON());
   }
 }
 Object.freeze(KeyManagementHandle.prototype);

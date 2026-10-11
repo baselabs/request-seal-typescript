@@ -47,4 +47,4 @@ export {isQuorumVerification} from './quorum/verification.ts';
 export type {QuorumVerification} from './quorum/verification.ts';
 export * from './web-bot-auth/index.ts';
 
-export {Profile, type ProfileStamp, type SignatureDictionaries} from "./profile.ts";
+export {Profile, type ProfileStamp, type ProfileMetadataValue, type SignatureDictionaries} from './profile.ts';

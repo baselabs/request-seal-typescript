@@ -1,3 +1,4 @@
+import {denoInspection} from './brand.ts';
 import {byteLimit} from './crypto/options.ts';
 import {CRYPTO_DEFAULT_MAX_BYTES} from './constants.ts';
 import {encodeUtf8} from './runtime.ts';
@@ -186,8 +187,8 @@ export class PublicKey {
   [Symbol.for('nodejs.util.inspect.custom')](): unknown {
     return this.toJSON();
   }
-  [Symbol.for('Deno.customInspect')](): unknown {
-    return this.toJSON();
+  [Symbol.for('Deno.customInspect')](render?: unknown): unknown {
+    return denoInspection(render, this.toJSON());
   }
 }
 

@@ -74,7 +74,8 @@ Generic success records `principal: "unattributed"` and
 `authorization: "not_evaluated"`; callers decide authorization.
 
 `Verification.profile` and `Verification.principal` are unions once Web Bot Auth
-is present: the profile is `rfc9421` or the `web_bot_auth` profile, and the
+is present: the profile is `rfc9421`, the `web_bot_auth` profile, or extension stamps
+selected through `Profile.verifyLabel`, and the
 principal is `"unattributed"`, an agent principal, or a held-key principal.
 Generic callers narrow `principal` before use, checking for `"unattributed"`
 and then the `kind` discriminator (`"agent"` or `"key"`).

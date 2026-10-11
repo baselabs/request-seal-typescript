@@ -1,4 +1,4 @@
-import { snapshotOptions } from "../brand.ts";
+import { inspection, snapshotOptions } from "../brand.ts";
 import {
   Policy,
   type Policy as GenericPolicy,
@@ -165,8 +165,7 @@ export function createPolicy(input: unknown): Result<WebBotAuthPolicy> {
       });
     Object.defineProperties(p, {
       toJSON: { value: inspect },
-      [Symbol.for("nodejs.util.inspect.custom")]: { value: inspect },
-      [Symbol.for("Deno.customInspect")]: { value: inspect },
+      ...inspection(inspect),
     });
     Object.freeze(p);
     policies.add(p);

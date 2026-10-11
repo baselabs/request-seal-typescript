@@ -27,6 +27,7 @@ export const TIMEOUT_DEFAULT_MS = 5000; // RequestSeal.Custody and JOSE.Support.
 export const SF_MAX_INTEGER = 999_999_999_999_999; // RequestSeal.StructuredFields, RFC 9651.
 export const PROFILE_MAX_MEMBERS = 8; // RequestSeal.Profile.
 export const PROFILE_MAX_VALUE_BYTES = 256; // RequestSeal.Profile.
+export const PROFILE_MAX_ATOM_CODE_POINTS = 255; // BEAM atom limit for profile names and keys.
 export const DISCOVERY_MAX_PERMITTED_ADDRESSES = 16; // RequestSeal.Discovery.Source.
 export const DISCOVERY_MAX_KEYS = 256; // RequestSeal.Discovery.Source.
 export const DISCOVERY_DEFAULT_MAX_KEYS = 32; // RequestSeal.Discovery.Source.

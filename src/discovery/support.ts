@@ -1,4 +1,4 @@
-import { snapshotOptions, deepFreeze } from "../brand.ts";
+import { snapshotOptions, deepFreeze, inspection } from "../brand.ts";
 import { discoveryError, isRequestSealError, type DiscoveryError } from "../errors/types.ts";
 import type { Reason } from "../errors/parity.ts";
 import { err, type Result } from "../result.ts";
@@ -66,8 +66,7 @@ export function inspectable<T extends object>(value: T, facts: object): T {
   const inspect = () => Object.freeze({ ...facts });
   Object.defineProperties(value, {
     toJSON: { value: inspect },
-    [Symbol.for("nodejs.util.inspect.custom")]: { value: inspect },
-    [Symbol.for("Deno.customInspect")]: { value: inspect },
+    ...inspection(inspect),
   });
   return Object.freeze(value);
 }

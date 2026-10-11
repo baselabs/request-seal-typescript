@@ -1,5 +1,17 @@
 import { err, ok, type Result } from './result.ts';
 import { coreError } from './errors/types.ts';
+/** Node and Deno inspection that shows only `view()`. Deno passes a render callback
+ * and prints the string it returns; Node formats the returned object itself. */
+export function inspection(view: () => unknown): PropertyDescriptorMap {
+  return {
+    [Symbol.for('nodejs.util.inspect.custom')]: {value: view},
+    [Symbol.for('Deno.customInspect')]: {value: (render?: unknown) => denoInspection(render, view())},
+  };
+}
+/** Deno.customInspect body: render the redacted view through Deno's callback when given. */
+export function denoInspection(render: unknown, view: unknown): unknown {
+  return typeof render === 'function' ? (render as (value: unknown) => string)(view) : view;
+}
 /** Snapshot plain data, then freeze the owned structures. Uint8Array copies remain mutable:
  * JavaScript cannot freeze nonempty typed arrays; caller buffers are never retained.
  * Accessors and other object types reject without being invoked or frozen.
