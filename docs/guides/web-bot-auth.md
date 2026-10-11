@@ -39,7 +39,7 @@ const response = must(await Message.response(200, [["content-type", "application
 const proof = must(await sign(response, {
   label: "directory", components: '("@authority";req "content-digest")', algorithm: "ed25519", expiresIn: 3600,
   keyid: thumbprint, tag: "http-message-signatures-directory", nonce: null,
-}, signer));
+}, signer, { clock: () => now })); // Sign with the same clock the snapshot check below uses.
 const headers = proof.fields.map((f) => [f.name, new TextDecoder().decode(f.value)] as [string, string]);
 
 // 2. The site turns those fetched bytes into a key set. The default requires the proof to verify.
