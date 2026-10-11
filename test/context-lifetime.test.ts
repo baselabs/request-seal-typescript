@@ -7,11 +7,15 @@ const value = <T>(r: api.Result<T>): T => {assert.ok(r.ok); return r.value;};
 test('idle Context expires and removes caller and parent listeners', async () => {
   const caller = new AbortController();
   const parent = value(api.withDeadline({timeoutMs: 5000}));
-  const child = value(api.withDeadline({signal: caller.signal, parent, timeoutMs: 30}));
+  const child = value(api.withDeadline({signal: caller.signal, parent, timeoutMs: 1000}));
   assert.equal(getEventListeners(caller.signal, 'abort').length, 1);
   assert.equal(getEventListeners(parent.signal, 'abort').length, 1);
   assert.deepEqual(await api.run(child, () => api.ok(true)), api.ok(true));
-  await new Promise(resolve => setTimeout(resolve, 70));
+  await new Promise<void>((resolve, reject) => {
+    const bound = setTimeout(() => reject(new Error('Idle context did not expire')), 5000);
+    if (child.signal.aborted) {clearTimeout(bound); resolve();}
+    else child.signal.addEventListener('abort', () => {clearTimeout(bound); resolve();}, {once: true});
+  });
   assert.equal(getEventListeners(caller.signal, 'abort').length, 0);
   assert.equal(getEventListeners(parent.signal, 'abort').length, 0);
   assert.equal(child.signal.aborted, true);

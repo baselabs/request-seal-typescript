@@ -2,6 +2,7 @@ import type {Query} from '../../src/replay/postgres.ts';
 export interface Connection {
   query(sql: string, params?: readonly unknown[]): Promise<{rowCount: number; rows: Record<string, any>[]} >;
   release(): void;
+  end(): Promise<void>;
 }
 export interface Pool {
   query(sql: string, params?: readonly unknown[]): Promise<{rowCount: number; rows: Record<string, any>[]} >;

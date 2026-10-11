@@ -17,7 +17,7 @@ type Wire = Record<string, unknown>;
 const v = <T>(r: S.Result<T>): T => {if (!r.ok) throw new Error(S.ruleId(r.error)); return r.value;};
 const b = (text: string) => v(S.decodeBase64Url(text));
 const e = S.encodeBase64Url;
-const selections = (r: Request): S.CustodyAlgorithm => r.family === 'jws' ? {jws: r.algorithm as S.JwsAlgorithm} : r.family === 'jwe' ? {jwe: r.algorithm as 'RSA-OAEP' | 'RSA-OAEP-256'} : r.algorithm as S.HttpAlgorithm;
+const selections = (r: Request): S.CustodyAlgorithm => r.algorithm.startsWith('jws:') ? {jws: r.algorithm.slice(4) as S.JwsAlgorithm} : r.family === 'jws' ? {jws: r.algorithm as S.JwsAlgorithm} : r.family === 'jwe' ? {jwe: r.algorithm as 'RSA-OAEP' | 'RSA-OAEP-256'} : r.algorithm as S.HttpAlgorithm;
 const recipients = new Map<string, S.KeyHandle>();
 let directory: Peer | undefined;
 let reply: {body: Uint8Array; fields: [string, string][]} | undefined;
@@ -35,7 +35,9 @@ async function key(r: Request) {
   const publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
   // Selectors are explicit in the exchange; runtime JOSE metadata must not override them.
   delete privateJwk.alg; delete publicJwk.alg;
-  return {handle: v(await S.Custody.local(selected, privateJwk)), jwk: publicJwk};
+  const directoryAlgorithm: S.HttpAlgorithm = spec.family === 'rsa' ? 'rsa-pss-sha512' : spec.family === 'ec' ? spec.curve === 'P-256' ? 'ecdsa-p256-sha256' : 'ecdsa-p384-sha384' : 'ed25519';
+  const directoryHandle = r.algorithm.startsWith('jws:') ? v(await S.Custody.local(directoryAlgorithm, privateJwk)) : undefined;
+  return {handle: v(await S.Custody.local(selected, privateJwk)), jwk: publicJwk, directoryHandle, directoryAlgorithm};
 }
 async function message(r: Request) {
   return v(await S.Message.request(r.method, r.url, r.fields.map(([n, x]) => [n, b(x)]), b(r.bytes)));
@@ -49,7 +51,7 @@ async function jwsPolicy(r: Request) {
   const k = await verificationKey({...r, family: 'jws'});
   return {policy: {algorithms: [r.algorithm], timeout: 5000, key_resolver: () => S.ok({algorithm: r.algorithm, key: k})}, key: k};
 }
-async function signedDirectory(r: Request, h: S.KeyHandle, publicKey: S.PublicKey) {
+async function signedDirectory(r: Request, h: S.KeyHandle, publicKey: S.PublicKey, algorithm: S.CustodyAlgorithm) {
   if (!directory) throw new Error('directory must be started first');
   const location = `https://127.0.0.1:${directory.port}`;
   const req = v(await S.Message.request('GET', location + '/.well-known/http-message-signatures-directory', [], ''));
@@ -57,10 +59,18 @@ async function signedDirectory(r: Request, h: S.KeyHandle, publicKey: S.PublicKe
   const response = v(await S.Message.response(200, [['content-type', 'application/http-message-signatures-directory+json'], ['cache-control', 'max-age=120']], body, {request: req, digest: ['sha-256']}));
   const kid = v(await publicKey.thumbprint());
   const input = `("@authority";req "content-digest");created=${r.now};expires=${BigInt(r.now) + 120n};keyid="${kid}";tag="http-message-signatures-directory"`;
-  const signed = v(await S.sign(response, {label: 'directory', algorithm: r.algorithm, signatureInput: input}, h));
+  const signed = v(await S.sign(response, {label: 'directory', algorithm, signatureInput: input}, h));
   reply = {body, fields: signed.fields.map(f => [f.name, new TextDecoder().decode(f.value)])};
 }
 export async function dispatch(r: Request): Promise<Wire> {
+  if (r.op === 'directory.read') {
+    if (!reply) throw new Error('Directory is not published');
+    return {bytes: e(reply.body), fields: reply.fields.map(([name, text]) => [name, e(new TextEncoder().encode(text))])};
+  }
+  if (r.op === 'directory.publish') {
+    reply = {body: b(r.bytes), fields: r.fields.map(([name, text]) => [name, new TextDecoder().decode(b(text))])};
+    return {published: true};
+  }
   if (r.op === 'directory.start') {
     directory = await peer((_req, res) => {
       if (!reply) {res.writeHead(503); res.end(); return;}
@@ -75,19 +85,19 @@ export async function dispatch(r: Request): Promise<Wire> {
       const m = await message(r);
       if (r.family === 'web_bot_auth') {
         const pub = v(await S.PublicKey.import(k.jwk));
-        await signedDirectory({...r, jwk: k.jwk!}, k.handle, pub);
-        const signed = v(await S.WebBotAuth.sign(m, {label: 'agent', key: pub, algorithm: r.algorithm, agent: {location: r.location, type: 'directory'}, created: Number(r.now), expires: Number(r.now) + 60, nonce: r.nonce, components}, k.handle));
+        await signedDirectory({...r, jwk: k.jwk!}, k.directoryHandle ?? k.handle, pub, k.directoryHandle ? k.directoryAlgorithm! : selections(r));
+        const signed = v(await S.WebBotAuth.sign(m, {label: 'agent', key: pub, algorithm: selections(r), agent: {location: r.location, type: 'directory'}, created: Number(r.now), expires: Number(r.now) + 60, nonce: r.nonce, components}, k.handle));
         return {jwk: k.jwk, fields: fields(signed)};
       }
       const signed = v(await S.sign(m, {label: 'sig', algorithm: r.algorithm, signatureInput: `${components};created=${r.now};expires=${BigInt(r.now) + 60n};nonce="${r.nonce}";alg="${r.algorithm}";keyid="exchange"`}, k.handle));
       return {...k.secret ? {secret: k.secret} : {jwk: k.jwk}, fields: fields(signed)};
-    } finally {await k.handle.release();}
+    } finally {await k.directoryHandle?.release(); await k.handle.release();}
   }
   if (r.op === 'verify') {
     if (r.family === 'web_bot_auth') {
       const source = v(S.DiscoverySource.create({type: 'directory', location: r.location, cacerts: [b(r.ca!)], permittedAddresses: ['127.0.0.1']}));
       const set = v(await Discovery.fetch(source, {clock: () => Number(r.now)}));
-      const policy = v(S.WebBotAuth.Policy.create({algorithms: [r.algorithm], agents: () => S.ok(set), cache: null, freshness: {clock: () => Number(r.now), maxAge: 60, skew: 0}, content: 'not_required', replay: 'not_required'}));
+      const policy = v(S.WebBotAuth.Policy.create({algorithms: [selections(r)], agents: () => S.ok(set), cache: null, freshness: {clock: () => Number(r.now), maxAge: 60, skew: 0}, content: 'not_required', replay: 'not_required'}));
       const result = await S.WebBotAuth.verify(await message(r), policy);
       return result.ok ? {accepted: true, proof: set.proof} : {accepted: false, rule: S.ruleId(result.error)};
     }

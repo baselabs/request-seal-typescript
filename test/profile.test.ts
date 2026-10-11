@@ -233,7 +233,7 @@ test("helpers: preflight coverage rejects before malformed freshness or its cloc
   value(await p.preflight(c.input,"()","allow",raw)); assert.deepEqual(reads,{clock:1,maxAge:1,skew:1,requireExpires:1});
 });
 
-for (const metadata of ["é", "😀", "\u2028", "\ufffd"]) test(`S1: stamp metadata ${JSON.stringify(metadata)} serializes as strict UTF-8`, async () => {
+for (const metadata of ["é", "😀", "\u2028", "\ufffd"]) test(`stamp metadata ${JSON.stringify(metadata)} serializes as strict UTF-8`, async () => {
   const verified = value(await check({...stamp, metadata}));
   const bytes = value(api.serializeVerification(verified));
   const text = new TextDecoder("utf-8", {fatal: true}).decode(bytes);

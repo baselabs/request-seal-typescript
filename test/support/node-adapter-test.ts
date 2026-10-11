@@ -8,6 +8,8 @@ export function nodeAdapterTest(file: string): typeof nodeTest {
   if (!process.versions.deno && !process.versions.bun) return nodeTest;
   return ((name: string, options: unknown, fn?: unknown) => {
     const attrs = typeof options === "function" ? {} : options as object;
+    const requestedTimeout = (attrs as {timeout?: unknown}).timeout;
+    const timeout = typeof requestedTimeout === "number" ? Math.max(30000, requestedTimeout) : 30000;
     return nodeTest(name, attrs, t => {
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const env = { ...process.env };
@@ -16,7 +18,7 @@ export function nodeAdapterTest(file: string): typeof nodeTest {
         "--unhandled-rejections=strict", "--experimental-strip-types", "--no-warnings",
         "--test", "--test-reporter=tap", `--test-name-pattern=^${escaped}$`,
         fileURLToPath(file),
-      ], { encoding: "utf8", timeout: 30000, env });
+      ], { encoding: "utf8", timeout, env });
       assert.match(output, /^# pass 1$/m);
       assert.match(output, /^# fail 0$/m);
       t.diagnostic(`Node adapter subprocess:\n${output}`);

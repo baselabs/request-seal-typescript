@@ -1,3 +1,4 @@
+:ok = :io.setopts(:standard_io, encoding: :latin1)
 Logger.configure(level: :warning)
 Code.require_file("../replay/connection.exs", __DIR__)
 
@@ -11,7 +12,16 @@ defmodule Reciprocal do
   def e(s), do: Base.url_encode64(s, padding: false)
   def v({:ok, x}), do: x
   def v({:error, error}), do: throw({:peer_rule, rule(error)})
-  def rule(error), do: "#{if Map.has_key?(error, :layer), do: "#{error.__struct__}/#{error.layer}", else: "#{error.__struct__}"}.#{error.reason}"
+  def rule(error) do
+    kind = case error.__struct__ do
+      RequestSeal.Error -> "core"
+      RequestSeal.JOSE.Error -> "jose"
+      RequestSeal.Discovery.Error -> "discovery"
+      _ -> "peer/unexpected"
+    end
+    kind <> if(Map.has_key?(error, :layer), do: "/#{error.layer}.#{error.reason}", else: "/#{error.reason}")
+  end
+  def selected(%{"algorithm" => "jws:" <> algorithm}), do: {:jws, algorithm}
   def selected(r) do
     case r["family"] do
     "jws" -> {:jws, r["algorithm"]}
@@ -20,7 +30,7 @@ defmodule Reciprocal do
     end
   end
   def key(r) do
-    alg = r["algorithm"]
+    alg = String.replace_prefix(r["algorithm"], "jws:", "")
     material = cond do
       alg in ["hmac-sha256", "HS256"] -> {:hmac, :crypto.strong_rand_bytes(32)}
       alg in ["ed25519", "EdDSA"] -> {_, seed} = :crypto.generate_key(:eddsa, :ed25519); {:ed25519, seed}
@@ -35,7 +45,7 @@ defmodule Reciprocal do
       {:hmac, secret} -> %{"secret" => e(secret)}
       _ -> pub = v(Custody.public_key(handle)); %{"jwk" => v(PublicKey.export(pub, :jwk))}
     end
-    {handle, exported}
+    {handle, exported, material}
   end
   def message(r), do: v(Message.request(r["method"], r["url"], Enum.map(r["fields"], fn [n, x] -> {n, b(x)} end), b(r["bytes"])))
   def fields(m), do: Enum.map(m.fields, fn f -> [f.name, e(f.value)] end)
@@ -56,20 +66,23 @@ defmodule Reciprocal do
   def serve(listener, state) do
     case :ssl.transport_accept(listener, 1000) do
       {:ok, socket} ->
-        spawn_link(fn ->
-          with {:ok, socket} <- :ssl.handshake(socket, 5000), {:ok, _} <- :ssl.recv(socket, 0, 5000) do
-            {body, headers} = Agent.get(state, & &1)
-            wire = "HTTP/1.1 200 OK\r\n" <> Enum.map_join(headers, "", fn {n,x} -> n <> ": " <> x <> "\r\n" end) <> "content-length: #{byte_size(body)}\r\nconnection: close\r\n\r\n" <> body
-            :ok = :ssl.send(socket, wire)
+        spawn(fn ->
+          try do
+            with {:ok, socket} <- :ssl.handshake(socket, 5000), {:ok, _} <- :ssl.recv(socket, 0, 5000) do
+              {body, headers} = Agent.get(state, & &1)
+              wire = "HTTP/1.1 200 OK\r\n" <> Enum.map_join(headers, "", fn {n,x} -> n <> ": " <> x <> "\r\n" end) <> "content-length: #{byte_size(body)}\r\nconnection: close\r\n\r\n" <> body
+              :ssl.send(socket, wire)
+            end
+          after
+            :ssl.close(socket)
           end
-          :ssl.close(socket)
         end)
         serve(listener, state)
       {:error, :timeout} -> serve(listener, state)
       {:error, :closed} -> :ok
     end
   end
-  def directory(r, handle) do
+  def directory(r, handle, material) do
     {port, state, _} = Process.get(:directory)
     location = "https://127.0.0.1:#{port}"
     request = v(Message.request("GET", location <> "/.well-known/http-message-signatures-directory", [], ""))
@@ -77,8 +90,36 @@ defmodule Reciprocal do
     response = v(Message.response(200, [{"content-type", "application/http-message-signatures-directory+json"}, {"cache-control", "max-age=120"}], body, request: request, digest: ["sha-256"]))
     pub = v(Custody.public_key(handle)); kid = v(PublicKey.thumbprint(pub)); now = String.to_integer(r["now"])
     input = ~s[("@authority";req "content-digest");created=#{now};expires=#{now + 120};keyid="#{kid}";tag="http-message-signatures-directory"]
-    signed = v(S.sign(response, %{label: "directory", algorithm: r["algorithm"], signature_input: input}, handle))
+    # Discovery possession proofs enumerate HTTP algorithms, even when the bot
+    # request uses a JOSE selector. Keep the same private key in local custody.
+    {proof_algorithm, proof_handle} = if is_tuple(selected(r)) do
+      algorithm = case material do
+        {:rsa, _} -> "rsa-pss-sha512"
+        {:ec, "P-256", _} -> "ecdsa-p256-sha256"
+        {:ec, "P-384", _} -> "ecdsa-p384-sha384"
+        {:ed25519, _} -> "ed25519"
+      end
+      {algorithm, v(Local.new(algorithm, material))}
+    else {selected(r), handle} end
+    signed = try do
+      v(S.sign(response, %{label: "directory", algorithm: proof_algorithm, signature_input: input}, proof_handle))
+    after
+      if proof_handle != handle, do: Local.release(proof_handle)
+    end
     Agent.update(state, fn _ -> {body, Enum.map(signed.fields, &{&1.name, &1.value})} end)
+  end
+  def dispatch(%{"op" => "directory.read"}) do
+    {_, state, _} = Process.get(:directory)
+    {body, headers} = Agent.get(state, & &1)
+    %{"bytes" => e(body), "fields" => Enum.map(headers, fn {n, x} -> [n, e(x)] end)}
+  end
+  def dispatch(%{"op" => "directory.publish"} = r) do
+    {_, state, _} = Process.get(:directory)
+    Agent.update(state, fn _ -> {b(r["bytes"]), Enum.map(r["fields"], fn [n, x] -> {n, b(x)} end)} end)
+    %{"published" => true}
+  end
+  def dispatch(%{"op" => "selectors"}) do
+    %{"selectors" => %{"http" => S.Crypto.algorithms(), "jws" => RequestSeal.JOSE.Support.algorithms(:jws), "jwe" => RequestSeal.JOSE.Support.algorithms(:jwe), "encs" => RequestSeal.JOSE.Support.encryption()}}
   end
   def dispatch(%{"op" => "directory.start"} = r) do
     [{:Certificate, cert, :not_encrypted}] = :public_key.pem_decode(b(r["cert"]))
@@ -91,14 +132,14 @@ defmodule Reciprocal do
     %{"location" => "https://127.0.0.1:#{port}", "ca" => r["ca"]}
   end
   def dispatch(%{"op" => "sign"} = r) do
-    {h, exported} = key(r)
+    {h, exported, material} = key(r)
     try do
       output = case r["family"] do
         "jws" -> %{"compact" => v(JWS.sign([{"alg", r["algorithm"]}], b(r["bytes"]), h))}
         "web_bot_auth" ->
-          directory(Map.merge(r, exported), h)
+          directory(Map.merge(r, exported), h, material)
           pub = v(Custody.public_key(h)); now = String.to_integer(r["now"])
-          signed = v(WebBotAuth.sign(message(r), %{label: "agent", agent: %{type: :directory, location: r["location"]}, key: pub, algorithm: r["algorithm"], created: now, expires: now + 60, nonce: r["nonce"], components: @components}, fn _, bytes -> Custody.sign(h, bytes) end))
+          signed = v(WebBotAuth.sign(message(r), %{label: "agent", agent: %{type: :directory, location: r["location"]}, key: pub, algorithm: selected(r), created: now, expires: now + 60, nonce: r["nonce"], components: @components}, fn _, bytes -> Custody.sign(h, bytes) end))
           %{"fields" => fields(signed)}
         _ ->
           now = String.to_integer(r["now"])
@@ -113,7 +154,7 @@ defmodule Reciprocal do
     now = String.to_integer(r["now"])
     source = v(Discovery.Source.new(%{type: :directory, location: r["location"], cacerts: [b(r["ca"])], permitted_addresses: [{127, 0, 0, 1}]}))
     set = v(Discovery.fetch(source, clock: fn -> now end))
-    policy = v(WebBotAuth.Policy.new(%{algorithms: [r["algorithm"]], agents: fn _ -> {:ok, set} end, cache: nil, freshness: %{clock: fn -> now end, max_age: 60, skew: 0}, content: :not_required, replay: :not_required}))
+    policy = v(WebBotAuth.Policy.new(%{algorithms: [selected(r)], agents: fn _ -> {:ok, set} end, cache: nil, freshness: %{clock: fn -> now end, max_age: 60, skew: 0}, content: :not_required, replay: :not_required}))
     Map.put(result(WebBotAuth.verify(message(r), policy)), "proof", Atom.to_string(set.proof))
   end
   def dispatch(%{"op" => "verify"} = r) do
@@ -132,7 +173,7 @@ defmodule Reciprocal do
   end
   def dispatch(%{"op" => "prepare"} = r) do
     if String.starts_with?(r["algorithm"], "RSA") do
-      {h, exported} = key(Map.put(r, "family", "jwe"))
+      {h, exported, _} = key(Map.put(r, "family", "jwe"))
       Process.put({:recipient, r["id"]}, h)
       Map.put(exported, "keyId", r["id"])
     else
@@ -182,14 +223,14 @@ defmodule Reciprocal do
   end
   def run do
     "0.4.1" = Application.spec(:request_seal, :vsn) |> to_string()
-    IO.puts(:json.encode(%{"ready" => true, "language" => "elixir", "version" => "0.4.1"}))
-    IO.stream(:stdio, :line) |> Enum.each(fn line ->
+    IO.binwrite(:stdio, [:json.encode(%{"ready" => true, "language" => "elixir", "version" => "0.4.1"}), "\n"])
+    IO.binstream(:stdio, :line) |> Enum.each(fn line ->
       r = :json.decode(line)
       response = try do dispatch(r) catch
         {:peer_rule, rule} -> %{"accepted" => false, "rule" => rule}
         kind, error -> %{"accepted" => false, "rule" => "peer/#{kind}: #{inspect(error)}"}
       end
-      IO.puts(:json.encode(Map.put(response, "id", r["id"])))
+      IO.binwrite(:stdio, [:json.encode(Map.put(response, "id", r["id"])), "\n"])
     end)
     if d = Process.get(:directory), do: :ssl.close(elem(d, 2))
   end

@@ -132,8 +132,10 @@ jobs:
       - run: npm pack --dry-run
   reciprocal:
     name: reciprocal
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
     services:
+      # Trust authentication and the passwordless URL are for this ephemeral runner only.
       postgres:
         image: postgres:18@sha256:885953109528ad3dfc90362b1a6f50a78620b5315be19f187753d267e484dc5b
         env:
@@ -164,7 +166,7 @@ jobs:
       - run: mix deps.get --check-locked && mix compile --warnings-as-errors
         working-directory: interop/replay
       - run: npm run typecheck --prefix interop/reciprocal
-      - run: node --experimental-strip-types --no-warnings --test test/peer-process.test.ts test/replay-reciprocal.test.ts test/reciprocal.test.ts
+      - run: node --experimental-strip-types --no-warnings --test test/peer-process.test.ts test/replay-reciprocal.test.ts test/reciprocal.test.ts test/reciprocal-driver.test.ts test/reciprocal-record.test.ts
         env:
           REQUESTSEAL_REPLAY_PG_URL: postgresql://postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/requestseal_replay
       - run: npm run exchange --prefix interop/reciprocal
@@ -174,4 +176,5 @@ jobs:
         if: always()
         with:
           name: reciprocal-exchange
+          retention-days: 3
           path: interop/reciprocal/.cache/exchange.jsonl

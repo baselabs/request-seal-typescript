@@ -9,12 +9,17 @@ import {spawnPeer, requireHex} from '../../test/support/peer-process.ts';
 import {peer} from '../../test/support/discovery-peer.ts';
 import {ddl} from '../../src/replay/postgres.ts';
 import {pool} from '../replay/pg.mjs';
+import {algorithms as httpAlgorithms} from '../../src/crypto/algorithm.ts';
+import {JWS_ALGORITHMS, JWE_ALGORITHMS, ENCRYPTION} from '../../src/jose/support.ts';
+import {publicRecord, assertRejection, runDate, cleanupDatabase} from './records.ts';
 
 process.chdir(resolve(dirname(fileURLToPath(import.meta.url)), '../..'));
-const http = ['rsa-pss-sha512', 'rsa-v1_5-sha256', 'hmac-sha256', 'ecdsa-p256-sha256', 'ecdsa-p384-sha384', 'ed25519'];
-const jws = ['RS256', 'PS256', 'PS384', 'PS512', 'HS256', 'ES256', 'ES384', 'EdDSA'];
-const jwe = ['RSA-OAEP', 'RSA-OAEP-256', 'A128GCMKW', 'A256GCMKW', 'dir'];
-const encs = ['A128GCM', 'A256GCM'];
+const registry = httpAlgorithms(); assert.ok(registry.ok);
+const http = registry.value;
+const jws = JWS_ALGORITHMS;
+const jwe = JWE_ALGORITHMS;
+const encs = ENCRYPTION;
+const webBotAlgorithms = [...http.filter(algorithm => algorithm !== 'hmac-sha256'), ...jws.filter(algorithm => algorithm !== 'HS256').map(algorithm => 'jws:' + algorithm)];
 const families = ['rfc9421', 'jws', 'jwe', 'nested', 'web_bot_auth', 'replay'];
 const rounds = 32;
 const cache = resolve('interop/reciprocal/.cache');
@@ -33,7 +38,7 @@ function base(family: string, algorithm: string, round: number): Request {
 function tamper(compact: string, segment: number) {
   const parts = compact.split('.'), raw = Buffer.from(parts[segment]!, 'base64url'); raw[0]! ^= 1; parts[segment] = raw.toString('base64url'); return parts.join('.');
 }
-type Response = {id: string; accepted?: boolean; bytes?: string; fields?: [string, string][]; compact?: string; jwk?: webcrypto.JsonWebKey; secret?: string; keyId?: string; location?: string; ca?: string; proof?: string; rule?: string; claim?: string};
+type Response = {id: string; accepted?: boolean; bytes?: string; fields?: [string, string][]; compact?: string; jwk?: webcrypto.JsonWebKey; secret?: string; keyId?: string; location?: string; ca?: string; proof?: string; rule?: string; claim?: string; released?: boolean; selectors?: {http: string[]; jws: string[]; jwe: string[]; encs: string[]}};
 
 test('fresh independently generated envelopes agree in both directions for every supported selector', {timeout: 900000}, async t => {
   assert.ok(process.env.REQUESTSEAL_REPLAY_PG_URL, 'REQUESTSEAL_REPLAY_PG_URL is required for the full reciprocal exchange');
@@ -45,16 +50,17 @@ test('fresh independently generated envelopes agree in both directions for every
   const db = pool(process.env.REQUESTSEAL_REPLAY_PG_URL!);
   const table = 'reciprocal_' + crypto.randomUUID().replaceAll('-', '');
   let sequence = 0;
+  let original: unknown;
   const call = async (p: ReturnType<typeof spawnPeer>, request: Request, extra: Record<string, unknown> = {}): Promise<Response> => {
     const r = {...request, ...extra, id: String(++sequence)};
     const waiting = p.waitLine(line => {
       try {return (JSON.parse(line) as Response).id === r.id;} catch {return false;}
     }, 15000);
-    p.child.stdin.write(JSON.stringify(r) + '\n');
+    p.write(JSON.stringify(r) + '\n');
     const response = JSON.parse(await waiting) as Response;
     // Public asymmetric key + exact input/output bytes reproduce the verification half.
-    // Synthetic symmetric material belongs only to this ignored exchange artifact.
-    await appendFile(resolve(cache, 'exchange.jsonl'), JSON.stringify({language: p === ts ? 'typescript' : 'elixir', request: r, response}) + '\n');
+    // Custody material is removed before serialization.
+    await appendFile(resolve(cache, 'exchange.jsonl'), JSON.stringify(publicRecord({language: p === ts ? 'typescript' : 'elixir', request: r, response})) + '\n');
     if (response.rule && response.accepted !== false) throw new Error(JSON.stringify(response));
     return response;
   };
@@ -69,6 +75,8 @@ test('fresh independently generated envelopes agree in both directions for every
     for (const p of [ts, ex]) await p.waitLine(line => {
       try {return (JSON.parse(line) as {ready?: boolean}).ready === true;} catch {return false;}
     }, 20000);
+    const peerSelectors = await call(ex, base('rfc9421', http[0]!, 0), {op: 'selectors'});
+    for (const [name, values] of Object.entries({http, jws, jwe, encs})) assert.deepEqual(peerSelectors.selectors?.[name as keyof NonNullable<Response['selectors']>]?.toSorted(), values.toSorted(), name + ' registry parity');
     const definition = ddl(table); assert.ok(definition.ok); await db.query(definition.value);
     const tsDirectory = await call(ts, base('web_bot_auth', 'ed25519', 0), {op: 'directory.start'});
     // Reuse the existing TLS certificate helper; the reverse publisher itself runs in OTP SSL.
@@ -81,7 +89,7 @@ test('fresh independently generated envelopes agree in both directions for every
     for (const family of families) for (const [sender, receiver, direction, directory] of [[ts, ex, 'typescript → elixir', tsDirectory], [ex, ts, 'elixir → typescript', exDirectory]] as const) {
       const row = {family, direction, rounds: 0, cases: 0, rejections: 0, disagreements: 0}; rows.push(row);
       for (let round = 0; round < rounds; round++) {
-        const algorithms = family === 'rfc9421' ? http : family === 'jws' ? jws : ['jwe', 'nested'].includes(family) ? jwe : ['ed25519'];
+        const algorithms = family === 'rfc9421' ? http : family === 'jws' ? jws : ['jwe', 'nested'].includes(family) ? jwe : family === 'web_bot_auth' ? webBotAlgorithms : ['ed25519'];
         for (const algorithm of algorithms) {
           const r = base(family, algorithm, round);
           if (family === 'replay') {
@@ -101,14 +109,16 @@ test('fresh independently generated envelopes agree in both directions for every
               const decrypted = await call(receiver, decrypt as Request);
               check(decrypted.accepted === true && decrypted.bytes === r.bytes, row, 'jose/crypto.authenticated_plaintext', decrypt, encrypted, decrypted); row.cases++;
               const bad = await call(receiver, decrypt as Request, {compact: tamper(encrypted.compact!, 4)});
+              assertRejection(bad, 'jose/crypto.decryption_failed');
               check(bad.accepted === false, row, 'jose/crypto.decryption_failed', decrypt, encrypted, bad); row.rejections++;
               if (family === 'nested') {
                 const wrongInner = tamper(inner.compact!, 2);
                 const wrongOuter = await call(sender, request, {...recipient, op: 'encrypt', bytes: Buffer.from(wrongInner).toString('base64url')});
                 const rejected = await call(receiver, decrypt as Request, {...wrongOuter, op: 'decrypt'});
-                check(rejected.accepted === false && (rejected.rule ?? '').includes('invalid_signature'), row, 'jose/crypto.inner_signature_required', wrongInner, wrongOuter, rejected); row.rejections++;
+                assertRejection(rejected, 'jose/crypto.invalid_signature');
+                check(rejected.accepted === false, row, 'jose/crypto.inner_signature_required', wrongInner, wrongOuter, rejected); row.rejections++;
               }
-              if (recipient.keyId) await call(receiver, request, {op: 'release', keyId: recipient.keyId});
+              if (recipient.keyId) {const release = await call(receiver, request, {op: 'release', keyId: recipient.keyId}); assert.ok(release.released === true, 'recipient release succeeds');}
             }
             continue;
           }
@@ -116,8 +126,19 @@ test('fresh independently generated envelopes agree in both directions for every
           const signed = await call(sender, request as Request, {op: 'sign'});
           const verified = await call(receiver, request as Request, {...signed, op: 'verify'});
           check(verified.accepted === true && (family !== 'jws' || verified.bytes === r.bytes) && (family !== 'web_bot_auth' || verified.proof === 'signed'), row, family + '/crypto.valid', request, signed, verified); row.cases++;
+          if (family === 'web_bot_auth' && round === 0 && algorithm === webBotAlgorithms[0]) {
+            const opposite = directory === tsDirectory ? exDirectory : tsDirectory;
+            const wrongCa = await call(receiver, request as Request, {...signed, op: 'verify', ca: opposite.ca});
+            assertRejection(wrongCa, 'discovery/tls_failed'); row.rejections++;
+            // Republish the real signed bytes at another trusted origin.
+            const directoryBytes = await call(sender, request as Request, {op: 'directory.read'});
+            await call(receiver, request as Request, {...directoryBytes, op: 'directory.publish'});
+            const wrongOrigin = await call(receiver, request as Request, {...signed, op: 'verify', location: opposite.location, ca: opposite.ca});
+            assertRejection(wrongOrigin, 'discovery/directory_signature_invalid'); row.rejections++;
+          }
           const changed = family === 'jws' ? {compact: tamper(signed.compact!, 2)} : {fields: signed.fields!.map(([n, x]) => [n, n === 'x-exchange' ? Buffer.from('tampered').toString('base64url') : x])};
           const rejected = await call(receiver, request as Request, {...signed, ...changed, op: 'verify'});
+          assertRejection(rejected, family === 'jws' ? 'jose/crypto.invalid_signature' : 'core/crypto.invalid_signature');
           check(rejected.accepted === false, row, family + '/crypto.invalid_signature', request, signed, rejected); row.rejections++;
         }
         row.rounds++;
@@ -127,10 +148,11 @@ test('fresh independently generated envelopes agree in both directions for every
     assert.equal((await db.query(`SELECT count(*) AS count FROM "${table}"`)).rows[0]?.count, '64');
     const receipt = '| Family | Direction | Rounds | Cases | Rejections | Disagreements |\n| --- | --- | ---: | ---: | ---: | ---: |\n' + rows.map(r => `| ${r.family} | ${r.direction} | ${r.rounds} | ${r.cases} | ${r.rejections} | ${r.disagreements} |`).join('\n');
     console.log(receipt);
-    if (receiptPath) await writeFile(resolve(receiptPath), '**Status:** verified · **Kind:** record · **Updated:** October 10, 2026 · **Governed by:** executed reciprocal exchange · **Review when:** peer or exchange changes\n\nOBSERVED: `npm run exchange --prefix interop/reciprocal` on Node ' + process.versions.node + ', Elixir 1.20.3 / OTP 29, published request_seal 0.4.1.\n\n' + receipt + '\n\nSeeds: xorshift32, 942100 + round for payloads; +7515 for nonces; 751600 for the replay namespace. Every selector runs all 32 rounds; all ten alg/enc pairs run per JWE and nested round. Keys, CEKs, and IVs use each runtime’s real random generator. The ignored `interop/reciprocal/.cache/exchange.jsonl` records all inputs and outputs for verification replay. It includes synthetic symmetric material and TLS test material; asymmetric signing private keys never leave their runtime.\n\nHosted CI execution belongs to the supervisor after landing.\n');
-  } finally {
-    ts.child.stdin.end(); ex.child.stdin.end();
+    if (receiptPath) await writeFile(resolve(receiptPath), '**Status:** verified · **Kind:** record · **Updated:** ' + runDate() + ' · **Governed by:** executed reciprocal exchange · **Review when:** peer or exchange changes\n\nOBSERVED: `npm run exchange --prefix interop/reciprocal` on Node ' + process.versions.node + ', Elixir 1.20.3 / OTP 29, published request_seal 0.4.1.\n\n' + receipt + '\n\nSeeds: xorshift32, 942100 + round for payloads; +7515 for nonces; 751600 for the replay namespace. Every selector runs all 32 rounds; all ten alg/enc pairs run per JWE and nested round. Keys, CEKs, and IVs use each runtime’s real random generator. The ignored `interop/reciprocal/.cache/exchange.jsonl` records public keys and public inputs/outputs for verification replay. Private keys, symmetric secrets, and CEKs are removed before serialization. Symmetric replay requires fresh caller-owned custody material.\n\nHosted CI execution is recorded separately.\n');
+  } catch (error) {original = error; throw error;}
+  finally {
+    ts.end(); ex.end();
     await Promise.all([ts.stop(), ex.stop()]);
-    try {await db.query(`DROP TABLE IF EXISTS "${table}"`);} finally {await db.end();}
+    await cleanupDatabase(db, table, original);
   }
 });

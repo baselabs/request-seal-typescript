@@ -2,7 +2,7 @@ defmodule RequestSealReplayConnection do
   def open do
     uri = URI.parse(System.fetch_env!("REQUESTSEAL_REPLAY_PG_URL"))
     if not is_binary(uri.userinfo) or uri.userinfo == "" do
-      IO.puts(:stderr, "Invalid replay database URL: userinfo is required")
+      IO.binwrite(:stderr, "Invalid replay database URL: userinfo is required\n")
       System.halt(1)
     end
     {:ok, _} = Application.ensure_all_started(:postgrex)

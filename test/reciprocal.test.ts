@@ -25,3 +25,20 @@ test('the reciprocal job requires the published peer and runs through release ve
   assert.match(job, /otp-version: '29.0.3'/);
   assert.match(readFileSync('.github/workflows/release.yml', 'utf8'), /uses: \.\/\.github\/workflows\/ci.yml/);
 });
+
+test('both published peers and every CI setup use the same exact pins', () => {
+  for (const folder of ['interop/elixir', 'interop/replay']) {
+    const project = readFileSync(folder + '/mix.exs', 'utf8');
+    assert.match(project, /elixir: "1\.20\.3"/);
+    assert.match(project, /\{:request_seal, "== 0\.4\.1"\}/);
+    assert.equal(readFileSync(folder + '/.tool-versions', 'utf8'), 'elixir 1.20.3-otp-29\nerlang 29.0.3\n');
+    const pin = readFileSync(folder + '/mix.lock', 'utf8').split('\n').find(line => line.startsWith('  "request_seal":'));
+    assert.ok(pin);
+    assert.match(pin, /:request_seal, "0\.4\.1", "493997dd77786060fec13bc175b0385b1a2f609d736eb74c996e2a18faeafda3"/);
+    assert.match(pin, /"hexpm", "834b005ddebd610e647c42f934c3120a659b7f316cdf81f9a064037194daef02"/);
+  }
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const setups = [...ci.matchAll(/uses: erlef\/setup-beam@[^\n]+\n\s+with:\n\s+otp-version: '([^']+)'\n\s+elixir-version: '([^']+)'/g)];
+  assert.equal(setups.length, 3);
+  for (const match of setups) assert.deepEqual(match.slice(1), ['29.0.3', '1.20.3']);
+});
