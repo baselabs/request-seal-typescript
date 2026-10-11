@@ -16,7 +16,7 @@ export function checkPeer(
   );
 }
 
-/** A connected peer denial terminates the address loop. */
+/** Peer and trust-store denials terminate the address loop unchanged. */
 export function allowConnectionRetry(error: unknown): void {
-  if (error && typeof error === "object" && "reason" in error && error.reason === "address_denied") throw error;
+  if (error && typeof error === "object" && "reason" in error && (error.reason === "address_denied" || error.reason === "transport_unavailable")) throw error;
 }

@@ -10,3 +10,8 @@ interop/elixir/_build/
 interop/elixir/deps/
 interop/elixir/.cache/
 interop/reciprocal/.cache/
+
+# Local runtime cache.
+.tools/
+interop/browser/.generated/
+interop/browser/bundle/

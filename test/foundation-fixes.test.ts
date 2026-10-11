@@ -64,7 +64,7 @@ test('child Context follows parent deadline and abort', async () => {
 });
 test('CI red proofs require marker and failure count', () => {
   const ci = read('../.github/workflows/ci.yml');
-  assert.equal((ci.match(/scripts\/red-proof\.sh/g) ?? []).length, 3);
+  assert.equal((ci.match(/scripts\/red-proof\.sh/g) ?? []).length, 4);
   const script = read('../scripts/red-proof.sh');
   assert.match(script, /Intentional red proof/); assert.match(script, /fail/); assert.match(script, /failed/);
 });

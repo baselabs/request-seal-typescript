@@ -8,7 +8,7 @@ permissions:
   contents: read
 jobs:
   node:
-    name: Node ${{ matrix.node }}
+    name: Node ${{ matrix.node == '26.11.1' && '26' || matrix.node }}
     runs-on: ubuntu-24.04
     services:
       # Trust authentication and the passwordless URL are for this ephemeral runner only.
@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22.12.0', '24.21.0', '26']
+        node: ['22.12.0', '24.21.0', '26.11.1']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -36,7 +36,7 @@ jobs:
         env:
           EXPECTED_NODE: ${{ matrix.node }}
         run: |
-          node -e 'const expected=process.env.EXPECTED_NODE; const actual=process.versions.node; if (expected.includes(".") ? actual!==expected : actual.split(".")[0]!==expected) process.exit(1); console.log(actual)'
+          node -e 'const expected=process.env.EXPECTED_NODE; const actual=process.versions.node; if (actual!==expected) process.exit(1); console.log(actual)'
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix interop --ignore-scripts
       - run: npm ci --prefix interop/adapters --ignore-scripts
@@ -123,13 +123,44 @@ jobs:
           REQUESTSEAL_REPLAY_PG_URL: postgresql://postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/requestseal_replay
         if: matrix.runtime == 'bun'
         run: |
-          bun test --isolate --timeout 30000 test/*.test.ts
+          bun test --timeout 30000 test/*.test.ts
           bun run tools/conformance/cli.ts --corpus test/fixtures/corpus-smoke --smoke
           bun run tools/conformance/cli.ts --corpus conformance --pending-ok
       - run: npm run self-checks && npm run build && npm run pack:check
       # Findings block this lane until individually adjudicated.
       - run: npm audit --audit-level=high
       - run: npm pack --dry-run
+  os-trust-denied:
+    name: Deno denied OS roots
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: '2.9.7'
+      - name: Refuse OS roots without system permission
+        env:
+          REQUEST_SEAL_EXPECT_DENIED_ROOTS: '1'
+        run: deno test --no-check --allow-read --allow-env=REQUEST_SEAL_EXPECT_DENIED_ROOTS test/discovery-os-trust.test.ts
+  browsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.21.0'
+      - run: npm ci --ignore-scripts
+      - run: npm ci --prefix interop/browser --ignore-scripts
+      - run: npm audit --prefix interop/browser --audit-level=high
+      - run: npx playwright install --with-deps chromium firefox webkit
+        working-directory: interop/browser
+      - run: npm run build
+      - run: npm run build --prefix interop/browser
+      - run: npm test --prefix interop/browser
+      - name: Prove every browser rejects a failure
+        run: sh scripts/red-proof.sh npm run test:red --prefix interop/browser
   reciprocal:
     name: reciprocal
     timeout-minutes: 20

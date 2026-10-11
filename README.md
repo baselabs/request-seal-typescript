@@ -151,15 +151,31 @@ allowlist. Exact-target, cookie, and per-occurrence byte coverage remain refused
 
 Crypto and custody behavior and the error vocabulary follow RequestSeal `v0.4.1`. Compatibility is checked against the byte-preserved RequestSeal `v0.4.0` corpus. The pins differ because the corpus index is unchanged and v0.4.1 supplied no corpus release assets. See [the corpus pin and update command](CONTRIBUTING.md). Development reports pending surfaces; releases require complete coverage.
 
-Node 22.12.0 and 24.21.0 and Deno 2.5.6 verify the pinned published vectors.
-Bun 1.3.14 WebCrypto rejects two valid Wycheproof ECDSA P-256 signatures:
-items 261 (`s = 2^128`) and 262 (`s = n - 2^128`). The consumer policy in
+The CI lane set is exact. Browser versions come from the private Playwright
+1.64.0 workspace. The release workflow runs the same lanes.
+
+| Runtime lane | Version | Declared runtime limitations |
+| --- | --- | --- |
+| Node 22.12.0 | 22.12.0 | OS trust requires a nonempty system store; empty-query Fetch signing returns `adapter/invalid_request`. |
+| Node 24.21.0 | 24.21.0 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
+| Node 26.11.1 | 26.11.1 | Required check name: `Node 26`; same Fetch verification restriction. |
+| Deno 2.5.6 | 2.5.6 | `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
+| Deno 2.9.7 | 2.9.7 | Denied OS roots check only; without `--allow-sys=ca`, source creation and fetch return `discovery/transport_unavailable`. Full-suite support is not asserted. |
+| Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
+| Chromium | 156.0.8078.4 | Browser Fetch verification returns `adapter/invalid_request`. |
+| Firefox | 157.0 | Browser Fetch verification returns `adapter/invalid_request`. |
+| WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. Browser Fetch verification returns `adapter/invalid_request`. |
+
+The consumer policy in
 [`tools/conformance/runtime-limits.json`](tools/conformance/runtime-limits.json)
-applies only to that exact version and reports both as `runtime_limited`.
-Published corpus verdicts stay valid. A stale entry, different rejection, unlisted
-divergence, or divergence on another Bun version fails conformance. See the
-[consumer runtime limitation contract](docs/reference/corpus-format.md#consumer-runtime-limitations)
-and [test API compatibility](CONTRIBUTING.md#runtime-test-compatibility).
+asserts exact release, platform where listed, and rejection. A stale entry,
+different rejection, or unlisted divergence fails. Published corpus verdicts
+stay unchanged. Firefox signs requests through its materialized body reader.
+WebKit's empty-message Ed25519 failure is probed directly in real pages using
+RFC 8032 test 1; declared refusals count as executed limitation checks.
+See the [runtime matrix](docs/reference/runtime-matrix.md) for the Node floor,
+additional runtime observations, OS trust permissions, and local browser commands,
+and the [consumer limitation contract](docs/reference/corpus-format.md#consumer-runtime-limitations).
 
 See [replay protection](docs/reference/replay.md) for the memory store and the
 optional `@request-seal/core/replay-postgres` query adapter.

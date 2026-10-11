@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": false,
+    "outDir": "bundle",
+    "rootDir": ".",
+    "types": [],
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["assert.ts", "harness.ts", "cases.ts", "limits.ts", "fetch.ts", "page.ts", ".generated/**/*.ts"]
+}

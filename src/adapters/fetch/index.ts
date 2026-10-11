@@ -66,6 +66,10 @@ function headers(message: HttpMessage): Headers {
   for (const f of message.fields) h.append(f.name, S.latin(f.value));
   return h;
 }
+// Captured once: a runtime without this accessor cannot carry Request streams.
+const requestBodyAccessor = typeof Request === "function"
+  ? Object.getOwnPropertyDescriptor(Request.prototype, "body")
+  : undefined;
 function requestBodySupported(
   request: Request,
   stage: "sign" | "verify",
@@ -73,7 +77,7 @@ function requestBodySupported(
   // Native ingress can omit GET/HEAD bodies while retaining their declared length.
   S.need(
     !["GET", "HEAD"].includes(request.method.toUpperCase()) ||
-      (request.body === null &&
+      (request.body == null &&
         !(Number(request.headers.get("content-length")) > 0)),
     "fetch",
     stage,
@@ -90,6 +94,14 @@ async function bytes(
     try {
       S.need(!value.bodyUsed, "fetch", stage, "body_unavailable");
       if (value.body === null) return ok(new Uint8Array());
+      if (value instanceof Request && requestBodyAccessor === undefined) {
+        // Runtimes without the body accessor cannot accept Request streams.
+        // The input is already materialized; this read allocates a complete copy
+        // before maxBytes can bound the bytes accepted for signing.
+        const data = new Uint8Array(await value.clone().arrayBuffer());
+        S.need(data.length <= max, "fetch", stage, "limit");
+        return ok(data);
+      }
       const reader = value.body.getReader();
       const cancel = () => {
         void reader.cancel().catch(() => {});
@@ -615,6 +627,9 @@ export async function signedFetch(
       "attach",
       "invalid_request",
     );
+    if (a.verify !== undefined) {
+      S.need(canVerify, "fetch", "verify", "invalid_request");
+    }
     // Constructing from another Request resets referrerPolicy unless explicit.
     const initialOptions = input instanceof Request &&
         !Object.hasOwn(i, "referrerPolicy")
@@ -659,9 +674,6 @@ export async function signedFetch(
     const maxRedirects = S.limitNumber(a.maxRedirects ?? 0, 10, "fetch"),
       maxRetries = S.limitNumber(a.maxRetries ?? 0, 10, "fetch");
     let redirects = 0, retries = 0;
-    if (a.verify !== undefined) {
-      S.need(canVerify, "fetch", "verify", "invalid_request");
-    }
     for (;;) {
       attempt++;
       const h = new Headers(current.headers);

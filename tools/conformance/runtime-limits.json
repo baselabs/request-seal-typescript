@@ -8,7 +8,9 @@
           262
         ],
         "observed": "crypto/invalid_signature",
-        "platforms": ["darwin-arm64"],
+        "platforms": [
+          "darwin-arm64"
+        ],
         "reason": "Observed on darwin-arm64: Bun 1.3.14 WebCrypto rejects the published valid P-256 signatures with s = 2^128 and s = n - 2^128. The October 10, 2026 ubuntu-24.04 CI failure log reports actual=valid for both items on linux-x64; the limitation does not apply there."
       },
       {
@@ -48,5 +50,26 @@
         "reason": "Deno 2.5.6 node:https returns invalid_response for a valid JWKS from the real trusted local publisher through the vetted TLS Agent. The same files pass on Node; pinned native transport conformance remains unavailable."
       }
     ]
+  },
+  "firefox": {
+    "157.0": []
+  },
+  "webkit": {
+    "27.2": [
+      {
+        "id": "custody/ed25519_empty_message",
+        "items": [
+          1
+        ],
+        "observed": "custody/invalid_key",
+        "platforms": [
+          "darwin-arm64"
+        ],
+        "reason": "Observed with Playwright 1.64.0 on darwin-arm64: WebKit 27.2 subtle.sign(\"Ed25519\", key, new Uint8Array()) produces a signature that subtle.verify returns false for. Generated keys and PKCS8/JWK imports have the same outcome; one-byte and 257-byte messages verify true. Local custody refuses its required empty-message key health check as invalid_key."
+      }
+    ]
+  },
+  "chromium": {
+    "156.0.8078.4": []
   }
 }

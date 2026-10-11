@@ -38,6 +38,7 @@ import { fields, header, expiry, mediaType } from "./headers.ts";
 import { bodyDocument, type KeySet } from "./body.ts";
 import { fromResource } from "./snapshot.ts";
 import { decodeBody } from "./gzip.ts";
+import {systemCertificateError} from "./node-trust.ts";
 import { checkPeer, allowConnectionRetry } from "./node-connection.ts";
 const lookup = dns.lookup.bind(dns);
 export type DiscoverySource = import("./source.ts").DiscoverySource;
@@ -107,8 +108,12 @@ async function resolve(
 }
 function systemCertificates(): string[] | undefined {
   if (typeof tls.getCACertificates !== "function") return undefined;
-  const certificates = tls.getCACertificates("system");
-  return certificates.length > 0 ? certificates : undefined;
+  try {
+    const certificates = tls.getCACertificates("system");
+    return certificates.length > 0 ? certificates : undefined;
+  } catch (error) {
+    systemCertificateError(error);
+  }
 }
 function tlsSocket(
   ip: string,
@@ -591,9 +596,13 @@ export const Discovery = Object.freeze({ ...CoreDiscovery, fetch });
 export const DiscoverySource = Object.freeze({
   ...CoreSource,
   create(input: unknown): Result<import("./source.ts").DiscoverySource> {
-    const result = CoreSource.create(input);
-    if (result.ok && result.value.cacerts === "os" && !systemCertificates())
-      return err(custodyError("unsupported_format"));
-    return result;
+    try {
+      const result = CoreSource.create(input);
+      if (result.ok && result.value.cacerts === "os" && !systemCertificates())
+        return err(custodyError("unsupported_format"));
+      return result;
+    } catch (error) {
+      return failure(error, "invalid_source");
+    }
   },
 });

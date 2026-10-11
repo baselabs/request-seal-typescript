@@ -1,0 +1,13 @@
+{
+  "name": "request-seal-browser-interop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node --experimental-strip-types --no-warnings build.ts",
+    "test": "node --experimental-strip-types --no-warnings run.ts",
+    "test:red": "node --experimental-strip-types --no-warnings run.ts --red"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0"
+  }
+}

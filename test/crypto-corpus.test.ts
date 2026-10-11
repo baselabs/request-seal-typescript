@@ -241,5 +241,5 @@ test('a current-platform limitation recognizes the real observed rejection', asy
   const runtime = process.versions.bun ? 'bun' : process.versions.deno ? 'deno' : 'node';
   const limits = selectRuntimeLimits({[runtime]: {[process.versions[runtime]!]: [entry]}}, process.versions);
   assert.equal(limits.length, 1);
-  assert.equal(classifyRuntimeResult(limits, entry.id, String(value.tcId), result), process.versions.bun && process.platform === 'darwin' && process.arch === 'arm64' ? 'runtime_limited' : 'stale_runtime_limitation');
+  assert.equal(classifyRuntimeResult(limits, entry.id, String(value.tcId), result), process.versions.bun === '1.3.14' && process.platform === 'darwin' && process.arch === 'arm64' ? 'runtime_limited' : 'stale_runtime_limitation');
 });

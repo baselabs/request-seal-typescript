@@ -814,3 +814,37 @@ for (const operation of ["sign", "verify"] as const) {
     }
   });
 }
+
+test('ineligible verified delivery with init preserves the caller Request body', {skip: canVerify}, async () => {
+  const owner = await key();
+  try {
+    for (const init of [{headers: {'x-caller': 'present'}}, {referrerPolicy: 'no-referrer'}]) {
+      const request = new Request('http://127.0.0.1/', {method: 'POST', body: new Uint8Array([1, 2, 3])});
+      const result = await F.signedFetch(request, init, {spec, signer: owner}, {verify: {policy: {}, label: 'sig'}});
+      refused(result, 'invalid_request');
+      assert.equal(request.bodyUsed, false, 'Refusal must precede Request construction');
+      assert.deepEqual(new Uint8Array(await request.arrayBuffer()), new Uint8Array([1, 2, 3]));
+    }
+  } finally {await owner.release();}
+});
+test("a Request that hides its body stream cannot bypass the bounded signing reader", {skip: typeof Object.getOwnPropertyDescriptor(Request.prototype, "body")?.get !== "function"}, async () => {
+  const h = await key();
+  let pulled = 0;
+  const chunk = new Uint8Array(64 * 1024);
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (pulled >= 5 * 1024 * 1024) return controller.close();
+      pulled += chunk.length;
+      controller.enqueue(chunk);
+    },
+  });
+  try {
+    const request = new Request("http://127.0.0.1:9/", {method: "POST", body: stream, duplex: "half"} as RequestInit);
+    Object.defineProperty(request, "body", {get: () => undefined});
+    const r = await F.signRequest(request, spec, h, {maxBytes: 1024});
+    assert.equal(r.ok, false);
+    assert.ok(pulled < 1024 * 1024, `the signing reader pulled ${pulled} bytes past a 1 KiB bound`);
+  } finally {
+    await h.release();
+  }
+});

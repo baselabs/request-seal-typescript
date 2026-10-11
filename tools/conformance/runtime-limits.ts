@@ -15,9 +15,9 @@ function platformName(value: unknown): value is string {
 export function selectRuntimeLimits(table: unknown, versions: Readonly<Record<string, string | undefined>>, platform = `${process.platform}-${process.arch}`): readonly RuntimeLimit[] {
   if (!record(table)) throw new Error('invalid_runtime_limits');
   for (const [runtime, releases] of Object.entries(table)) {
-    if (!['bun', 'deno', 'node'].includes(runtime) || !record(releases)) throw new Error('invalid_runtime_limits');
+    if (!['bun', 'deno', 'node', 'chromium', 'firefox', 'webkit'].includes(runtime) || !record(releases)) throw new Error('invalid_runtime_limits');
     for (const [version, entries] of Object.entries(releases)) {
-      if (!/^\d+\.\d+\.\d+$/.test(version) || !Array.isArray(entries)) throw new Error('invalid_runtime_limits');
+      if (!( ['chromium', 'firefox', 'webkit'].includes(runtime) ? /^\d+\.\d+(?:\.\d+){0,2}$/ : /^\d+\.\d+\.\d+$/).test(version) || !Array.isArray(entries)) throw new Error('invalid_runtime_limits');
       const seen = new Set<string>();
       for (const entry of entries) {
         if (!record(entry) || !['id,items,observed,reason', 'id,items,observed,platforms,reason'].includes(Object.keys(entry).sort().join(',')) || typeof entry.id !== 'string' || !/^[a-z_]+\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(entry.id) || !Array.isArray(entry.items) || !entry.items.length || typeof entry.observed !== 'string' || !entry.observed.trim() || typeof entry.reason !== 'string' || !entry.reason.trim()) throw new Error('invalid_runtime_limits');
