@@ -181,10 +181,11 @@ test('watchdog rejects a living owner that is no longer its parent', {timeout: 5
   }
 });
 
-for (const stream of ['stdout', 'stderr'] as const) test(`peer ${stream} capture retains at most the last 1 MiB`, {timeout: 5000}, async () => {
+for (const stream of ['stdout', 'stderr'] as const) test(`peer ${stream} capture retains at most the last 1 MiB`, {timeout: 20000}, async () => {
   const p = spawnPeer('node', ['-e', `process.${stream}.write("😀".repeat(400000)); process.${stream}.write("TAIL");`]);
   try {
-    try {await p.waitExit(2500);} catch (error) {assert.match(String(error), /Peer output limit exceeded/);}
+    // Writing 1.6 MB through a child process can take seconds on a loaded host.
+    try {await p.waitExit(15000);} catch (error) {assert.match(String(error), /Peer output limit exceeded/);}
     const captured = stream === 'stdout' ? p.output() : p.diagnostics();
     assert.ok(Buffer.byteLength(captured) >= 1000000, 'the real writer crossed the capture bound');
     assert.ok(Buffer.byteLength(captured) <= 1048576, 'capture is bounded in bytes');
