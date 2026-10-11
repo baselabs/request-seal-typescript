@@ -39,7 +39,7 @@ for (const locale of ['en_US.UTF-8', 'empty', 'C.UTF-8', 'unset']) test(`binary 
 
 test('setup works from the repository root', {timeout: 120000, skip: process.env.REQUESTSEAL_REPLAY_ELIXIR !== '1'}, t => {
   if (spawnSync('mix', ['--version'], {timeout: 5000}).error?.message.includes('ENOENT')) {t.skip('Mix is not installed'); return;}
-  const run = spawnSync('node', ['--experimental-strip-types', '--no-warnings', 'interop/reciprocal/setup.ts'], {encoding: 'utf8', timeout: 110000, env: {...process.env, HEX_OFFLINE: '1'}});
+  const run = spawnSync('node', ['--experimental-strip-types', '--no-warnings', 'interop/reciprocal/setup.ts'], {encoding: 'utf8', timeout: 110000});
   assert.equal(run.status, 0, run.stderr);
 });
 
