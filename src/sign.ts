@@ -99,7 +99,28 @@ function append(m: HttpMessage, name: string, bytes: unknown): HttpMessage {
     result(FieldOccurrence.create({ name, value: bytes, section: "headers" })),
   ]);
 }
-/** Sign a lossless HTTP message with explicit components and caller-owned custody. */
+/**
+ * Sign a lossless HTTP message with explicit components and caller-owned custody.
+ *
+ * Appends one `Signature-Input` and one `Signature` field occurrence and returns a new
+ * branded Message. The input message is never modified, and existing signatures stay.
+ *
+ * @param message - A branded Message from `Message.request`, `Message.response`, or `Message.create`.
+ * @param spec - A generated spec with `label`, `components`, `algorithm`, and `expiresIn`, plus
+ *   optional `created`, `nonce`, `alg`, `keyid`, `tag` (or the same choices nested under
+ *   `parameters`), `digest`, and `fieldSchemas`; or an exact-input spec with only `label`,
+ *   `signatureInput`, and `algorithm`.
+ * @param signer - A KeyHandle for the same algorithm, or a {@link Signer} callback.
+ * @param options - Generated specs accept `clock`, `nonce`, `signingTimeout`, and `context`;
+ *   exact-input specs accept `fieldSchemas`, `signingTimeout`, and `context`. `signingTimeout`
+ *   is 1 through 300,000 milliseconds (default 5,000).
+ * @returns `ok(message)`, or a `core` error such as `input.invalid_options`,
+ *   `fields.label_in_use`, `input.signer_algorithm_mismatch`, `crypto.signing_failed`, or
+ *   `crypto.signer_failed`.
+ * @see [Signing and verifying guide](https://github.com/baselabs/request-seal-typescript/blob/main/docs/guides/signing-and-verifying.md),
+ *   [reference](https://github.com/baselabs/request-seal-typescript/blob/main/docs/reference/sign-and-verify.md), and the
+ *   [error reasons](https://github.com/baselabs/request-seal-typescript/blob/main/docs/reference/errors.md).
+ */
 export async function sign(
   message: unknown,
   spec: unknown,

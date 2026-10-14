@@ -497,7 +497,25 @@ export async function verifyLabel(
   }
 }
 
-/** Verify one HTTP signature under an explicit branded policy. */
+/**
+ * Verify one HTTP signature under an explicit branded policy.
+ *
+ * Checks exactly the named label; it never tries other labels. Success means the
+ * cryptography, coverage, freshness, content, and replay layers all passed. It does not
+ * authorize: the Verification records `authorization: "not_evaluated"`.
+ *
+ * @param message - A branded Message carrying the signature.
+ * @param policy - A branded Policy from `Policy.create`.
+ * @param options - `{label, context?, representation?, digestState?}`. `representation` is a
+ *   complete retained Body and needs a `"representation"` content policy. `digestState` is a
+ *   DigestState of the policy's content kind that you fed with a streamed body; verify finishes
+ *   it. The two are mutually exclusive.
+ * @returns `ok(verification)`, or a bounded error such as `core` `crypto.invalid_signature`,
+ *   `freshness.expired`, `content.digest_mismatch`, `key.unknown_key`, or `replay.replayed`.
+ * @see [Signing and verifying guide](https://github.com/baselabs/request-seal-typescript/blob/main/docs/guides/signing-and-verifying.md),
+ *   [reference](https://github.com/baselabs/request-seal-typescript/blob/main/docs/reference/sign-and-verify.md), and the
+ *   [error reasons](https://github.com/baselabs/request-seal-typescript/blob/main/docs/reference/errors.md).
+ */
 export function verify(message: unknown, policy: unknown, options: unknown): Promise<Result<Verification>> {
   return verifyLabel(message, policy, options);
 }

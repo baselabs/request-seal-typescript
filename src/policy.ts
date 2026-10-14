@@ -303,5 +303,17 @@ export function createPolicy(input: unknown): Result<Policy> {
 }
 /** Verification policy construction. */
 export const Policy = Object.freeze({
-  /** Snapshot, validate, and brand an explicit verification policy. */
+  /**
+   * Snapshot, validate, and brand an explicit verification policy.
+   *
+   * Six choices are required and none is defaulted: `algorithms`, `components`,
+   * `keyResolver`, `freshness`, `content`, and `replay`. Optional members are
+   * `extraComponents` (`"allow"` or `"reject"`), `maxSignatures` (1 through 64, default 16),
+   * and `fieldSchemas`.
+   *
+   * @returns `ok(policy)`, or `core` `input.invalid_policy` when any choice is missing,
+   *   unknown, or malformed.
+   * @see [Signing and verifying guide](https://github.com/baselabs/request-seal-typescript/blob/main/docs/guides/signing-and-verifying.md#verify) and
+   *   [reference](https://github.com/baselabs/request-seal-typescript/blob/main/docs/reference/sign-and-verify.md).
+   */
   create: createPolicy });
