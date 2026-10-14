@@ -87,3 +87,22 @@ test('quoted and parameterized cache directives preserve the pinned comma-split 
 test('source validation accepts pinned numeric and trailing-dot host spellings', () => {
   for (const location of ['https://2130706433/', 'https://0x7f.1/', 'https://example.com./']) assert.ok(DiscoverySource.create({type: 'jwks_uri', location}).ok, location);
 });
+test('the key-set resolver checks freshness against the caller clock it is given',async()=>{
+  // A snapshot fetched at a fixed past time with no cache headers stays fresh for minTtl (300 s).
+  const fetchedAt=1_000_000, s=source(), set=value(await snapshot(s,fetchedAt));
+  let now=fetchedAt+10;
+  const fixed=value(Discovery.resolver(set,{algorithms:['ed25519'],clock:()=>now}));
+  assert.equal(value(await fixed({keyid:kid})).algorithm,'ed25519');
+  now=fetchedAt+300; reason(await fixed({keyid:kid}),'unknown_key'); // stale against the same clock
+  // Without a clock the bridge keeps system time, where this 1970 snapshot is long stale.
+  reason(await value(Discovery.resolver(set,{algorithms:['ed25519']}))({keyid:kid}),'unknown_key');
+  // The cache bridge passes the same clock to cache.resolve.
+  const c=value(createCache({clock:()=>fetchedAt}));
+  try {value(await c.refresh(s,set)); now=fetchedAt+10;
+    assert.equal(value(await value(Discovery.resolver({cache:c,source:s},{algorithms:['ed25519'],clock:()=>now}))({keyid:kid})).algorithm,'ed25519');
+  }finally{c.close();}
+  for(const clock of [5,()=>-1,()=>1.5]){
+    const r=Discovery.resolver(set,{algorithms:['ed25519'],clock});
+    if(r.ok) reason(await r.value({keyid:kid}),'invalid_options'); else reason(r,'invalid_options');
+  }
+});

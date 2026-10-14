@@ -78,9 +78,13 @@ revision over decoded key-resource bytes. `lookup()` rejects stale keys and
 selects only a compatible HTTP or explicit JOSE algorithm from the caller's allowlist.
 An asserted HTTP `alg` must match exactly; an unstamped key may bind an explicit
 JOSE choice. HMAC public keys remain forbidden.
-`Discovery.resolver(snapshot, {algorithms})` returns a Result containing an async
-bridge that accepts `keyid` and returns only the algorithm and public key. Over a
-key set, the bridge checks freshness against the system clock, not the policy clock.
+`Discovery.resolver(snapshot, {algorithms, clock?})` returns a Result containing an async
+bridge that accepts `keyid` and returns only the algorithm and public key. `clock`
+returns integer Unix seconds; pass the policy's freshness clock so both checks use one
+time. Without it, a key set is checked against system time and a cache against its own
+clock; with it, the cache bridge passes `clock` to `resolve`. A clock that returns an
+invalid time makes the lookup fail with `invalid_options`. RequestSeal for Elixir has no
+resolver clock and uses system time.
 
 ## Explicit Node transport
 

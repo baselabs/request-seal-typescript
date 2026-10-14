@@ -37,7 +37,7 @@ A key set is the validated result. Look a key up with `keySet.lookup(thumbprint,
 
 `Discovery.resolver.fromSnapshot(source, bodyBytes, fetchedAt, headers)` validates a response that you fetched yourself and returns a key set. It starts no connection, imports no Node module, and runs on Node, Deno, and Bun. Use it when you already have a trusted fetch path (your own HTTP client, a proxy, a build-time download) or when you run outside Node.
 
-You own the network when you take this path: DNS, address filtering, redirects, TLS, and timeouts. Pass the response body bytes unchanged, the Unix time you received them, and the response headers as ordered pairs, including a `content-type` that matches the source type (otherwise the snapshot fails with `unexpected_media_type`), so cache headers are honored. `Discovery.resolver(keySet, { algorithms })` then gives you a resolver that you can use inside a policy's `keyResolver`.
+You own the network when you take this path: DNS, address filtering, redirects, TLS, and timeouts. Pass the response body bytes unchanged, the Unix time you received them, and the response headers as ordered pairs, including a `content-type` that matches the source type (otherwise the snapshot fails with `unexpected_media_type`), so cache headers are honored. `Discovery.resolver(keySet, { algorithms, clock })` then gives you a resolver that you can use inside a policy's `keyResolver`. Pass the policy's freshness clock as `clock` so key freshness and signature freshness use the same time; without it, the key set is checked against system time.
 
 The program runs under Deno. It turns a literal JWKS response into a key set, looks a key up, shows that unknown and stale keys are refused, and verifies a signature through the key set.
 
@@ -65,8 +65,9 @@ assert.equal(found.algorithm, "ed25519");
 assert.equal((await keys.lookup("unknown-thumbprint", ["ed25519"], now)).ok, false);
 assert.equal((await keys.lookup(thumbprint, ["ed25519"], now + 1_000_000)).ok, false); // stale keys are never served
 
-// The same key set can resolve signatures in a policy.
-const resolve = must(Discovery.resolver(keys, { algorithms: ["ed25519"] }));
+// The same key set can resolve signatures in a policy, on the policy's clock.
+const clock = () => now;
+const resolve = must(Discovery.resolver(keys, { algorithms: ["ed25519"], clock }));
 const signer = must(await Custody.local("ed25519", pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string));
 const components = '("@method" "@authority")';
 // An unknown key is not an error: return ok(null) and verification reports unknown_key.
@@ -76,7 +77,7 @@ const keyResolver: KeyResolver = async ({ keyid }) => {
 };
 const policy = must(Policy.create({
   algorithms: ["ed25519"], components, keyResolver,
-  freshness: { clock: () => now, maxAge: 60, skew: 5, requireExpires: true }, content: "not_required", replay: "not_required",
+  freshness: { clock, maxAge: 60, skew: 5, requireExpires: true }, content: "not_required", replay: "not_required",
 }));
 const request = must(await Message.request("GET", "https://api.example.com/", [], ""));
 const signed = must(await sign(request, { label: "sig", components, algorithm: "ed25519", expiresIn: 60, keyid: thumbprint }, signer, { clock: () => now }));

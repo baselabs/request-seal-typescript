@@ -17,8 +17,11 @@ export type KeyResolver = (
 /** Create a resolver over a branded key set or caller-owned discovery cache. */
 function resolver(input: unknown, opts: unknown): Result<KeyResolver> {
   try {
-    const a = unwrap(snapshotOptions(opts, ["algorithms"]), "invalid_options");
+    const a = unwrap(snapshotOptions(opts, ["algorithms", "clock"]), "invalid_options");
     const allowed = algorithmList(a.algorithms);
+    // An explicit clock, usually the policy's freshness clock; system time otherwise.
+    const clock = Object.hasOwn(a, "clock") ? a.clock : undefined;
+    ensure(clock === undefined || typeof clock === "function", "invalid_options");
     let set: KeySet | undefined,
       cache: DiscoveryCache | undefined,
       source: DiscoverySource | undefined;
@@ -45,8 +48,14 @@ function resolver(input: unknown, opts: unknown): Result<KeyResolver> {
         );
         const kid = (request as { keyid: unknown }).keyid;
         const result = set
-          ? await set.lookup(kid, allowed)
-          : await cache!.resolve(source!, kid, { algorithms: allowed });
+          ? clock === undefined
+            ? await set.lookup(kid, allowed)
+            : await set.lookup(kid, allowed, (clock as () => number)())
+          : await cache!.resolve(
+              source!,
+              kid,
+              clock === undefined ? { algorithms: allowed } : { algorithms: allowed, clock },
+            );
         return result.ok
           ? ok(
               Object.freeze({
@@ -69,7 +78,12 @@ const Resolver = Object.freeze(Object.assign(resolver, {
   fromSnapshot }));
 /** Snapshot resolution and explicit discovery operations. */
 export const Discovery = Object.freeze({
-  /** Create a resolver over a branded key set or caller-owned discovery cache. */
+  /**
+   * Create a resolver over a branded key set or caller-owned discovery cache.
+   * Options are `algorithms` and an optional `clock` (integer Unix seconds); pass the
+   * policy's freshness clock so key freshness and signature freshness agree. Without
+   * `clock`, a key set uses system time and a cache uses its own clock.
+   */
   resolver: Resolver });
 export { DiscoverySource, isDiscoverySource, directoryId } from "./source.ts";
 export {

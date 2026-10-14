@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Add an optional `clock` to `Discovery.resolver`, so a key set's freshness is checked on the same clock as the policy; with a cache, it is passed to `resolve`. Without it the key set bridge keeps system time, which disagreed with a policy running on a fixed or offset clock.
 - Give each request captured by `capture(server)` its own deadline: the new `timeoutMs` option (1 to 300,000 ms, default 5,000) applies per request, and `context` is now refused with `adapter/invalid_options`. A Context passed to `capture(server)` was one absolute deadline shared by every later request, so once it passed, every capture on that server failed with `custody/deadline_exceeded`.
 - Bound exact-input function signers by `signingTimeout` when no `context` is passed, as generated specs already did; the option was accepted and ignored, and such signers always ran under a fixed 5,000 ms deadline. A function that outlasts its `signingTimeout` now returns `signer_failed`.
 - Generate `Content-Digest` in `Message.request` and `Message.response` with the `crypto.subtle.digest` captured at load, as every other cryptographic operation already did; code that replaces the global after RequestSeal loads can no longer change a generated digest.
