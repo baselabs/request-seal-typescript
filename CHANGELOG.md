@@ -29,7 +29,7 @@
 - Rename the npm package from `request-seal` to `@request-seal/core` under the `request-seal` organization; use `@request-seal/core/<subpath>` for every subpath import.
 - Add captured Node HTTP Web Bot Auth verification, shared attempt storage, and executable signed TLS directory examples.
 - Reject concurrent capture consumers and retained length mismatches; derive HTTP/2 scheme from TLS and reject conflicting Host/authority.
-- Add captured-request quorum verification with shared replay and single-verification guards.
+- Add captured-request quorum verification with single-verification guards. Quorum verification refuses a required replay policy with `invalid_policy`; one replay claim belongs only after the complete quorum verifies.
 - Apply redirect method/body rules, validate redirect policy before delivery, remove Location fragments, and report actual client attempts.
 - Measure Fetch runtime overrides and eligibility in the wire lane; refuse Node sec-fetch-mode signing, empty-query targets on Node majors below 24, and planted runtime markers.
 - Deliver response signatures with their exact buffered bytes, use one clock for Date and created, and omit prohibited lengths.
