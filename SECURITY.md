@@ -1,8 +1,10 @@
-**Status:** maintained · **Kind:** policy · **Updated:** October 11, 2026 · **Governed by:** the public error contract · **Review when:** reporting channels or security boundaries change
+**Status:** maintained · **Kind:** policy · **Updated:** October 14, 2026 · **Governed by:** the public error contract · **Review when:** reporting channels or security boundaries change
 
 # Security
 
-Report vulnerabilities privately through [GitHub security advisories](https://github.com/baselabs/request-seal-typescript/security/advisories/new). Include affected versions and a reproduction. Avoid private keys or live credentials.
+Report vulnerabilities privately with GitHub private vulnerability reporting: open the repository's **Security** tab and choose **Report a vulnerability**, or go straight to the [private report form](https://github.com/baselabs/request-seal-typescript/security/advisories/new). Only the maintainers see the report. Do not open a public issue for a vulnerability.
+
+Include the affected versions and a reproduction. Avoid private keys or live credentials.
 
 ## Supported versions
 
