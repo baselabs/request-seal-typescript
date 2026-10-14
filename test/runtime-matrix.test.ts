@@ -10,7 +10,7 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   const tokens = /node: \[([^\]]+)\]/.exec(ci)?.[1]?.split(',').map(s => s.trim().replace(/^'|'$/g, ''));
   assert.ok(tokens);
   for (const token of tokens) assert.match(token, /^\d+\.\d+\.\d+$/, 'every Node lane must pin an exact version');
-  assert.deepEqual(tokens, ['22.12.0', '24.21.0', '26.11.1']);
+  assert.deepEqual(tokens, ['22.12.0', '22.23.1', '24.21.0', '26.11.1']);
   assert.match(ci, /name: Node \$\{\{ matrix\.node == '26\.11\.1' && '26' \|\| matrix\.node \}\}/);
   assert.match(ci, /if \(actual!==expected\) process\.exit\(1\)/);
   const denos = [...ci.matchAll(/deno-version: '([^']+)'/g)].map(m => m[1]!);
@@ -27,6 +27,7 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   const noSystemStore = 'No `tls.getCACertificates`, so `cacerts: "os"` returns `discovery/transport_unavailable`.';
   const nativeFacts: Record<string, string> = {
     'node:22.12.0': noSystemStore + ' Empty-query Fetch signing returns `adapter/invalid_request`.',
+    'node:22.23.1': 'Empty-query Fetch signing returns `adapter/invalid_request`.',
     'deno:2.5.6': noSystemStore,
   };
   const nativeBoundary = (runtime: string, limits: Limit[] = []) => [

@@ -134,7 +134,7 @@ Dependencies that are not part of the package live in separate workspaces under 
 
 | Runtime | What the tests prove |
 | --- | --- |
-| Node 22.12.0, 24.21.0, and 26.11.1 | The full suite, build, conformance corpus, and packed-package import checks. |
+| Node 22.12.0, 22.23.1, 24.21.0, and 26.11.1 | The full suite, build, conformance corpus, and packed-package import checks. |
 | Deno 2.5.6 | The core suite and conformance on Deno's own WebCrypto. Fetch verification runs only here. |
 | Bun 1.3.14 | The core suite and conformance. On macOS arm64, Bun's WebCrypto rejected two valid ECDSA P-256 vectors; a declared limitation, scoped to the exact version and platform, reports them instead of weakening a check. |
 | Deno 2.9.7 | Only that discovery refuses OS trust roots when the system permission is denied. |

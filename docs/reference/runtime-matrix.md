@@ -3,7 +3,7 @@
 # Runtime matrix
 
 CI runs on Linux (`ubuntu-24.04`). Development supports macOS and Linux;
-Windows developers use WSL2. The table below equals the CI runtime lanes: Node 22.12.0, 24.21.0, and 26.11.1; Deno 2.5.6;
+Windows developers use WSL2. The table below equals the CI runtime lanes: Node 22.12.0, 22.23.1, 24.21.0, and 26.11.1; Deno 2.5.6;
 Bun 1.3.14; the denied-roots-only check on Deno 2.9.7; Chromium 156.0.8078.4, Firefox 157.0, and WebKit 27.2 from
 Playwright 1.64.0. The separate `reciprocal` job runs on Node 24.21.0 with Erlang/OTP
 29.0.3 and Elixir 1.20.3. Releases call the same workflow, including `browsers`.
@@ -15,6 +15,7 @@ assertions use exact patch versions.
 | Runtime lane | Version | Declared runtime limitations |
 | --- | --- | --- |
 | Node 22.12.0 | 22.12.0 | No `tls.getCACertificates`, so `cacerts: "os"` returns `discovery/transport_unavailable`. Empty-query Fetch signing returns `adapter/invalid_request`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
+| Node 22.23.1 | 22.23.1 | Empty-query Fetch signing returns `adapter/invalid_request`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Node 24.21.0 | 24.21.0 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Node 26.11.1 | 26.11.1 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Deno 2.5.6 | 2.5.6 | No `tls.getCACertificates`, so `cacerts: "os"` returns `discovery/transport_unavailable`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |

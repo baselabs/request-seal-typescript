@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Test on Node 22.23.1 in CI, beside 22.12.0, 24.21.0, and 26.11.1 (Linux only).
 - Match IP-literal discovery hosts against the certificate's IP addresses with OpenSSL (`X509Certificate.checkIP`). On Node 22.23.1, `tls.checkServerIdentity` normalizes the host with `domainToASCII` before its IP test, which turns `::1` into an empty string, so every `https://[IPv6]` source failed with `discovery/tls_failed`. DNS hosts still use `tls.checkServerIdentity`.
 - Report a missing or empty OS trust store as `discovery/transport_unavailable` instead of custody `unsupported_format` when `@request-seal/core/discovery-node` creates or fetches a `cacerts: "os"` source. Node before 22.15.0, including 22.12.0, and Deno 2.5.6 have no `tls.getCACertificates`; the refusal stays (bundled roots are never a fallback) but now has a discovery kind, the same as a denied store. Callers matching the old custody reason must update.
 - Add an optional `clock` to `Discovery.resolver`, so a key set's freshness is checked on the same clock as the policy; with a cache, it is passed to `resolve`. Without it the key set bridge keeps system time, which disagreed with a policy running on a fixed or offset clock.
