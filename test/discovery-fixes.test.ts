@@ -203,3 +203,14 @@ test('an IP-literal source requires that exact IP in the certificate, on IPv4 an
     } finally {await p.close();}
   }
 });
+test('an IP named only in the subject common name, with no IP SAN, is refused', async () => {
+  for (const [address, host] of [['127.0.0.1', '127.0.0.1'], ['::1', '[::1]']] as const) {
+    const p = await peer((_q,r) => {r.setHeader('content-type','application/json');r.end(jwks());}, address, 'DNS:directory.test', address);
+    try {
+      assert.equal(new X509Certificate(p.tlsOptions.cert).subject, `CN=${address}`);
+      const s = value(NodeSource.create({type:'jwks_uri',location:`https://${host}:${p.port}/keys`,cacerts:[p.ca],permittedAddresses:[address]}));
+      reason(await NodeDiscovery.fetch(s), 'tls_failed');
+      assert.equal(p.requests, 0, `${address}: a common-name-only IP must not reach HTTP`);
+    } finally {await p.close();}
+  }
+});

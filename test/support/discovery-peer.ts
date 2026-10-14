@@ -20,6 +20,7 @@ export async function peer(
   listener: RequestListener,
   address = "127.0.0.1",
   altNames = "DNS:localhost,DNS:directory.test,IP:127.0.0.1,IP:::1",
+  commonName = "localhost",
 ): Promise<Peer> {
   const root = await mkdtemp(resolve("test/.tmp-discovery-tls-"));
   let server: Server | undefined;
@@ -60,7 +61,7 @@ export async function peer(
       "-out",
       "leaf.csr",
       "-subj",
-      "/CN=localhost",
+      `/CN=${commonName}`,
     ]);
     await writeFile(
       join(root, "ext.cnf"),
