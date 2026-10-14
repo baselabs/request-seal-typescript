@@ -2,7 +2,7 @@
 
 # Security
 
-Report vulnerabilities privately with GitHub private vulnerability reporting: open the repository's **Security** tab and choose **Report a vulnerability**, or go straight to the [private report form](https://github.com/baselabs/request-seal-typescript/security/advisories/new). Only the maintainers see the report. Do not open a public issue for a vulnerability.
+Report vulnerabilities privately with GitHub private vulnerability reporting: open the repository's **Security** tab and choose **Report a vulnerability**, or go straight to the [private report form](https://github.com/baselabs/request-seal-typescript/security/advisories/new). Only you and the repository maintainers can see the report. Do not open a public issue for a vulnerability.
 
 Include the affected versions and a reproduction. Avoid private keys or live credentials.
 
