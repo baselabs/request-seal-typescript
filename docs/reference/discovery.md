@@ -82,8 +82,10 @@ JOSE choice. HMAC public keys remain forbidden.
 bridge that accepts `keyid` and returns only the algorithm and public key. `clock`
 returns integer Unix seconds; pass the policy's freshness clock so both checks use one
 time. Without it, a key set is checked against system time and a cache against its own
-clock; with it, the cache bridge passes `clock` to `resolve`. A clock that returns an
-invalid time makes the lookup fail with `invalid_options`. RequestSeal for Elixir has no
+clock. With a cache, `clock` decides only whether the returned key is fresh: the cache
+still fetches, stores, and judges its entries on its own clock, so one caller's clock
+never changes what other callers of a shared cache see. A clock that throws or returns
+an invalid time makes the lookup fail with `invalid_options` on both paths. RequestSeal for Elixir has no
 resolver clock and uses system time.
 
 ## Explicit Node transport

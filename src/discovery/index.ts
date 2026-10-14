@@ -2,10 +2,10 @@ import { ok, type Result } from "../result.ts";
 import { snapshotOptions } from "../brand.ts";
 import { isKeySet, algorithmList, type KeySet } from "./body.ts";
 import { isDiscoverySource, type DiscoverySource } from "./source.ts";
-import { isDiscoveryCache, type DiscoveryCache } from "./cache.ts";
+import { isDiscoveryCache, resolveOnClock, type DiscoveryCache } from "./cache.ts";
 import { fromSnapshot } from "./snapshot.ts";
 import { type Resolution } from "./body.ts";
-import { ensure, unwrap, failure } from "./support.ts";
+import { ensure, unwrap, failure, clockValue } from "./support.ts";
 /** A discovery-backed signature key resolver. @inline */
 export type KeyResolver = (
   request: unknown,
@@ -47,15 +47,15 @@ function resolver(input: unknown, opts: unknown): Result<KeyResolver> {
           "unknown_key",
         );
         const kid = (request as { keyid: unknown }).keyid;
+        // A clock decides key freshness only: a throwing or invalid clock is
+        // invalid_options on both paths, and a cache still fetches and stores on its own clock.
         const result = set
           ? clock === undefined
             ? await set.lookup(kid, allowed)
-            : await set.lookup(kid, allowed, (clock as () => number)())
-          : await cache!.resolve(
-              source!,
-              kid,
-              clock === undefined ? { algorithms: allowed } : { algorithms: allowed, clock },
-            );
+            : await set.lookup(kid, allowed, clockValue(clock))
+          : clock === undefined
+            ? await cache!.resolve(source!, kid, { algorithms: allowed })
+            : await resolveOnClock(cache!, source!, kid, { algorithms: allowed }, clock as () => number);
         return result.ok
           ? ok(
               Object.freeze({
@@ -82,7 +82,9 @@ export const Discovery = Object.freeze({
    * Create a resolver over a branded key set or caller-owned discovery cache.
    * Options are `algorithms` and an optional `clock` (integer Unix seconds); pass the
    * policy's freshness clock so key freshness and signature freshness agree. Without
-   * `clock`, a key set uses system time and a cache uses its own clock.
+   * `clock`, a key set uses system time and a cache uses its own clock. With a cache,
+   * `clock` decides only the returned key's freshness; the cache keeps its own clock for
+   * fetching and storing.
    */
   resolver: Resolver });
 export { DiscoverySource, isDiscoverySource, directoryId } from "./source.ts";

@@ -55,6 +55,16 @@ export type DiscoveryCache = Readonly<{
   close: () => Result<true>;
 }>;
 const caches = new WeakSet<object>();
+type DecidedResolve = (s: unknown, kid: unknown, input: unknown, decision: () => number) => Promise<Result<Resolution>>;
+const decided = new WeakMap<object, DecidedResolve>();
+/**
+ * Internal to the resolver bridge, not exported from the package: resolve with the
+ * cache's own clock for fetching, storing, negative caching, and entry freshness, and
+ * decide the key's freshness on `decision`.
+ */
+export function resolveOnClock(cache: DiscoveryCache, s: unknown, kid: unknown, input: unknown, decision: () => number): Promise<Result<Resolution>> {
+  return decided.get(cache)!(s, kid, input, decision);
+}
 /** Check the private brand of a discovery cache. */
 export function isDiscoveryCache(v: unknown): v is DiscoveryCache {
   return !!v && typeof v === "object" && caches.has(v);
@@ -228,21 +238,7 @@ export function createCache(input: unknown = {}): Result<DiscoveryCache> {
         }
       }
     }
-    const out: DiscoveryCache = {
-      async refresh(s, snapshot) {
-        try {
-          const e = enroll(s);
-          if (snapshot !== undefined) {
-            ensure(isKeySet(snapshot), "invalid_options");
-            ensure(!flights.has(sourceIdentity(e.source)), "cache_overloaded");
-            return store(e, ok(snapshot), clockFn, true);
-          }
-          return await load(e, clockFn);
-        } catch (e) {
-          return failure(e, "source_unavailable");
-        }
-      },
-      async resolve(s, kid, input = {}) {
+    async function resolveWith(s: unknown, kid: unknown, input: unknown, decision?: () => number): Promise<Result<Resolution>> {
         try {
           ensure(isDiscoverySource(s), "invalid_source");
           const a = options(input, ["algorithms", "clock", "context", "timeoutMs"]);
@@ -253,8 +249,11 @@ export function createCache(input: unknown = {}): Result<DiscoveryCache> {
           );
           ensure(keyIdValid(s, kid), "unknown_key");
           ensure(s.keyId === "directory" || !s.revoked.includes(kid), "revoked_key");
-          const selectedClock = Object.hasOwn(a, "clock") ? a.clock : clockFn;
+          // With a decision clock (the resolver bridge), the cache's own clock fetches, stores,
+          // and judges entry freshness; the decision clock judges only the key returned.
+          const selectedClock = decision === undefined && Object.hasOwn(a, "clock") ? a.clock : clockFn;
           const now = clockValue(selectedClock);
+          const decisionNow = decision === undefined ? now : clockValue(decision);
           ensure(
             !Object.hasOwn(a, "context") || isContext(a.context),
             "invalid_options",
@@ -280,7 +279,7 @@ export function createCache(input: unknown = {}): Result<DiscoveryCache> {
           ensure(e.source.keyId === "directory" ||
             (!e.removed.has(kid) && !e.source.revoked.includes(kid)), "revoked_key");
           if (e.set && now < e.set.expiresAt)
-            return await lookup(e.set, kid, choices, now);
+            return await lookup(e.set, kid, choices, decisionNow);
           ensure(
             e.failureUntil === undefined || now >= e.failureUntil,
             "source_unavailable",
@@ -295,12 +294,29 @@ export function createCache(input: unknown = {}): Result<DiscoveryCache> {
             filter(fetched.value, e),
             kid,
             choices,
-            clockValue(selectedClock),
+            decision === undefined ? clockValue(selectedClock) : clockValue(decision),
             fetched.value.expiresAt === fetched.value.fetchedAt,
           );
         } catch (e) {
           return failure(e, "source_unavailable");
         }
+    }
+    const out: DiscoveryCache = {
+      async refresh(s, snapshot) {
+        try {
+          const e = enroll(s);
+          if (snapshot !== undefined) {
+            ensure(isKeySet(snapshot), "invalid_options");
+            ensure(!flights.has(sourceIdentity(e.source)), "cache_overloaded");
+            return store(e, ok(snapshot), clockFn, true);
+          }
+          return await load(e, clockFn);
+        } catch (e) {
+          return failure(e, "source_unavailable");
+        }
+      },
+      resolve(s, kid, input = {}) {
+        return resolveWith(s, kid, input);
       },
       remove(s, kid) {
         try {
@@ -337,6 +353,7 @@ export function createCache(input: unknown = {}): Result<DiscoveryCache> {
       },
     };
     caches.add(out);
+    decided.set(out, (src, kid, input, decision) => resolveWith(src, kid, input, decision));
     return ok(inspectable(out, { kind: "DiscoveryCache" }));
   } catch (e) {
     return failure(e, "invalid_options");

@@ -106,3 +106,28 @@ test('the key-set resolver checks freshness against the caller clock it is given
     if(r.ok) reason(await r.value({keyid:kid}),'invalid_options'); else reason(r,'invalid_options');
   }
 });
+test('a throwing resolver clock gives invalid_options on both the key-set and cache paths',async()=>{
+  const s=source(), set=value(await snapshot(s,1_000_000)), boom=()=>{throw new Error('clock');};
+  reason(await value(Discovery.resolver(set,{algorithms:['ed25519'],clock:boom}))({keyid:kid}),'invalid_options');
+  const c=value(createCache({clock:()=>1_000_000}));
+  try {value(await c.refresh(s,set));
+    reason(await value(Discovery.resolver({cache:c,source:s},{algorithms:['ed25519'],clock:boom}))({keyid:kid}),'invalid_options');
+  }finally{c.close();}
+});
+test('a resolver clock decides freshness but never stamps the shared cache',async()=>{
+  const cacheNow=1_000_000, ahead=cacheNow+100_000, s=source();
+  const fetches:number[]=[];
+  // The fetch callback builds a real snapshot from fixed bytes at the clock the cache hands it.
+  const c=value(createCache({clock:()=>cacheNow,fetch:async(src:unknown,{clock}:{clock:()=>number})=>{fetches.push(clock());return Discovery.resolver.fromSnapshot(src,bytes(jwks()),clock(),[...headers,['cache-control','max-age=600']]);}}));
+  try {
+    // At the resolver's clock the key is long stale, so it is refused...
+    reason(await value(Discovery.resolver({cache:c,source:s},{algorithms:['ed25519'],clock:()=>ahead}))({keyid:kid}),'unknown_key');
+    // ...but the cache fetched and stored on its own clock, so other callers see a fresh entry.
+    assert.deepEqual(fetches,[cacheNow]);
+    assert.equal(value(await c.resolve(s,kid)).fetchedAt,cacheNow);
+    assert.equal(fetches.length,1,'the stored entry is served without another fetch');
+    // A resolver clock inside the entry's lifetime resolves without refetching.
+    assert.equal(value(await value(Discovery.resolver({cache:c,source:s},{algorithms:['ed25519'],clock:()=>cacheNow+60}))({keyid:kid})).algorithm,'ed25519');
+    assert.equal(fetches.length,1);
+  } finally {c.close();}
+});
