@@ -76,11 +76,21 @@ test("the README status table maps every reason and agrees with the signing guid
     assert.ok(ERROR_PARITY.some(e => pattern.endsWith("*") ? e.rule_id.startsWith(pattern.slice(0, -1)) : e.rule_id === pattern), `unknown pattern: ${pattern}`);
 });
 
-test("the error reasons page explains every reason in the vocabulary exactly once", () => {
-  const rows = [...read("docs/reference/errors.md").matchAll(/^\| `([a-z0-9_]+\/[a-z0-9_.]+)` \| ([^|]+) \| ([^|]+) \|$/gm)];
-  const listed = rows.map(row => row[1]!);
+test("the error reasons page explains every reason in the vocabulary exactly once, under its kind", () => {
   const known = ERROR_PARITY.map(entry => entry.rule_id);
-  assert.deepEqual([...new Set(listed)].length, listed.length, "no reason is listed twice");
+  const listed: string[] = [];
+  let section: string | null = null;
+  for (const [index, line] of read("docs/reference/errors.md").split("\n").entries()) {
+    const heading = /^## (.+)$/.exec(line);
+    if (heading) { section = heading[1]!; continue; }
+    if (!line.startsWith("| `")) continue;
+    // Every reason row must parse; a malformed row fails instead of being skipped.
+    const row = /^\| `([a-z0-9_]+)\/([a-z0-9_.]+)` \| ([^|]+) \| ([^|]+) \|$/.exec(line);
+    assert.ok(row, `errors.md line ${index + 1} is not a well-formed reason row: ${line}`);
+    assert.equal(row[1], section, `errors.md line ${index + 1}: ${row[1]}/${row[2]} sits under "## ${section}"`);
+    assert.ok(row[3]!.trim() && row[4]!.trim(), `${row[1]}/${row[2]} has a meaning and an action`);
+    listed.push(`${row[1]}/${row[2]}`);
+  }
+  assert.equal(new Set(listed).size, listed.length, "no reason is listed twice");
   assert.deepEqual([...listed].sort(), [...known].sort(), "every vocabulary reason, and only those, is listed");
-  for (const row of rows) assert.ok(row[2]!.trim() && row[3]!.trim(), `${row[1]} has a meaning and an action`);
 });
