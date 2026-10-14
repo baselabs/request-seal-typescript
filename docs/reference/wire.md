@@ -89,8 +89,11 @@ Direct `Message.create` supports all four target forms without normalization.
 Authorities follow RFC 3986 Section 3.2.2: bracketed hosts are IPv6 or IPvFuture
 literals. Bracketed IPv4 (including shortened, decimal, or hex forms) and zone identifiers
 reject with `invalid_message`; an unbracketed numeric host such as `127.1` is a
-registered name and is kept as written. Canonical base64 padding is required when parsing
-Structured Fields byte sequences; nonzero padding bits reject with `syntax`.
+registered name and is kept as written. When parsing Structured Fields byte
+sequences, `=` padding is optional, as RFC 9651 Section 4.2.7 recommends: absent or
+partial padding is accepted (`:YQ:`, `:YQ=:`, and `:YQ==:` all decode to `a`). Nonzero
+padding bits (`:YR==:`) reject with `syntax`; this is the shared decoding rule, stricter
+than the RFC's recommendation.
 Optional `digest: ["sha-256", "sha-512"]` adds Content-Digest over retained
 bytes. Generating a digest rejects an existing Content-Digest occurrence.
 A response builder accepts `request` to set its related request.

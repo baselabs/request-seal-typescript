@@ -110,7 +110,7 @@ Returned by Structured Fields parsing and serialization.
 | `structured_fields/missing_field` | The requested field is absent. | Treat the field as missing. |
 | `structured_fields/revision_type` | A value uses a type the selected RFC revision does not allow. | Choose the right revision or reject. |
 | `structured_fields/schema_type` | A value has a type the schema does not allow. | Reject the field or widen the schema. |
-| `structured_fields/syntax` | The text is not valid Structured Fields, including noncanonical base64 padding. | Reject the field. |
+| `structured_fields/syntax` | The text is not valid Structured Fields, including a byte sequence with nonzero base64 padding bits. Missing `=` padding is accepted. | Reject the field. |
 | `structured_fields/unavailable_section` | The requested section (such as pending trailers) is not available. | Read the section once it is complete. |
 
 ## signature_base
