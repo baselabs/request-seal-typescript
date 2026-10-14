@@ -1,9 +1,9 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
 
 # Contributing
 
 Use Node 22.12.0 or newer. Elixir must be on PATH for the replay peer URL check;
-local tests print a skip reason when it is absent, and CI requires it. The OpenSSL reciprocal tests require OpenSSL development headers, a C compiler, and pkg-config; the AES-GCM peer uses EVP because the `openssl enc` frontend rejects AEAD. Development supports macOS and Linux; Windows developers use WSL2. CI runs on Linux.
+local tests print a skip reason when it is absent, and CI requires it. The OpenSSL tests need OpenSSL 3 or later as `openssl` on PATH (on macOS, Homebrew's `openssl@3` or newer; the system LibreSSL lacks `pkeyutl -rawin` Ed25519 signing), and the reciprocal tests also need its development headers, a C compiler, and pkg-config; the AES-GCM peer uses EVP because the `openssl enc` frontend rejects AEAD. Development supports macOS and Linux; Windows developers use WSL2. CI runs on Linux.
 
 ```sh
 npm ci --ignore-scripts

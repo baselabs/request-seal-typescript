@@ -3,6 +3,7 @@ import type { RequestListener } from "node:http";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import type { Socket } from "node:net";
 import assert from "node:assert/strict";
 export type Peer = {
@@ -41,7 +42,10 @@ export async function peer(
       "-days",
       "1",
       "-subj",
-      "/CN=Discovery Test CA",
+      // A unique name per peer: tests trust several peers' CAs at once, and with two same-named CAs
+      // a leaf without an authority key identifier (OpenSSL 4 and LibreSSL add none by default)
+      // can be checked against the wrong CA (CERT_SIGNATURE_FAILURE).
+      `/CN=Discovery Test CA ${randomUUID()}`,
       "-addext",
       "basicConstraints=critical,CA:TRUE",
     ]);
@@ -59,7 +63,7 @@ export async function peer(
     ]);
     await writeFile(
       join(root, "ext.cnf"),
-      "subjectAltName=DNS:localhost,DNS:directory.test,IP:127.0.0.1,IP:::1\nbasicConstraints=critical,CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n",
+      "subjectAltName=DNS:localhost,DNS:directory.test,IP:127.0.0.1,IP:::1\nbasicConstraints=critical,CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n",
     );
     run([
       "x509",
