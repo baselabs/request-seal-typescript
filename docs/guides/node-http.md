@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** RFC 9421, RFC 9113, and executed Node, Express, and Fastify transport tests · **Review when:** a supported Node version, framework version, or adapter contract changes
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9113, and executed Node, Express, and Fastify transport tests · **Review when:** a supported Node version, framework version, or adapter contract changes
 
 # Node HTTP, Express, and Fastify
 
@@ -8,13 +8,13 @@
 
 A signature covers bytes. By the time a framework has parsed a request, the raw target may be rewritten, header names may be lowercased and merged, and the body may be a JavaScript object. The adapter therefore **captures** the request before anything else touches it, and verification runs against the capture.
 
-- `captureRequest(req, options)` runs as the first middleware, or first in a plain handler. It reads the body, retains at most `maxBytes` (1 MiB, the default and the maximum), and records the request line and headers.
+- `captureRequest(req, options)` runs as the first middleware, or first in a plain handler. It reads the body, retains at most `maxBytes` (1 MiB, the default and the maximum), and records the request line and headers. Without a `context`, each capture has its own 5-second deadline. A second `captureRequest` call on the same request returns the first capture, and returns `invalid_options` if it passes options.
 - `capture(server, options)` installs a listener that runs before the application listener and returns a registration you can close. Use it with frameworks that give you no early hook.
-- `captureBody(req, bytes)` hands the adapter bytes that a body parser has already read. For `express.json`, this hook requires body framing (`Content-Length` or `Transfer-Encoding`) and a matching JSON content type; requests without framing and non-JSON requests need a different capture path.
+- `captureBody(req, bytes, { maxBytes, trustedProxies })` hands the adapter bytes that a body parser has already read. It refuses a request that is already captured, including by `capture(server)`, with `invalid_request`. For `express.json`, this hook requires body framing (`Content-Length` or `Transfer-Encoding`) and a matching JSON content type; requests without framing and non-JSON requests need a different capture path.
 
 Capture owns the request stream. A second data listener, or a flowing consumer reading while capture reads, returns `parser_order`. A declared `Content-Length` that disagrees with the retained bytes returns `body_unavailable`.
 
-`verifyRequest(req, policy, { label })` returns `{ capture, verification, bytes }`. `bytes` are copies of the authenticated body. Parse those bytes, not the original stream: the stream is consumed. The adapter allows one verification per request, so a second call returns `already_verified`, and `verification(req)` returns the stored result.
+`verifyRequest(req, policy, { label })` (plus optional `context`, `representation`, and `digestState`) returns `{ capture, verification, bytes }`. `bytes` are copies of the authenticated body. Parse those bytes, not the original stream: the stream is consumed. The adapter allows one verification per request, so a second call returns `already_verified`. `verification(req)` returns the stored result, `already_verified` while an attempt is still running, or `not_captured` before any attempt.
 
 ## A plain Node server
 
@@ -58,11 +58,11 @@ server.close();
 server.closeAllConnections();
 ```
 
-`signedRequest` is the matching client. It sends through `http.request` or `https.request`, signs every hop and retry afresh, and defaults to no redirects and no retries. Retries resend the body: enable `maxRetries` only for idempotent operations or application-level deduplication. A 5xx does not prove the request was not processed.
+`signedRequest` is the matching client. It sends through `http.request` or `https.request`, signs every hop and retry afresh, and defaults to no redirects and no retries (each accepts up to 10). It returns `{ request, message, status, bytes }`. Retries resend the body: enable `maxRetries` only for idempotent operations or application-level deduplication. A 5xx does not prove the request was not processed.
 
 ## Behind a reverse proxy
 
-Behind a proxy or load balancer the socket peer is the proxy, and the public scheme and host arrive in a `Forwarded` or `X-Forwarded-*` header. Anyone can send those headers, so the adapter ignores them unless you configure `trustedProxies: { peers, field }`: the exact addresses of the proxies you trust, and which field to read (`forwarded` or `x-forwarded`). Use exact proxy addresses, never broad ranges. With this option, an unlisted peer fails capture with `adapter/untrusted_proxy`; a listed peer without a usable selected header fails with `adapter/invalid_request`. When the actual socket peer matches, the last element supplies the external scheme and authority. Observed connection facts stay separate in `capture.ingress`.
+Behind a proxy or load balancer the socket peer is the proxy, and the public scheme and host arrive in a `Forwarded` or `X-Forwarded-*` header. Anyone can send those headers, so the adapter ignores them unless you configure `trustedProxies: { peers, field }`: the proxies you trust (1 to 1,024 exact IP addresses or CIDR ranges), and which field to read (`forwarded` or `x-forwarded`). Prefer exact proxy addresses over broad ranges. With this option, an unlisted peer fails capture with `adapter/untrusted_proxy`; a listed peer without a usable selected header fails with `adapter/invalid_request`. When the actual socket peer matches, the last element supplies the external scheme and authority. Observed connection facts stay separate in `capture.ingress`.
 
 The program below signs a request for `https://api.example.com`, delivers it to a private listener through a trusted proxy address, and shows that the same bytes fail when the forwarding header is missing.
 
@@ -95,10 +95,10 @@ const server = createServer(async (req, res) => {
 await once(server, "listening");
 
 // The client signed for the public origin; the proxy forwards it to the private listener.
-const request = must(await Message.request("GET", "https://api.example.com/orders", [], ""));
+const request = must(await Message.request("GET", "https://api.example.com/forecasts", [], ""));
 const signed = must(await sign(request, { label: "sig", components, algorithm: "hmac-sha256", expiresIn: 60 }, key));
 const headers = signed.fields.map((f) => [f.name, new TextDecoder().decode(f.value)] as [string, string]);
-const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/orders`;
+const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/forecasts`;
 const viaProxy = await fetch(url, { headers: [...headers, ["forwarded", "proto=https;host=api.example.com"]] });
 assert.equal(await viaProxy.text(), "api.example.com");
 // The listed peer lacks a usable Forwarded header: capture fails with adapter/invalid_request.
@@ -238,11 +238,11 @@ As with Express, Fastify is your dependency and the program loads the copy this 
 
 ## Responses, Web Bot Auth, and quorums
 
-- `signResponse(res, spec, signer, { body, request })` signs a final response over exactly the bytes it will send, then writes and ends the response. Do not write to the response afterward.
-- `verifyWebBotAuth(req, policy, { timeoutMs })` verifies a Web Bot Auth request over the same capture. See [Web Bot Auth](web-bot-auth.md).
+- `signResponse(res, spec, signer, { body, request })` (plus optional `context`, `clock`, `nonce`, and `pendingCookies`) signs a final response over exactly the bytes it will send, writes and ends the response, and returns the signed `Message`. `request` must be a `Capture`. Do not write to the response afterward.
+- `verifyWebBotAuth(req, policy, { timeoutMs })` (plus optional `context`, `representation`, and `digestState`) verifies a Web Bot Auth request over the same capture. See [Web Bot Auth](web-bot-auth.md).
 - `verifyQuorum(req, quorum, options)` verifies several signatures from one request. See [multiple signatures](../reference/quorum.md).
 
-All three share the one-verification-per-request rule.
+`verifyRequest`, `verifyWebBotAuth`, and `verifyQuorum` share the one-verification-per-request rule.
 
 ## Where to go next
 

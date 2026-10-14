@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
 
 # HTTP and custody adapters
 
@@ -7,6 +7,12 @@ and verification APIs. They return Results and retain bounded errors. They
 start no listener or agent, discover no credentials, and grant no authorization.
 The core imports no Node modules. Node transports and SSH custody have separate
 package subpaths.
+Adapter errors are `{kind: "adapter", reason, adapter, stage, attempt, source,
+correlation, retryable: false}`. `stage` is `attach`, `capture`, `sign`, or `verify`;
+`attempt` counts client attempts (0 before the first); `source` carries the underlying
+core, custody, or message error. A signing `digest_mismatch` is reported as
+`digest_conflict`. An expired or canceled Context is not wrapped: it returns
+`custody/deadline_exceeded` directly.
 Native test lanes run Node HTTP and framework adapter contracts in real Node
 subprocesses; Fetch contracts execute on the native runtime. SSH agent/OpenSSL
 checks run natively; socket fault and close-event tests use real Node peers.
@@ -20,7 +26,9 @@ middleware. It retains rawHeaders in occurrence order, the exact target,
 method, trailers after EOF, and body bytes. Capture retains at most `maxBytes`
 body bytes per request before any policy decision. The default and maximum
 ceiling are 1 MiB; `maxBytes` can lower that ceiling. Peak memory also includes
-transport buffers and copies of retained bytes. `context` supplies an absolute deadline.
+transport buffers and copies of retained bytes. `context` supplies an absolute deadline;
+without it, each capture gets its own 5-second deadline. A `context` passed to
+`capture(server)` is one deadline shared by every later request on that server.
 Capture registration options cannot be changed by later middleware. Capture owns
 stream consumption: another data listener or a flowing consumer during the read
 rejects with `parser_order`. A present Content-Length must equal retained bytes; a mismatch returns
@@ -60,7 +68,8 @@ verification authenticates captured bytes, not parser output.
 `verifyRequest(req, policy, {label, context?, representation?, digestState?})`
 returns `{capture, verification, bytes}`. Byte access returns copies. Concurrent
 or repeated verification is refused. `verification(req)` retrieves successful core, quorum, or Web Bot Auth facts, or the stored
-bounded rejection after a verification attempt. Required layers still follow the core Policy.
+bounded rejection after a verification attempt; it returns `already_verified` while an
+attempt is still running and `not_captured` before any attempt. Required layers still follow the core Policy.
 `verifyQuorum(req, quorum, {context?, acceptSignature?})` returns captured bytes
 and the composite verification. All three entry points share the one-verification and
 parser-order guards. All three reject malformed option keys and invalid contexts
@@ -97,7 +106,7 @@ verification calls; `verification(req)` returns `not_captured` because no
 successful capture or verification state was created.
 
 An explicit `trustedProxies: {peers, field}` selects origin reconstruction.
-`peers` is a list of CIDR ranges or exact socket IP addresses, including native
+`peers` is a list of 1–1,024 CIDR ranges or exact socket IP addresses, including native
 or mapped IPv4 (for example `127.0.0.0/8` and `::ffff:127.0.0.1`);
 `field` is `forwarded` or `x-forwarded`. The last element supplies external
 scheme/authority only after the actual socket peer matches. Every Forwarded
@@ -176,8 +185,9 @@ Both Node and Fetch response checks exempt components carrying `;req` from
 response-side field refusals: those components select captured request facts.
 Core signing restrictions still apply, including the Host and trailer refusals. A prior write rejects
 with unsupported_delivery. Set-Cookie coverage rejects while cookies are pending.
-`request` is a branded Capture for request-related components. Later transforms
-must not change signed headers or body bytes.
+`request` is a branded Capture for request-related components; anything else returns
+invalid_options. It returns the signed Message. Later transforms must not change signed
+headers or body bytes.
 
 `signedRequest({url, method?, headers?, body?, ca?, context?, clock?, nonce?,
 maxBytes?, maxRedirects?, maxRetries?, allowedOrigins?, credentialHeaders?,
@@ -187,24 +197,31 @@ invalid_options; the transport derives it from each final URL. Nonempty GET or H
 return invalid_options before delivery. The Node client uppercases the
 method before signing to match ClientRequest delivery. Incoming capture preserves
 wire method case. Explicit CA material is PEM
-bytes. Defaults make no redirect or retry. Every hop/attempt signs afresh;
+bytes. Defaults make no redirect or retry; `maxRedirects` and `maxRetries` accept 0–10.
+There is no `signingTimeout` option; the exchange Context bounds signing. Every hop/attempt signs afresh;
 credential fields are removed on approved cross-origin hops. `allowedOrigins`
 contains exact HTTP(S) origins; the default refuses cross-origin redirects.
-Both allowedOrigins and credentialHeaders are validated before delivery. Location
+Both allowedOrigins and credentialHeaders hold at most 64 entries (credential header
+names are tokens of at most 256 characters) and are validated before delivery. A URL
+with userinfo or a fragment, or a method that is not a token, returns invalid_request.
+A cross-origin redirect outside `allowedOrigins` returns cross_origin_redirect. Location
 parse errors return invalid_request; fragments are removed. A 303 for non-GET/HEAD
 and POST 301/302 switch to GET without a body or Content-Type, Content-Length,
 Content-Encoding, Content-Language, Content-Location, or Content-Digest;
 307/308 retain method and body. Errors report the actual attempt number.
 Optional `verify: {policy, label}` withholds every response until verification.
-`verifyResponse(response, response.request, policy, options)` binds the exact
-sent request. Successful responses expose bounded copied bytes and the Message.
+The result is `{request, message, status, bytes}`.
+`verifyResponse(response, response.request, policy, {label, context?, representation?, digestState?})`
+binds the exact sent request; a different request returns invalid_request. Successful
+responses expose bounded copied bytes and the Message.
 
 ## Fetch
 
 Import from `@request-seal/core/fetch`. `signRequest(request, spec, signer, options)`
 returns `{request, message}` with retained final bytes and the URL fragment
 removed. `signResponse(response, spec, signer, {request?, ...options})` returns
-`{response, message}`. Bodies are consumed once; use the returned rebuilt value.
+`{response, message}`; `request` is the `{request, message}` pair from `signRequest` or
+a request Message, and a plain Request returns invalid_options. Bodies are consumed once; use the returned rebuilt value.
 Options accept context, maxBytes, clock, nonce, and signingTimeout. Request signals
 and signedFetch init signals share the Context deadline and cancel body reads,
 signing, and delivery. GET or HEAD requests with a body or declared nonempty
@@ -224,7 +241,11 @@ Bun signing refuses unusual methods and repeated leading slashes whose wire
 representation was not preserved.
 
 `signedFetch(input, init, {spec, signer}, options)` sets redirect to manual and
-Accept-Encoding to identity. A caller-supplied Host or an Accept-Encoding value
+Accept-Encoding to identity. `init` accepts method, headers, body, credentials, cache,
+mode, referrer, referrerPolicy, integrity, keepalive, and signal; any other key,
+including redirect, returns invalid_options. Options are context, maxBytes,
+maxRedirects, maxRetries, allowedOrigins, credentialHeaders, verify, clock, nonce, and
+signingTimeout; a `nonce` option applies to the first attempt only. A caller-supplied Host or an Accept-Encoding value
 other than identity returns invalid_options before delivery. Limits, explicit
 cross-origin approval, credential
 removal, fresh signing per retry/hop, and optional `{policy, label}` verification
@@ -255,7 +276,7 @@ The tested normalized URL removes a dot segment and fragment while keeping an
 encoded slash and query escapes. This does not establish exact wire-target
 identity. A separate target probe observed Bun 1.3.14 changing `//%2F?`
 to `/%2F?`; signing now refuses that shape. Deno preserves mixed-case `gEt` and
-`pOsT` on native ingress and preserves an empty query delimiter. `verifyRequest(request, policy, {label, scheme, authority, ...options})`
+`pOsT` on native ingress and preserves an empty query delimiter. `verifyRequest(request, policy, {label, scheme, authority, context?, maxBytes?, representation?})`
 requires caller-selected origin facts. It refuses @request-target, @target-uri,
 @path, @query, every bs/tr parameter, and cookie in required or selected covered
 components before resolving keys. @query-param follows the core's form-urlencoded
@@ -264,7 +285,7 @@ Fetch verification requires an explicit label; a missing label returns adapter
 invalid_options on eligible runtimes before core verification. Response
 verification rejects representation with invalid_options because response content
 checks cannot apply it on this lane.
-`verifyResponse(response, policy, {label, request?, ...options})` preserves
+`verifyResponse(response, policy, {label, request?, context?, maxBytes?})` preserves
 Set-Cookie occurrences through getSetCookie. Successful verification returns
 copied bytes plus a rebuilt Request/Response containing those exact bytes.
 
@@ -322,7 +343,10 @@ refer to files under `lib/request_seal/`.
 Import `createSshAgent` or `SSHAgent.create` from `@request-seal/core/custody-ssh-agent`.
 `createSshAgent(algorithm, socketPath, publicKey, {context? | timeoutMs?})` requires
 an explicit absolute POSIX socket path (1–103 UTF-8 bytes, no NUL) and a branded
-PublicKey. Relative paths return invalid_options; no environment socket is read. The caller owns agent startup, key
+PublicKey. Relative paths, unknown option keys, and passing both `context` and
+`timeoutMs` return invalid_options; an algorithm outside the list below returns
+unsupported_algorithm, a non-PublicKey returns invalid_key, and a key that does not fit
+the algorithm returns key_mismatch. No environment socket is read. The caller owns agent startup, key
 loading, and authorization. The adapter proves possession at construction.
 
 Supported HTTP algorithms are ed25519, rsa-v1_5-sha256, ecdsa-p256-sha256, and
@@ -346,8 +370,9 @@ verifies that the next sign succeeds. No specific boundary count is required.
 See [the v0.4.1 custodian](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/custody/ssh_agent.ex).
 The shared corpus remains v0.4.0, unchanged between these releases.
 
-Unknown construction keys return custodian_rejected; removed operational keys
-return key_not_found; failed connection establishment returns custodian_unavailable;
+A public key the agent does not hold at construction, an agent failure reply, or a
+returned signature that fails local verification returns custodian_rejected; removed
+operational keys return key_not_found; failed connection establishment returns custodian_unavailable;
 malformed or incomplete replies return custodian_protocol. Verification uses
 local trusted public material and does not assert continued agent possession.
 OBSERVED by `test/custody-ssh-agent.test.ts`: generated real OpenSSH keys exercise

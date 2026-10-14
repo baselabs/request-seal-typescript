@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, and the v0.4.0 corpus · **Review when:** JOSE policies or custody boundaries change
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, and the v0.4.0 corpus · **Review when:** JOSE policies or custody boundaries change
 
 # Compact JOSE
 
@@ -9,7 +9,8 @@ exactly. A signer is a branded KeyHandle or any callable receiving
 or asynchronously. Function length does not determine validity; returned Results
 and signature bytes do. The selector is `{jws: algorithm}`; a KeyHandle must be
 bound to that algorithm or signing returns `algorithm_mismatch`. Function signers run under
-the operation deadline and failures become `signer_failed`. Payloads must be nonempty.
+the operation deadline and failures become `signer_failed`. Payloads must be nonempty; an empty payload returns
+`detached_payload`.
 `JWS.verify(compact, policy, options)` requires exactly `algorithms`, `timeout`
 (milliseconds, 1–300,000), and `key_resolver`. Supported names are RS256, PS256,
 PS384, PS512, HS256, ES256, ES384, and EdDSA.
@@ -20,7 +21,8 @@ Return `ok({algorithm, key})` with a PublicKey or KeyHandle, or
 `ok({algorithm, verify})`. A verifier receives `(selector, base, signature, context)`
 and returns `Result<true>`. The selector is `{jws: algorithm}`. Resolver errors
 mean `unknown_key`; throws and malformed entries mean `key_resolver_failed`.
-An entry must have exactly two keys and must match the selected wire algorithm.
+An entry must have exactly two keys and must match the selected wire algorithm
+(otherwise `algorithm_mismatch`).
 
 `JWE.encrypt(pairs, plaintext, recipient, options)` supports RSA-OAEP,
 RSA-OAEP-256, A128GCMKW, A256GCMKW, and dir with A128GCM or A256GCM.
@@ -58,18 +60,22 @@ one JWS inside one authenticated JWE. Options require a unique nonempty
 `content_types` array. The outer `cty` must match; an inner envelope or inner JWS
 with `cty` rejects. Each stage retains its own policy timeout. All APIs accept an
 optional branded `context` to share a parent deadline. Signing and encryption
-also accept `timeout`; all other option keys reject.
+also accept `timeout` (1–300,000 ms, default 5,000); all other option keys reject
+with `invalid_options`.
 
 Successful results are frozen and independently branded. `JWS.isResult`,
-`JWE.isResult`, and `Nested.isResult` validate their respective types. Header
+`JWE.isResult`, and `Nested.isResult` (also exported as `isJwsResult`, `isJweResult`, and
+`isNestedResult`) validate their respective types; `KeyManagement.isHandle` (also
+`isKeyManagementHandle`) and `isUnwrappedKey` check those capabilities. Header
 nodes are frozen; `payload` and `plaintext` return fresh byte copies. JSON and
 inspection show public facts only. Protected segments are received bytes,
 never reserialized for verification or authentication.
 
 Compact input and output are bounded to 1,048,576 bytes; protected JSON is bounded
 to 16,384 bytes, depth four, and 64 members or array entries per container.
-Duplicate names reject at every depth. Headers reject `crit`, `zip`, `jku`,
-`x5u`, `jwk`, and `b64` regardless of value. JSON serializations, detached JWS,
+Duplicate names reject at every depth. Headers reject `crit` (`unsupported_critical_header`), `zip`
+(`compression_unsupported`), and `jku`, `x5u`, `jwk`, and `b64` (`unsupported_header`)
+regardless of value. JSON serializations, detached JWS,
 floats, and integers outside ±999,999,999,999,999 reject. Malformed framing,
 headers, IVs, and tags retain their specific input errors; uniform failure covers
 unwrap and authentication. Cryptography establishes envelope integrity;
@@ -101,4 +107,6 @@ verbatim. Use `signProtected` when exact caller-serialized bytes are required.
 
 JOSE header strings accept Unicode noncharacters, matching the reference's UTF-8
 validation. The generic I-JSON decoder retains its stricter default; JOSE enables
-noncharacters explicitly. `JoseHeader` is internal; use the JWS and JWE APIs.
+noncharacters explicitly. `JoseHeader` is internal; use the JWS and JWE APIs. The exported
+`JoseProtectedHeader` type is the ordered-pair header that resolvers and unwrappers
+receive.

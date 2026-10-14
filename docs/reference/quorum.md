@@ -1,13 +1,14 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** RFC 9421 and the shared conformance corpus · **Review when:** quorum assignment, bindings, or negotiation changes
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RFC 9421 and the shared conformance corpus · **Review when:** quorum assignment, bindings, or negotiation changes
 
 # Multiple-signature verification
 
-`Quorum.create({mode, unit, slots, unexpected, invalid, bindings?, maxSignatures?})`
+`Quorum.create({mode, unit, slots, unexpected, invalid, sharedPrincipal?, bindings?, maxSignatures?})`
 returns a frozen branded policy. Node and Deno custom inspection and
 `JSON.stringify()` show only `mode`, `unit`, and `maxSignatures`, omitting
-slots and callbacks. Mode is `"all"`, `"any"`, or `{threshold: n}`.
+slots and callbacks. Mode is `"all"`, `"any"`, or `{threshold: n}`, where `n` is an integer from 1
+through `maxSignatures`.
 Unit is `"keys"`, `"principals"`, or `"roles"`; roles additionally require the
-Boolean `sharedPrincipal` choice. Every mode fills all required slots and needs
+Boolean `sharedPrincipal` choice, which must be absent for other units. Every mode fills all required slots and needs
 at least one counting unit. `all` requires at least one required slot; with
 unshared principals it also requires distinct principals for the required roles.
 
@@ -28,6 +29,15 @@ replay policies; verification rejects every replay policy
 with `invalid_policy` at `input`, after checking the quorum and before checking
 the message, including optional or unmatched slots. No clock, resolver,
 commitment, or store callback runs.
+
+Reasons: construction failures return `invalid_quorum` at `input`. Verification
+returns, at the `quorum` layer, `unexpected_signature` for a refused unexpected
+label, `nonqualifying_signature` (with the last slot's reason as `detail`) for a
+refused invalid signature, `quorum_not_met` when the mode is not satisfied,
+`binding_unsatisfied` when a binding fails, and, when counting keys,
+`ambiguous_key_identity` when a required slot's only matches have no known key
+identity. A malformed `acceptSignature` option returns
+`invalid_accept_signature` at `negotiation`.
 
 Signature dictionaries are parsed once under the quorum limit; slot policy
 `maxSignatures` does not restrict that parse. Signature bases are cached per
@@ -64,7 +74,8 @@ Bindings are `{kind: "nested", outer, inner}` or
 both `"signature-input";key="<assigned-inner-label>"` and
 `"signature";key="<assigned-inner-label>"` by the assigned outer signature.
 Same-parameter binding requires equal present `nonce`, `tag`, or `created`
-values in the selected slots. At most 64 unique bindings are accepted.
+values in the selected slots, which name 1–16 unique slot IDs. A nested binding's
+`outer` and `inner` differ. At most 64 unique bindings are accepted.
 
 `AcceptSignature.parse(bytesOrOccurrences, {target: "request" | "response"})`
 returns an ordered frozen branded request array. It rejects duplicate labels

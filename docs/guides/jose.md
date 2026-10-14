@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, RFC 8725, and the executed examples in this guide · **Review when:** JOSE policies or custody boundaries change
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, RFC 8725, and the executed examples in this guide · **Review when:** JOSE policies or custody boundaries change
 
 # Signed and encrypted tokens (JOSE)
 
@@ -16,13 +16,13 @@ Verification and decryption take a policy object with exact keys. Unknown keys a
 | `JWE.decrypt` | `algorithms`, `encryption`, `max_plaintext` (1 to 1,048,576), `timeout`, `key_resolver` |
 | `Nested.decrypt` | `{ jwe, jws }` with the two policies above, and a `content_types` option |
 
-The JWS algorithms are RS256, PS256, PS384, PS512, HS256, ES256, ES384, and EdDSA. JWE supports RSA-OAEP, RSA-OAEP-256, A128GCMKW, A256GCMKW, and `dir`, with A128GCM or A256GCM content encryption. The resolver receives the algorithm and the parsed header, and returns `ok({ algorithm, key })` where `key` is a `PublicKey` or a key handle. Return `err(...)` for an unknown key.
+The JWS algorithms are RS256, PS256, PS384, PS512, HS256, ES256, ES384, and EdDSA. JWE supports RSA-OAEP, RSA-OAEP-256, A128GCMKW, A256GCMKW, and `dir`, with A128GCM or A256GCM content encryption. The resolver receives the algorithm and the parsed header. For JWS it returns `ok({ algorithm, key })` with a `PublicKey` or key handle, or `ok({ algorithm, verify })`; for JWE it returns `ok({ algorithm, key })` with an RSA-OAEP key handle, or `ok({ algorithm, unwrap })`. If the returned `algorithm` differs from the token's, the call fails with `algorithm_mismatch`. Return `err(...)` for an unknown key.
 
 HTTP algorithm names (`ed25519`) and JOSE names (`EdDSA`) are different registries, and no alias connects them. A key handle for JOSE is bound to a JOSE algorithm when you create it: `Custody.local({ jws: "EdDSA" }, pem)` or `Custody.local({ jwe: "RSA-OAEP-256" }, pem)`.
 
 ## What the parser refuses
 
-Compact tokens are limited to 1,048,576 bytes and protected headers to 16,384 bytes, depth four, and 64 members per object. A protected header with a duplicate member name at any depth is refused. The headers `crit`, `zip`, `jku`, `x5u`, `jwk`, and `b64` are refused whatever their value, so a token cannot compress its content, pick its own key, or point at a key URL. JSON serializations and detached payloads are refused. The received protected bytes are never reserialized before verification.
+Compact tokens are limited to 1,048,576 bytes and protected headers to 16,384 bytes, depth four, and 64 members per object. A protected header with a duplicate member name at any depth is refused. The headers `crit`, `zip`, `jku`, `x5u`, `jwk`, and `b64` are refused whatever their value (`unsupported_critical_header` for `crit`, `compression_unsupported` for `zip`, `unsupported_header` for the rest), so a token cannot compress its content, pick its own key, or point at a key URL. JSON serializations and detached payloads are refused. The received protected bytes are never reserialized before verification.
 
 ## A complete example
 
@@ -83,7 +83,24 @@ Equal errors do not make equal timings. The [threat model](../design/threat-mode
 
 ## Keep keys in custody
 
-A `PublicKey` recipient encrypts. To decrypt, the resolver returns a key handle for the RSA private key, or an `unwrap` function that returns an operation-only AES capability. For `dir` and the AES key-wrapping algorithms, `KeyManagement.local` holds the key as a caller-owned capability. The library borrows capabilities you provide and never releases them, so release them yourself after use. See [key custody](key-custody.md) for handles.
+A `PublicKey` recipient encrypts. To decrypt, the resolver returns a key handle for the RSA private key, or an `unwrap` function that returns an operation-only AES capability. For `dir` and the AES key-wrapping algorithms, `KeyManagement.local` holds the key as a caller-owned capability. It is not a key handle, so you pass it through functions: its `wrap` method as the encryption recipient, and its `unwrap` method from the resolver. The library borrows capabilities you provide and never releases them, so release them yourself after use. See [key custody](key-custody.md) for handles.
+
+```ts
+import assert from "node:assert/strict";
+import { JWE, KeyManagement, ok, type Context, type JoseProtectedHeader, type Result } from "@request-seal/core";
+
+const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
+// A 256-bit key-encryption key shared by sender and recipient. Load it from your secret store.
+const kek = must(await KeyManagement.local("A256GCMKW", crypto.getRandomValues(new Uint8Array(32))));
+const sealed = must(await JWE.encrypt([["alg", "A256GCMKW"], ["enc", "A256GCM"]], new TextEncoder().encode("sensor calibration"),
+  (algorithm: string, contentKey: Uint8Array, context: Context) => kek.wrap(algorithm, contentKey, context)));
+const opened = must(await JWE.decrypt(sealed, {
+  algorithms: ["A256GCMKW"], encryption: ["A256GCM"], max_plaintext: 1024, timeout: 5000,
+  key_resolver: () => ok({ algorithm: "A256GCMKW", unwrap: (encryptedKey: Uint8Array, header: JoseProtectedHeader, context: Context) => kek.unwrap(encryptedKey, header, context) }),
+}));
+assert.equal(new TextDecoder().decode(opened.plaintext), "sensor calibration");
+must(await kek.release()); // The library never releases capabilities you own.
+```
 
 ## Where to go next
 

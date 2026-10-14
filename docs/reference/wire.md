@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 9, 2026 · **Governed by:** RFC 8941, RFC 9651, and RFC 9421 · **Review when:** wire API contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RFC 8941, RFC 9651, and RFC 9421 · **Review when:** wire API contracts change
 
 # Wire APIs
 
@@ -62,14 +62,18 @@ if (parsed.ok) {
 `Message.validate(value)` applies the same rules and returns a new frozen
 snapshot. Required attributes are `kind`, `fields`, `trailers`, `body`, and
 `transport`. Requests additionally require `method`, `rawTarget`, and
-`targetForm`. Responses require `status`; `relatedRequest` can link a validated
+`targetForm`, and may set `scheme` and `authority` together. Responses require an
+integer `status` from 100 through 599; `relatedRequest` can link a validated
 request. Related requests must be branded Message values. Field occurrences retain name case, whitespace, obs-text, duplicates,
 and order. Header and trailer sections remain separate. Body and field byte
 accessors return fresh copies so callers cannot mutate a constructed message.
 
-Create nested values through `FieldOccurrence.create({name, value, section})`,
-`Body.create({state, bytes?, source?, maxBytes?})`, and
-`TransportFacts.create({httpVersion?, tls?, evidence?})`. Body states are
+Create nested values through `FieldOccurrence.create({name, value, section, provenance?})`
+(provenance `caller`, the default, `http1`, `http2`, or `http3`),
+`Body.create({state, bytes?, source?, ownership?, maxBytes?})` (ownership is only
+`"caller"`; `maxBytes` defaults to 1,048,576 and has no fixed ceiling), and
+`TransportFacts.create({httpVersion?, tls?, evidence?})` (`httpVersion` is `unknown`,
+`http1_0`, `http1_1`, `http2`, or `http3`; `tls` is `unknown`, `plain`, or `tls`). Body states are
 `retained`, `streaming`, `consumed`, and `unavailable`. Streaming requires a
 caller-owned stream with a callable `getReader` (including streams from other realms); construction never reads or locks it.
 `trailers: "pending"` requires streaming content. Transport evidence can only
@@ -79,11 +83,13 @@ The asynchronous convenience builders
 `Message.request(method, absoluteHttpUrl, orderedPairs, bytesOrNull, options)`
 and `Message.response(status, orderedPairs, bytesOrNull, options)` retain body
 bytes. The request builder lowercases scheme/host and omits HTTP(S) default
-ports while preserving path and query octets. An absent path becomes `/`.
+ports while preserving path and query octets. An absent path becomes `/`. Fragments and non-HTTP(S) schemes reject with
+`invalid_message`.
 Direct `Message.create` supports all four target forms without normalization.
 Authorities follow RFC 3986 Section 3.2.2: bracketed hosts are IPv6 or IPvFuture
-literals. Bracketed IPv4, shortened/decimal/hex IPv4 forms, and zone identifiers
-reject with `invalid_message`. Canonical base64 padding is required when parsing
+literals. Bracketed IPv4 (including shortened, decimal, or hex forms) and zone identifiers
+reject with `invalid_message`; an unbracketed numeric host such as `127.1` is a
+registered name and is kept as written. Canonical base64 padding is required when parsing
 Structured Fields byte sequences; nonzero padding bits reject with `syntax`.
 Optional `digest: ["sha-256", "sha-512"]` adds Content-Digest over retained
 bytes. Generating a digest rejects an existing Content-Digest occurrence.

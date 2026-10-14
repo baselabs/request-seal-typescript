@@ -1,8 +1,8 @@
-**Status:** maintained · **Kind:** design · **Updated:** October 11, 2026 · **Governed by:** the RequestSeal for Elixir 0.4.1 threat model, WebCrypto, public standards, and executed boundary tests · **Review when:** a trust boundary, profile, adapter, data shape, custody mechanic, or runtime behavior changes
+**Status:** maintained · **Kind:** design · **Updated:** October 14, 2026 · **Governed by:** the RequestSeal for Elixir 0.4.1 threat model, WebCrypto, public standards, and executed boundary tests · **Review when:** a trust boundary, profile, adapter, data shape, custody mechanic, or runtime behavior changes
 
 # RequestSeal threat model
 
-RequestSeal processes attacker-controlled wire data at an authentication boundary. Its primary security goal is to report exactly what was cryptographically established, by which trusted association, under which profile, without granting caller authorization or payment authority.
+RequestSeal processes attacker-controlled wire data at an authentication boundary. Its primary security goal is to report exactly what was cryptographically established, by which trusted association, under which profile, without granting the caller any authorization.
 
 This package and the RequestSeal library for Elixir are two native implementations of one contract. They share an independently sourced conformance corpus and an error vocabulary, and they share these invariants. The first part of this document restates the invariants and the threat table that both implementations answer to. The second part, [TypeScript boundaries](#typescript-boundaries), records what is specific to this package. The rest of the file records measurements and the detailed custody and JOSE boundaries.
 
@@ -61,7 +61,7 @@ Custody, discovery, JOSE callbacks, Web Bot Auth trust callbacks, and required r
 
 ## Residual boundaries
 
-RequestSeal cannot establish that a caller's trust anchors, proxy configuration, authorization policy, payment decision, or external key-custody service are correct. It makes their inputs, provenance, and unevaluated state explicit so the caller cannot receive an accidental success signal. Assurance for a configured adapter comes from the real-substrate tests listed above, not from the existence of an interface.
+RequestSeal cannot establish that a caller's trust anchors, proxy configuration, authorization policy, or external key-custody service are correct. It makes their inputs, provenance, and unevaluated state explicit so the caller cannot receive an accidental success signal. Assurance for a configured adapter comes from the real-substrate tests listed above, not from the existence of an interface.
 
 # TypeScript boundaries
 
@@ -69,7 +69,7 @@ The invariants above hold in this package through the mechanisms below. Each is 
 
 ## The WebCrypto boundary
 
-All cryptography runs on WebCrypto. The core imports no Node module, which `npm run typecheck:web` enforces by compiling it against browser-style globals with no Node types; only the four files that need Node (`src/node_hasher.ts`, `src/discovery/node.ts`, `src/adapters/node-http/`, `src/custody/ssh-agent/`) are excluded, and each ships as its own subpath. `src/crypto/subtle.ts` captures `crypto.subtle` methods and `getRandomValues` once, at module load, so code that replaces those globals later cannot change a verdict. Verification accepts only a literal `true` from the runtime. The library implements no cryptographic primitive.
+All cryptography runs on WebCrypto. The core imports no Node module, which `npm run typecheck:web` enforces by compiling it against browser-style globals with no Node types; only the four locations that need Node (`src/node_hasher.ts`, `src/discovery/node.ts`, `src/adapters/node-http/`, `src/custody/ssh-agent/`) are excluded, and each ships as its own subpath. `src/crypto/subtle.ts` captures `crypto.subtle` methods and `getRandomValues` once, at module load, so code that replaces those globals later cannot change a verdict. One exception reads a global at call time: when `Message.request` or `Message.response` generates a `Content-Digest`, it calls the global `crypto.subtle.digest`. Verification recomputes digests with the captured function. Verification accepts only a literal `true` from the runtime. The library implements no cryptographic primitive.
 
 This boundary trades portability for exposure to each runtime's WebCrypto behavior, which is why [runtime limitations](#runtime-limitations) are declared and not hidden. See [ADR 0002](../adr/0002-zero-runtime-dependencies-and-webcrypto.md).
 

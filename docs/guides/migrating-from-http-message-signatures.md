@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** RFC 9421 and the comparison tests in `interop/migration` · **Review when:** the compared package version, or either library's signing or verification behavior, changes
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421 and the comparison tests in `interop/migration` · **Review when:** the compared package version, or either library's signing or verification behavior, changes
 
 # Migrating from http-message-signatures
 
@@ -128,9 +128,9 @@ const policy = must(Policy.create({
   content: "not_required", replay: "not_required",
 }));
 
-const outgoing = await signPlain({ method: "POST", url: "https://example.com/orders", headers: { "content-type": "application/json" }, body: '{"id":1}' }, key);
+const outgoing = await signPlain({ method: "POST", url: "https://example.com/articles", headers: { "content-type": "application/json" }, body: '{"id":1}' }, key);
 must(await verifyPlain(outgoing, policy));
-const unsigned = await verifyPlain({ method: "POST", url: "https://example.com/orders", headers: { "content-type": "application/json" } }, policy);
+const unsigned = await verifyPlain({ method: "POST", url: "https://example.com/articles", headers: { "content-type": "application/json" } }, policy);
 assert.ok(!unsigned.ok && unsigned.error.kind === "core" && unsigned.error.reason === "missing_signature_input");
 ```
 

@@ -1,18 +1,18 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** RFC 9421, the Fetch standard, and executed Node and Deno transport tests · **Review when:** a supported runtime version or the Fetch adapter contract changes
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, the Fetch standard, and executed Node and Deno transport tests · **Review when:** a supported runtime version or the Fetch adapter contract changes
 
 # Fetch
 
-`@request-seal/core/fetch` signs outgoing `Request` and `Response` objects and sends signed requests with `fetch`. It also verifies incoming requests and responses on the runtime versions the tests have measured. It exports `signedFetch`, `signRequest`, `signResponse`, `verifyRequest`, and `verifyResponse`. The [adapter reference](../reference/adapters.md#fetch) has the complete option list.
+`@request-seal/core/fetch` signs outgoing `Request` and `Response` objects and sends signed requests with `fetch`. It also verifies incoming requests and responses on the runtime versions the tests have measured. It exports `signedFetch`, `signRequest`, `signResponse`, `verifyRequest`, and `verifyResponse`. The [adapter reference](../reference/adapters.md#fetch) describes each function's options and errors.
 
 ## Send a signed request
 
-`signedFetch(input, init, { spec, signer }, options)` is `fetch` plus signing. `spec` is the same signature spec that `sign` takes, and `signer` is a key handle or a signing function. The call returns a `Result` holding `{ response, request }`: the response, and the exact signed request that was sent.
+`signedFetch(input, init, { spec, signer }, options)` is `fetch` plus signing. `spec` is the same signature spec that `sign` takes, and `signer` is a key handle or a signing function. The call returns a `Result` holding `{ response, request }`: the response, and a `{ request, message }` pair for the exact signed request that was sent. `init` accepts `method`, `headers`, `body`, `credentials`, `cache`, `mode`, `referrer`, `referrerPolicy`, `integrity`, `keepalive`, and `signal`; any other key, including `redirect`, returns `invalid_options`. Options are `context`, `maxBytes`, `maxRedirects`, `maxRetries`, `allowedOrigins`, `credentialHeaders`, `verify`, `clock`, `nonce`, and `signingTimeout`.
 
 Three behaviors matter in production.
 
-- **Every attempt is signed afresh.** A retry or redirect builds a new signature with a new `created` time and a new nonce, so a retried request is never a replay of the first one.
-- **Redirects and retries are off by default.** `maxRedirects` and `maxRetries` each default to 0 and accept up to 10. Only 5xx responses are retried. Retries resend the body. Enable `maxRetries` only for idempotent operations or with application-level deduplication: a 5xx does not prove the request was not processed. A redirect that leaves the original origin needs that origin in `allowedOrigins`, and the adapter then removes `Authorization`, `Cookie`, `Proxy-Authorization`, and any `credentialHeaders` you list.
-- **One deadline covers the exchange.** Pass `context: withDeadline({ timeoutMs })` to bound every body read, signature, redirect, retry, and delivery together. The default is five seconds.
+- **Every attempt is signed afresh.** A retry or redirect builds a new signature. With the spec's default `created` and `nonce`, each attempt gets a new `created` time and a new random nonce, so a retried request is never a replay of the first one. A `nonce` option applies to the first attempt only.
+- **Redirects and retries are off by default.** `maxRedirects` and `maxRetries` each default to 0 and accept up to 10. Only 5xx responses are retried. Retries resend the body. Enable `maxRetries` only for idempotent operations or with application-level deduplication: a 5xx does not prove the request was not processed. A redirect that leaves the original origin needs that origin in `allowedOrigins`, or it fails with `cross_origin_redirect`; the adapter then removes `Authorization`, `Cookie`, `Proxy-Authorization`, and any `credentialHeaders` you list. Each list holds at most 64 entries.
+- **One deadline covers the exchange.** Pass `context: withDeadline({ timeoutMs })` to bound every body read, signature, redirect, retry, and delivery together. The default is five seconds. An expired deadline returns `custody/deadline_exceeded`, not an adapter error.
 
 The program signs an idempotent GET, receives a 503, retries once, and checks that the two attempts carry different nonces.
 
@@ -35,7 +35,7 @@ const server = createServer((req, res) => {
   res.end("done");
 }).listen(0, "127.0.0.1");
 await once(server, "listening");
-const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/orders`;
+const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/status`;
 
 const spec = { label: "sig", components: '("@method" "@authority" "@path")', algorithm: "hmac-sha256", expiresIn: 60 };
 const sent = must(await signedFetch(url, { method: "GET" }, { spec, signer }, { maxRetries: 1 }));
@@ -58,11 +58,11 @@ A runtime sets some fields itself, so a signature that covers them could never v
 
 ## Sign a request or a response yourself
 
-`signRequest(request, spec, signer, options)` returns `{ request, message }`: a rebuilt `Request` with the signature headers, and the `Message` that was signed. `signResponse(response, spec, signer, { request })` does the same for a `Response`; pass the request so the signature can cover request components with `;req`. The body of the input is consumed once, so always use the rebuilt value that comes back.
+`signRequest(request, spec, signer, options)` returns `{ request, message }`: a rebuilt `Request` with the signature headers, and the `Message` that was signed. `signResponse(response, spec, signer, { request })` does the same for a `Response`; pass the request so the signature can cover request components with `;req`. The request must be the `{ request, message }` pair from `signRequest` or a request `Message`; a plain `Request` returns `invalid_options`. The body of the input is consumed once, so always use the rebuilt value that comes back.
 
 ## Verify incoming requests
 
-`verifyRequest(request, policy, { label, scheme, authority })` verifies a `Request` against a generic `Policy` and returns `{ request, message, verification, bytes }`. `bytes` is a copy of the verified body, and `request` is a rebuilt request holding exactly those bytes, so read the body from it and not from the original.
+`verifyRequest(request, policy, { label, scheme, authority })` (plus optional `context`, `maxBytes`, and `representation`) verifies a `Request` against a generic `Policy` and returns `{ request, message, verification, bytes }`. `bytes` is a copy of the verified body, and `request` is a rebuilt request holding exactly those bytes, so read the body from it and not from the original.
 
 Two rules keep Fetch verification honest.
 
@@ -100,9 +100,9 @@ const server = Deno.serve({ hostname: "127.0.0.1", port: 0, onListen: ({ port })
   return verified.ok ? new Response(new TextDecoder().decode(verified.value.bytes)) : new Response(null, { status: 401 });
 });
 const spec = { label: "sig", components, algorithm: "ed25519", expiresIn: 60, digest: ["sha-256"] };
-const sent = must(await signedFetch(`http://${authority}/orders`, { method: "POST", body: "hello" }, { spec, signer }));
+const sent = must(await signedFetch(`http://${authority}/telemetry`, { method: "POST", body: "hello" }, { spec, signer }));
 assert.equal(await sent.response.text(), "hello");
-const unsigned = await fetch(`http://${authority}/orders`, { method: "POST", body: "hello" });
+const unsigned = await fetch(`http://${authority}/telemetry`, { method: "POST", body: "hello" });
 assert.equal(unsigned.status, 401);
 await unsigned.body?.cancel();
 await server.shutdown();
@@ -110,7 +110,7 @@ await server.shutdown();
 
 ## Verify responses
 
-`verifyResponse(response, policy, { label, request })` verifies a response and, with `request` set to the signed request you sent, binds it to that request. `signedFetch` can do this for you: pass `{ verify: { policy, label } }` in the options and it withholds every response until it verifies. Response content checks do not apply on this adapter, because Fetch hides content encodings: a policy that requires a content digest on a response returns `body_unavailable`. Verify response digests only when the response arrives through [Node HTTP](node-http.md).
+`verifyResponse(response, policy, { label, request })` (plus optional `context` and `maxBytes`) verifies a response and, with `request` set to the signed request you sent, binds it to that request. `signedFetch` can do this for you: pass `{ verify: { policy, label } }` in the options and it withholds every response until it verifies. Response content checks do not apply on this adapter, because Fetch hides content encodings: a response policy whose `content` is anything but `"not_required"` returns `body_unavailable`. On a runtime outside `FETCH_VERIFICATION_RUNTIMES`, `signedFetch` with `verify` returns `invalid_request` before anything is sent. Verify response digests only when the response arrives through [Node HTTP](node-http.md).
 
 ## Where to go next
 

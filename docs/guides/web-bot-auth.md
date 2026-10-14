@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00, RFC 9421, and the executed examples in this guide · **Review when:** the Web Bot Auth draft, discovery behavior, or the policy contract changes
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00, RFC 9421, and the executed examples in this guide · **Review when:** the Web Bot Auth draft, discovery behavior, or the policy contract changes
 
 # Web Bot Auth
 
@@ -122,7 +122,7 @@ assert.ok(!refused.ok && refused.error.kind === "core" && refused.error.reason =
 
 ### Reading the result
 
-`WebBotAuth.verify(message, policy)` validates every selected `web-bot-auth` label independently and returns a frozen envelope: `signatures` (a map from label to a verified result with a `principal`), `evidence` for nested signatures, `ignored` labels, a `replay` receipt, and `authorization: "not_evaluated"`. The principal is `{ kind: "agent", identifier, type, origin, thumbprint, provenance }` when a trusted source vouched for the key, or `{ kind: "key", thumbprint }` for a held key. Authentication is not authorization: decide what the agent may do after you have its identity.
+`WebBotAuth.verify(message, policy, options)` validates every selected `web-bot-auth` label independently and returns a frozen envelope: the `web_bot_auth` `profile`, `signatures` (a map from label to a verified result with a `principal`), `evidence` for nested signatures, `ignored` labels, a `replay` receipt, and `authorization: "not_evaluated"`. The principal is `{ kind: "agent", identifier, type, origin, thumbprint, provenance }` when a trusted source vouched for the key, or `{ kind: "key", thumbprint }` for a held key. Authentication is not authorization: decide what the agent may do after you have its identity.
 
 ### Policy choices
 
@@ -139,9 +139,11 @@ assert.ok(!refused.ok && refused.error.kind === "core" && refused.error.reason =
 | `maxLifetime` | 1 to 604,800 seconds, default 86,400. |
 | `testKeys` | `"reject"` (default) refuses published example keys; `"allow"` is for tests. |
 | `untagged` | `"ignore"` (default) records labels that are not Web Bot Auth in `ignored`; `"reject"` refuses them. |
-| `unresolved` | `"reject"` (default) or `{ heldKeys }` to pin keys. |
+| `unresolved` | `"reject"` (default), or `{ heldKeys }` to pin keys: a resolver called with `{ label, keyid, tag }` and the Context that returns `{ algorithm, key }` with an `algorithm` from `algorithms`, or `null`. |
+| `maxSignatures` | 1 to 64 signatures per message, default 16. |
+| `fieldSchemas` | Structured Fields schemas for covered fields, by lowercase name. |
 
-Time-limited work runs under one deadline: `timeoutMs` (1 to 300,000 milliseconds, default 5,000) covers trust, discovery, verification, content, and replay. A deadline during trust or discovery is `agent_unresolved` with detail `timeout`; a deadline inside signature checking is a retryable `custody/deadline_exceeded`.
+`WebBotAuth.verify` accepts `{ timeoutMs, context, representation, digestState }` as its third argument; the last two work as they do for generic `verify`. Time-limited work runs under one deadline: `timeoutMs` (1 to 300,000 milliseconds, default 5,000) covers trust, discovery, verification, content, and replay. A deadline during trust or discovery is `agent_unresolved` with detail `timeout`; a deadline inside signature checking is a retryable `custody/deadline_exceeded`.
 
 ### Express, Hono, and the Node adapter
 
@@ -149,7 +151,7 @@ Time-limited work runs under one deadline: `timeoutMs` (1 to 300,000 millisecond
 
 ## Sign as an agent
 
-`WebBotAuth.sign(message, spec, signer)` takes a request message and a spec with `label`, `agent: { location, type }`, the agent's public `key`, `algorithm`, explicit `created` and `expires` times, and a `nonce` (a non-empty string, or `null`). The signer is a key handle or a signing function. Signing derives the key ID from the key, adds the `Signature-Agent` member and the `@authority` coverage, and stamps the parameters in the order the draft expects. Lifetimes are positive and at most 86,400 seconds. A conflicting existing `Signature-Agent` member is refused before the signing key is touched.
+`WebBotAuth.sign(message, spec, signer, options)` takes a request message and a spec with `label`, `agent: { location, type }`, the agent's public `key`, `algorithm`, explicit `created` and `expires` times, a `nonce` (1 to 1,024 characters, or `null`), and optional extra `components`. Options are `fieldSchemas` and `context`. The signer is a key handle or a signing function. Signing derives the key ID from the key, adds the `Signature-Agent` member, covers `@authority` and that label's `signature-agent` member, and stamps the parameters in the order the draft expects. Lifetimes are positive and at most 86,400 seconds. A conflicting existing `Signature-Agent` member is refused before the signing key is touched.
 
 Include a fresh `nonce` whenever the site may require replay protection; a `null` nonce signs without one and a site that requires replay refuses it with `missing_replay_identifier`.
 
@@ -158,7 +160,10 @@ Include a fresh `nonce` whenever the site may require replay protection; a `null
 | Reason | Meaning |
 | --- | --- |
 | `agent_unresolved` | Trust could not connect the signature to a key. The detail says why: `untrusted_agent`, `unknown_key`, `source_mismatch`, `revoked_key`, `missing_member`, `unsupported_type`, `not_an_origin`, `source_unavailable`, or `timeout`. It does not claim the signature is invalid. |
-| `invalid_signature_agent` | The `Signature-Agent` field breaks the draft's dictionary rules, or uses the legacy string form. |
+| `invalid_signature_agent` | The `Signature-Agent` field breaks the draft's dictionary rules. The detail is `invalid_dictionary`, `invalid_member`, `duplicate_member`, or `legacy_string` (the old string form). |
+| `invalid_keyid` | The `keyid` is not an RFC 7638 thumbprint. |
+| `missing_required_component` | The signature covers neither `@authority` nor `@target-uri`, or omits its own `signature-agent` member. |
+| `unexpected_signature` | The policy sets `untagged: "reject"` and the message carries a signature without the `web-bot-auth` tag. |
 | `lifetime_exceeded` | `expires` minus `created` is longer than `maxLifetime`. |
 | `nested_coverage_incomplete` | An outer signature does not cover the inner signature and its components. |
 | `test_key_rejected` | The key is a published example key. |

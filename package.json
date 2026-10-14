@@ -4,6 +4,18 @@
   "description": "Standards-based HTTP message signatures and JOSE for web-standard runtimes.",
   "type": "module",
   "license": "Apache-2.0",
+  "keywords": [
+    "http-message-signatures",
+    "rfc9421",
+    "rfc9530",
+    "content-digest",
+    "web-bot-auth",
+    "jose",
+    "jws",
+    "jwe",
+    "webcrypto",
+    "replay-protection"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

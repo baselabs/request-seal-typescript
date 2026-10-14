@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** the shared RequestSeal corpus contract · **Review when:** manifest schema or canonical serialization changes
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** the shared RequestSeal corpus contract · **Review when:** manifest schema or canonical serialization changes
 
 # Conformance corpus format
 
@@ -99,7 +99,7 @@ Never use a bare JSON number for a wire value. Explicit pairs preserve member or
 | `replay.claim` | Namespace/key bytes; created, expires, max_age, and skew tagged integers, with nullable expires/max_age. Retention integer and hexadecimal row form, or rejection. |
 | `profile.name` | Built-in profile name or package/kind pair. Valid or `core/input.invalid_profile`. |
 
-An unregistered surface or batch item format is reported as pending with case IDs and case/item counts. It fails by default. `--pending-ok` reads the committed `tools/conformance/pending.json` allowlist. Pending surfaces, item formats, case IDs, and case/item counts must match their declared entries. A registered surface or item format appearing in pending, an unlisted entry, or changed counts fails the run; integrity errors and disagreements also fail. Update the allowlist and exact executed count deliberately as execution adapters land. A pending known-positive case is explicitly reported as unexecuted and blocks releases. The separate tooling smoke corpus registers `smoke` for the actual base64url and JSON decoders, plus all four wire surfaces, `crypto.verify`, `key.import`, and `discovery.body`. It exercises byte-exact, verify-only, and rejection classes and has its own pinned index. It is not a released protocol corpus. `--unpinned` allows a deliberate development run; ordinary release-corpus runs require `CORPUS_PIN`.
+An unregistered surface or batch item format is reported as pending with case IDs and case/item counts. It fails by default. `--pending-ok` reads the committed `tools/conformance/pending.json` allowlist. Pending surfaces, item formats, case IDs, and case/item counts must match their declared entries. A registered surface or item format appearing in pending, an unlisted entry, or changed counts fails the run; integrity errors and disagreements also fail. Update the allowlist and exact executed count deliberately as execution adapters land. A pending known-positive case is explicitly reported as unexecuted and blocks releases. The separate tooling smoke corpus registers `smoke` for the actual base64url and JSON decoders, plus one case each for the four wire surfaces, `crypto.verify`, `key.import`, `sign`, `verify`, `digest.content`, `jws.sign`, `jws.verify`, `jwe.decrypt`, `nested.decrypt`, `discovery.body`, `replay.claim`, and `web_bot_auth.verify`. It exercises byte-exact, verify-only, and rejection classes and has its own pinned index. It is not a released protocol corpus. `--unpinned` allows a deliberate development run; ordinary release-corpus runs require `CORPUS_PIN`.
 
 ## Canonical Verification
 
@@ -253,6 +253,11 @@ Bun 1.3.14 has one entry for
 with `s = 2^128` and `s = n - 2^128` on `darwin-arm64`. The October 10, 2026
 ubuntu-24.04 CI failure log reports that both items verify on `linux-x64`, so
 this entry applies only to `darwin-arm64`.
+
+The browser suite reads the same file. WebKit 27.2 has two entries whose IDs name
+browser cases rather than corpus manifests: `custody/ed25519_empty_message` on
+`darwin-arm64` and `custody/ed25519_pkcs8_leading_zero_seed` on `linux-x64`, both
+observed as `custody/invalid_key`. The [runtime matrix](runtime-matrix.md) lists them.
 
 Each item still runs actual cryptography. An entry scoped to another platform
 does not exempt an outcome or trigger a stale check: the item must agree with

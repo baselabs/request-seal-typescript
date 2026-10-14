@@ -1,11 +1,12 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** exact CI pins, package engines, public standards, and executed runtime probes · **Review when:** runtime lanes, permissions, Playwright, or declared limitations change
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** exact CI pins, package engines, public standards, and executed runtime probes · **Review when:** runtime lanes, permissions, Playwright, or declared limitations change
 
 # Runtime matrix
 
 CI runs on Linux (`ubuntu-24.04`). Development supports macOS and Linux;
-Windows developers use WSL2. The table below equals the CI lane set: Node 22.12.0, 24.21.0, and 26.11.1; Deno 2.5.6;
+Windows developers use WSL2. The table below equals the CI runtime lanes: Node 22.12.0, 24.21.0, and 26.11.1; Deno 2.5.6;
 Bun 1.3.14; the denied-roots-only check on Deno 2.9.7; Chromium 156.0.8078.4, Firefox 157.0, and WebKit 27.2 from
-Playwright 1.64.0. Releases call the same workflow, including `browsers`.
+Playwright 1.64.0. The separate `reciprocal` job runs on Node 24.21.0 with Erlang/OTP
+29.0.3 and Elixir 1.20.3. Releases call the same workflow, including `browsers`.
 The Node 26 job remains named `Node 26`; all Node pins and installed-version
 assertions use exact patch versions.
 
@@ -25,9 +26,9 @@ assertions use exact patch versions.
 
 ## Node floor and engines
 
-The package floor remains `>=22.12.0`. `npm run check` runs source contracts,
-self-checks, build, the shared corpus, and the package boundary check. The latter
-runs built-module contracts without changing the source runner.
+The package floor remains `>=22.12.0`. `npm run check` runs, in order, `typecheck`,
+`typecheck:web`, `build`, `test`, `self-checks`, `conformance`, and `pack:check`. The
+package boundary check runs built-module contracts without changing the source runner.
 
 OBSERVED on macOS arm64, October 10, 2026: the Node 23.11.0 probe
 `node -e 'const tls=require("node:tls"); console.log(process.version, tls.rootCertificates.length, tls.getCACertificates("system").length)'`

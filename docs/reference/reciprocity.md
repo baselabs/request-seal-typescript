@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 ·
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 ·
 **Governed by:** RFC 9421, RFC 7515, RFC 7516, protocol-00, and RequestSeal
 v0.4.1 · **Review when:** peer pins, exchange protocol, or CI changes
 
@@ -50,7 +50,7 @@ npm ci --prefix interop/reciprocal --ignore-scripts
 mix local.hex --force
 mix local.rebar --force
 npm run setup --prefix interop/reciprocal
-(cd interop/replay && mix deps.get --check-locked && mix compile)
+(cd interop/replay && mix deps.get --check-locked && mix compile --warnings-as-errors)
 ```
 
 Set `REQUESTSEAL_REPLAY_PG_URL` to an existing authorized PostgreSQL database
@@ -62,8 +62,9 @@ elixir --version
 npm run typecheck --prefix interop/reciprocal
 REQUESTSEAL_RECIPROCAL_RECEIPT=interop/reciprocal/.cache/receipt.md \
   npm run exchange --prefix interop/reciprocal
-REQUESTSEAL_REPLAY_ELIXIR=1 node --experimental-strip-types --no-warnings \
-  --test test/replay-reciprocal.test.ts
+REQUESTSEAL_REPLAY_ELIXIR=1 node --experimental-strip-types --no-warnings --test \
+  test/peer-process.test.ts test/replay-reciprocal.test.ts test/reciprocal.test.ts \
+  test/reciprocal-driver.test.ts test/reciprocal-record.test.ts
 ```
 
 The full exchange requires the database URL; it never skips a surface. Each peer
@@ -139,5 +140,6 @@ The Linux CI job is named exactly `reciprocal`. It uses
 dependency installation, the same PostgreSQL service as the Node lanes, and the
 full exchange. The job has a 20-minute timeout and retains its public exchange
 artifact for three days. `release.yml` calls this CI workflow before publishing.
-A Hex outage fails the job. The existing required check names remain
-`Node 24.21.0`, `Node 22.12.0`, `Node 26`, `deno`, and `bun`.
+A Hex outage fails the job. The required check names on `main` are
+`Node 24.21.0`, `Node 22.12.0`, `Node 26`, `deno`, `bun`, `reciprocal`, `browsers`, and
+`Deno denied OS roots`.

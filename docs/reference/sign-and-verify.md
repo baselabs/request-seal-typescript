@@ -1,41 +1,60 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 crypto and custody behavior, RFC 9421, RFC 9530, and the shared conformance corpus · **Review when:** signing, policy, digest, or verification contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 crypto and custody behavior, RFC 9421, RFC 9530, and the shared conformance corpus · **Review when:** signing, policy, digest, or verification contracts change
 
 # Signing and verification
 
 `sign(message, spec, signer, options)` appends ordered `Signature-Input` and
 `Signature` header occurrences and returns a new branded Message in a Result.
-Exact-input specs accept a callable signer `(algorithm, base, context) => Result<Uint8Array>`
-(with asynchronous results supported) or a branded KeyHandle. Function length
-does not determine validity; returned Results and signature bytes do.
-Exact-input specs contain `label`,
-`signatureInput`, and `algorithm`; their options are `fieldSchemas`, `signingTimeout`, and `context`.
-`signingTimeout` accepts integer milliseconds from 1 through 300,000, default
-5,000. On both forms, the handle deadline starts immediately before the custody
-call, after signature-base construction, and is capped at `signingTimeout` even
-under a longer caller Context. A caller Context can shorten that deadline.
-Explicit callable execution remains unchanged. An explicit handle algorithm
-mismatch returns `signer_algorithm_mismatch` at `input` with message
-`"signer algorithm does not match signature specification"`.
-Both explicit and generated handle failures return `signing_failed` at `crypto`,
-with a bounded custody error in `source`. The outer error is nonretryable;
-`source.retryable` can be true for `deadline_exceeded`. Empty, non-binary, or
-over-1,024-byte HTTP signatures use source `invalid_signing_output`; malformed
-custody errors use `custodian_failure`. Other core errors have null `message`
-and `source`. Callable failures on both paths retain `signer_failed` and null
-`source`. The reference now accepts KeyHandle on both forms too; the remaining
-signer divergence is accepting any callable rather than requiring an arity-two
-function.
-Generated specs accept a KeyHandle or a signer function and contain `label`,
-`components`, `algorithm`, and `expiresIn`.
-Defaults are `created: true`, `nonce: "random"`, and `alg: true` for HTTP algorithms (false for JWS selections). Optional `keyid`
-and `tag` are printable ASCII. A nested `parameters` object accepts the same
-metadata choices. Complete specs also provide `digest`, `fieldSchemas`, and all
-six parameter choices; only those permit `expiresIn: null`. Metadata order is
-created, expires, nonce, alg, keyid, tag. Generated options are `clock`, a fresh
-32-byte `nonce`, `signingTimeout`, and `context`.
+The signer is a branded KeyHandle or a callable `(algorithm, base, context) =>
+Result<Uint8Array>` (asynchronous results are supported) that returns 1 to 1,024
+signature bytes. Function length does not determine validity; returned Results and
+signature bytes do.
+
+Exact-input specs contain only `label`, `signatureInput`, and `algorithm`; their
+options are `fieldSchemas`, `signingTimeout`, and `context`. Generated specs contain
+`label`, `components`, `algorithm`, and `expiresIn`; their options are `clock`, a fresh
+32-byte `nonce`, `signingTimeout`, and `context`. `signingTimeout` accepts integer
+milliseconds from 1 through 300,000, default 5,000.
+
+Deadlines depend on the signer:
+
+- A KeyHandle's deadline starts immediately before the custody call, after
+  signature-base construction, and is capped at `signingTimeout` even under a longer
+  caller Context. A caller Context can shorten it.
+- A function signer on a generated spec runs under the caller's `context` when one is
+  passed, and otherwise under `signingTimeout`.
+- A function signer on an exact-input spec runs under the caller's `context` when one
+  is passed, and otherwise under a fixed 5,000 ms deadline; `signingTimeout` does not
+  apply to it.
+
+Errors: an exact-input handle algorithm mismatch returns `signer_algorithm_mismatch`
+at `input` with message `"signer algorithm does not match signature specification"`;
+a generated spec reports the same mismatch as `invalid_options`. Handle failures on
+both forms return `signing_failed` at `crypto`, with a bounded custody error in
+`source`. The outer error is nonretryable; `source.retryable` can be true for
+`deadline_exceeded` or `custodian_unavailable`. Empty, non-binary, or over-1,024-byte
+handle signatures use source `invalid_signing_output`; malformed custody errors use
+`custodian_failure`. Function failures on both forms return `signer_failed` with null
+`source`. Other core errors have null `message` and `source`. A label already present
+returns `label_in_use` at `fields`. Generated specs report signature-base failures as
+`limit` or `unsupported_component` at `input`, and refuse the `host` component, the
+`;tr` parameter, and `;req` on a request with `unsupported_component`; exact-input
+specs report base failures as `signature_base_failed` at `crypto`.
+
+Generated defaults are `created: true`, `nonce: "random"`, and `alg: true` for HTTP
+algorithms (false for JWS selections, where an explicit `alg: true` rejects). Optional
+`keyid` and `tag` are printable ASCII of at most 1,024 characters, or null. A numeric
+`expiresIn` requires `created: true`. A nested `parameters` object accepts the same
+metadata choices and `expiresIn`, and excludes the top-level metadata keys. Complete
+specs put all six choices in `parameters` and also provide `digest` and
+`fieldSchemas`; only those permit `expiresIn: null`. Metadata order is created,
+expires, nonce, alg, keyid, tag. `digest` lists `sha-256`, `sha-512`, or both, needs
+a retained body (otherwise `body_unavailable` at `content`), and adds
+`Content-Digest`; an existing `Content-Digest` must carry exactly those algorithms
+(otherwise `digest_mismatch` at `content`).
 
 `Policy.create()` requires six explicit choices: `algorithms`, serialized
-`components`, `keyResolver`, `freshness`, `content`, and `replay`. HTTP algorithms
+`components`, `keyResolver`, `freshness`, `content`, and `replay`; every failure is
+`invalid_policy` at `input`. `algorithms` holds 1 to 64 unique entries. HTTP algorithms
 are exact tokens from `Crypto.algorithms()`. JWS selections use `{jws: name}`
 for RS256, PS256, PS384, PS512, HS256, ES256, ES384, or EdDSA; sender `alg`
 must be absent for these selections. A resolver receives `{keyid, label,
@@ -56,15 +75,20 @@ Freshness is `"not_evaluated"` or `{clock, maxAge, skew, requireExpires}`.
 return integer Unix seconds from 0 through 253,402,300,799.
 Content is `"not_required"` or `{kind, algorithms, section}`, where kind is
 `"content"` or `"representation"`, algorithms select SHA-256/SHA-512, and section
-is `"headers"` or `"trailers"`. Optional `extraComponents: "reject"` requires
-exact coverage; `maxSignatures` defaults to 16 and may be 1 through 64.
+is `"headers"` or `"trailers"`. Optional `extraComponents` is `"allow"` (the default)
+or `"reject"`, which requires exact coverage; `maxSignatures` defaults to 16 and may be 1 through 64.
 `fieldSchemas` supplies explicit Structured Fields schemas by lowercase field name.
 
 `verify(message, policy, {label, context?, representation?, digestState?})`
 returns a frozen branded Verification only after required layers succeed.
-Representation and digest state are mutually exclusive. Representation must be
-an explicit complete retained Body. Content checks require complete signed
-coverage of the selected digest field and every supported checksum present.
+Without `context`, verification runs under a 5,000 ms deadline. `profile` or
+`principal` keys return `invalid_profile` at `input`. Representation and digest state
+are mutually exclusive. Representation must be an explicit complete retained Body and
+needs a `"representation"` content policy; a digest state's kind must match the
+policy's content kind; otherwise `invalid_options`. Content checks require complete signed
+coverage of the selected digest field. Every SHA-256 or SHA-512 member the field
+carries must be one of the policy's algorithms (otherwise `digest_unsupported`), at
+least one must be present, and each is recomputed.
 Unknown algorithms are recorded but cannot establish integrity.
 `serializeVerification()` emits the ordered language-neutral facts documented in
 [corpus format](corpus-format.md#canonical-verification).
@@ -80,8 +104,8 @@ principal is `"unattributed"`, an agent principal, or a held-key principal.
 Generic callers narrow `principal` before use, checking for `"unattributed"`
 and then the `kind` discriminator (`"agent"` or `"key"`).
 
-`digest(bytes, algorithms)` returns RFC 9530 dictionary bytes using captured
-WebCrypto, with a 16 MiB hard work ceiling. `DigestState.create(kind, algorithms,
+`digest(bytes, algorithms, {maxBytes?})` returns RFC 9530 dictionary bytes using
+captured WebCrypto, with a 16 MiB hard work ceiling; `maxBytes` lowers it. `DigestState.create(kind, algorithms,
 hasher, {maxBytes?})` validates a caller-injected IncrementalHasher against SHA-2
 empty and multichunk known answers before use. `create`, session `update`,
 and session `finish` must be own properties; explicitly bind prototype methods
@@ -92,7 +116,9 @@ work budget. `createNodeHasher()` from `@request-seal/core/node-hasher` supplies
 Node-compatible SHA-2 port.
 
 Replay is `"not_required"` or `{identifier: "nonce", namespace, commitment,
-store, timeoutMs}` with bounded freshness. The caller-owned ReplayStore port
+store, timeoutMs}`, with a 1–256-byte namespace and `timeoutMs` from 1 through
+300,000. It needs bounded freshness: `requireExpires: true` or a non-null `maxAge`.
+A signature without a nonce returns `missing_replay_identifier` at `replay`. The caller-owned ReplayStore port
 reads `claim`, `sweep`, and optional `identity` by own property; prototype
 methods must be explicitly bound to own properties. `identity` is a public
 ASCII adapter name (1 through 256 visible characters), defaulting to `"caller"`
@@ -145,8 +171,8 @@ Unwrap does not accept this option.
 Direct custodian callbacks require Uint8Array input within the ceiling before
 reading their private reference. A custodian using another handle or primitive
 must explicitly pass the ceiling after the managed boundary has checked the
-caller's bound. Message, Body, JWS, adapters, and SignatureBase retain their
-fixed 1 MiB limits.
+caller's bound. A Body defaults to 1 MiB and its `maxBytes` can raise that; message
+fields, JWS, adapters, and SignatureBase keep their fixed limits.
 
 Source: [RequestSeal for Elixir 0.4.1 crypto](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/crypto.ex)
 and [custody](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/custody.ex).

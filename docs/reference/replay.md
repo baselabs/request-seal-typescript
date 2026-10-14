@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** reference ADR 0005 (the atomic replay envelope) and the shared v0.4.0 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RequestSeal for Elixir ADR 0005 (the atomic replay envelope) and the shared v0.4.0 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
 
 # Replay protection
 
@@ -13,6 +13,15 @@ and uniqueness. For interoperability, independently encode the same exact UTF-8
 identifier and SHA-256 it in both languages, with identical namespace bytes. This
 recipe suits only callers whose authenticated identifier defines their entire
 uniqueness scope; include additional authenticated facts when their scope needs them.
+
+Replay reasons: `Claim.create` returns `replay/invalid_claim` for bad bytes or
+retention; `Replay.retainUntil`, `Replay.sweep`, and `createMemoryStore` return
+`replay/invalid_options`; `createReplayStore`, the PostgreSQL `createStore`, and `ddl` return
+`replay/invalid_store` for a malformed port or table name; stores return `store_unavailable`, `store_timeout`,
+`store_failed`, or `store_full`. During verification, a commitment that throws or
+returns anything but 1–256 bytes is `core/replay.commitment_failed`, a repeat is
+`core/replay.replayed`, and store errors become `core/replay.store_unavailable`,
+`store_timeout`, or `store_failed`. The [error vocabulary](error-parity.md) lists all of them.
 
 The library passes the profile to commitment but does not prefix the namespace
 or commitment output. This matches the reference: a nonce-only commitment in a
@@ -57,7 +66,10 @@ claim with copied byte getters. Retention is integer Unix seconds from
 −9,223,372,036,854,775,808 through 253,402,300,799, matching the reference claim
 domain. Use safe integer numbers or bigint for exact ends outside the safe number
 range. Negative ends are valid already-expired claims. `Replay.retainUntil({created, expires, maxAge, skew})` computes
-`min(expires + skew, created + maxAge + skew + 1)` over present bounds. Expiration
+`min(expires + skew, created + maxAge + skew + 1)` over present bounds. All four keys are
+required; pass `null` for an absent `expires` or `maxAge`, and at least one must be
+present. `maxAge` is positive, `skew` is 0 through 86,400, and a `maxAge` needs a
+`created`. Anything else returns `replay/invalid_options`. Expiration
 is exclusive; max age includes its final second. An end above the maximum rejects
 with `core/replay.retention_exceeded` before commitment or storage.
 
@@ -132,8 +144,9 @@ verification errors are nonretryable. Query exceptions
 expose only bounded reasons; neither SQL nor backend diagnostics appear in Results.
 Connection-error classification is per driver: this PostgreSQL adapter maps
 `ECONNREFUSED`, `ENOTFOUND`, `EHOSTUNREACH`, and `ENETUNREACH` to `store_unavailable`.
-A pg read timeout without a code maps to `store_failed`; a Context deadline or
-coded timeout maps to `store_timeout`. All are nonretryable. The reference's
+A pg read timeout without a code maps to `store_failed`. An `AbortError` name, or the
+code `ABORT_ERR`, `ETIMEDOUT`, or SQLSTATE `57014` (statement timeout or cancel), maps to
+`store_timeout`; other codes, including `55P03` (lock timeout), map to `store_failed`. All are nonretryable. The reference's
 Postgrex driver classifies ordinary connection errors as `store_failed`.
 
 For real database checks, install the isolated driver with

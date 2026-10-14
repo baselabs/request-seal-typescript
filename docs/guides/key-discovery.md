@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** RFC 7517, RFC 7638, draft-ietf-webbotauth-httpsig-protocol-00, and the executed examples in this guide · **Review when:** discovery policy, body formats, or runtime compatibility changes
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 7517, RFC 7638, draft-ietf-webbotauth-httpsig-protocol-00, and the executed examples in this guide · **Review when:** discovery policy, body formats, or runtime compatibility changes
 
 # Key discovery
 
@@ -28,16 +28,16 @@ Addresses must be HTTPS and may not carry user information, fragments, dot segme
 | Keys per set | 32 | 256 |
 | Timeout | 5,000 ms | 300,000 ms |
 | Redirects | 0 | 3 |
-| Minimum and maximum cache time | 300 s and 86,400 s | 604,800 s each |
+| Cache time when the response has no `max-age` or `Expires` (`minTtl`), and the cap on any cache time (`maxTtl`) | 300 s and 86,400 s | 604,800 s each |
 | Negative cache time | 30 s | 300 s |
 
-A key set is the validated result. Look a key up with `keySet.lookup(thumbprint, algorithms, now)`. Lookup selects only a key compatible with the algorithms you allow, and it returns an error for an unknown, stale, or revoked key. Key IDs are RFC 7638 thumbprints by default. A source can use `keyId: "directory"` for key sets that assign their own IDs.
+A key set is the validated result. Look a key up with `keySet.lookup(thumbprint, algorithms, now)`. Lookup selects only a key compatible with the algorithms you allow, and it returns `unknown_key` for an unknown, stale, or revoked key. Key IDs are RFC 7638 thumbprints by default. A `jwks_uri` or `cimd` source can use `keyId: "directory"` for key sets that assign their own IDs; `directory` sources always use thumbprints.
 
 ## Snapshots: the path for any runtime
 
 `Discovery.resolver.fromSnapshot(source, bodyBytes, fetchedAt, headers)` validates a response that you fetched yourself and returns a key set. It starts no connection, imports no Node module, and runs on Node, Deno, and Bun. Use it when you already have a trusted fetch path (your own HTTP client, a proxy, a build-time download) or when you run outside Node.
 
-You own the network when you take this path: DNS, address filtering, redirects, TLS, and timeouts. Pass the response body bytes unchanged, the Unix time you received them, and the response headers as ordered pairs so cache headers are honored. `Discovery.resolver(keySet, { algorithms })` then gives you a resolver that you can use inside a policy's `keyResolver`.
+You own the network when you take this path: DNS, address filtering, redirects, TLS, and timeouts. Pass the response body bytes unchanged, the Unix time you received them, and the response headers as ordered pairs, including a `content-type` that matches the source type (otherwise the snapshot fails with `unexpected_media_type`), so cache headers are honored. `Discovery.resolver(keySet, { algorithms })` then gives you a resolver that you can use inside a policy's `keyResolver`.
 
 The program runs under Deno. It turns a literal JWKS response into a key set, looks a key up, shows that unknown and stale keys are refused, and verifies a signature through the key set.
 
@@ -96,7 +96,7 @@ A signed directory carries a proof that its publisher holds the keys in it. By d
 - Redirects are manual, bounded, and checked again. The default scope is the same origin. `redirectScope: "any_https"` permits cross-origin HTTPS redirects: for SSRF protection, allow only destinations your application intends to contact, especially if you configured private `permittedAddresses`.
 - Context cancellation and the deadline destroy the sockets it owns. Errors carry only bounded facts, such as the reason and whether a retry may help.
 
-`cacerts` takes DER certificates, or `"os"` for the operating system trust store. `"os"` needs a Node that exposes a non-empty system store (22.15 or newer on the 22 line, or 24 and newer); otherwise source creation and fetch both refuse, and you should supply DER roots.
+`cacerts` takes 1 to 256 DER certificates, or `"os"` (the default) for the operating system trust store. `"os"` needs a Node that exposes a non-empty system store (22.15 or newer on the 22 line, or 24 and newer); otherwise the `discovery-node` `DiscoverySource.create` and `Discovery.fetch` both refuse with `custody/unsupported_format`, and you should supply DER roots.
 
 Wrap the fetch in a cache. `createCache({ fetch: Discovery.fetch })` returns a capability that fetches on demand and reuses fresh keys. Concurrent callers share one fetch. It follows `Cache-Control` and `Expires`, capped by your maximum, caches negative results briefly, serves nothing stale, and starts no background timers; call `cache.close()` when you are done.
 
@@ -164,7 +164,7 @@ On Deno and Bun the HTTPS transport is not supported: the real HTTPS probe retur
 
 ## Revoking and removing keys
 
-`remove(source, thumbprint)` on a cache records a denial that survives refresh and invalidation, so a key you pulled stays out even when the publisher still lists it. `invalidate(source)` discards freshness and keeps removals. A source's `revoked` option does the same at configuration time. A revoked key is refused with `revoked_key`.
+`remove(source, thumbprint)` on a cache records a denial (at most 256 per source) that survives refresh and invalidation, so a key you pulled stays out even when the publisher still lists it. `invalidate(source)` discards freshness and keeps removals. A source's `revoked` option (at most 256 thumbprints) does the same at configuration time. The cache's `resolve` refuses a revoked or removed key with `revoked_key`; a key set's `lookup` reports it as `unknown_key`. For a planned change of keys, see [rotating keys](key-rotation.md).
 
 ## Where to go next
 

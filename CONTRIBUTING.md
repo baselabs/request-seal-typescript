@@ -14,9 +14,9 @@ npm run check
 
 Write behavior tests before implementation and retain the failing and passing output. Use `node:test` and fast-check properties. Test actual cryptography and published vectors; no substitutes for an external peer. `npm run test:red` deliberately fails and verifies the runner's exit status.
 
-Keep the core independent of Node modules and runtime dependencies. Generate error documentation with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 0a6568aa246326617f760e94e21b359285c6ddfc <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-0a6568a.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
+Keep the core independent of Node modules and runtime dependencies. Regenerate `docs/reference/error-parity.md` in place with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 0a6568aa246326617f760e94e21b359285c6ddfc <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-0a6568a.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
 
-The shared corpus in `conformance/` is pinned to RequestSeal `v0.4.0`, commit `b2392871933d99641a7cb2ca2726aefd20081dee`, index SHA-256 `f37435eca377666ab45c2b8f580287263145268e03d9224c76e324e4afaded6f`. Shared corpus updates preserve upstream bytes and expectations. With the GitHub CLI authenticated, reproduce that byte copy with:
+The shared corpus in `conformance/` is pinned to RequestSeal `v0.4.0`, commit `b2392871933d99641a7cb2ca2726aefd20081dee`, index SHA-256 `f37435eca377666ab45c2b8f580287263145268e03d9224c76e324e4afaded6f`. Shared corpus updates preserve upstream bytes and expectations. With network access, reproduce that byte copy with:
 
 ```sh
 node --experimental-strip-types --no-warnings scripts/vendor-corpus.ts v0.4.0
@@ -42,11 +42,11 @@ application Context deadlines remain separate. The Elixir URL check has a
 30-second parent bound around its 25-second subprocess bound.
 
 The native files already use top-level `test()` and `t.diagnostic()`; they do not
-use `describe` or `mock`. The lane's 22 module errors followed a 5-second timeout
-in a test executing the whole corpus twice. Bun retained the running-test state
-and rejected later files' module-level registrations as nested tests. Give corpus tests an explicit 30-second timeout (the two CLI subprocesses each
-have a 10-second bound), and the live vendoring test an
-explicit 180-second timeout matching its two bounded subprocess commands.
+use `describe` or `mock`. Bun keeps a running test's state after a timeout and then rejects later files'
+module-level registrations as nested tests, so one slow test can fail many files.
+Give tests that run the whole corpus through the CLI an explicit 90-second timeout
+around 30-second subprocess bounds, and the live vendoring tests an explicit
+180-second timeout matching their bounded subprocess commands.
 The message-override, stale-pending, and override-container corpus checks use
 30-second budgets for complete inventory reads and repeated corpus validation.
 The private-byte tracker test has a 15-second timeout around its 10-second child

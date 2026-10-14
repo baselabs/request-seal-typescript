@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** WebCrypto, the OpenSSH agent protocol, and the executed examples in this guide · **Review when:** custody mechanics, adapter contracts, or runtime behavior changes
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** WebCrypto, the OpenSSH agent protocol, and the executed examples in this guide · **Review when:** custody mechanics, adapter contracts, or runtime behavior changes
 
 # Key custody
 
@@ -68,13 +68,13 @@ When `sign` takes a handle, the signing deadline begins just before the custody 
 
 ## Hardware, vaults, and key services
 
-Anything that can sign can be a custodian: a cloud key service, a hardware module, a vault. Implement the `Custodian` interface (`sign`, `verify`, `publicKey`, `identity`, `unwrap`, `release`) and wrap it with `createKeyHandle(algorithm, custodian)`. The wrapper puts every call under the deadline, contains exceptions, and checks that results have the right type, so a faulty custodian cannot return garbage as a signature. Custodian code is trusted code: it must pass the `Context` along to its own network calls, and it must not log secrets. For a function-sized integration you do not need a custodian at all: `sign` accepts a function `(algorithm, base, context) => Result<Uint8Array>`.
+Anything that can sign can be a custodian: a cloud key service, a hardware module, a vault. Implement the `Custodian` interface (`sign`, `verify`, `publicKey`, `identity`, `unwrap`, `release`) and wrap it with `createKeyHandle(algorithm, custodian, capabilities)`, which returns a `Result` holding the handle (`invalid_handle` for a malformed custodian or capability list). The wrapper puts every call under the deadline, contains exceptions, and checks that results have the right type, so a faulty custodian cannot return garbage as a signature. Custodian code is trusted code: it must pass the `Context` along to its own network calls, and it must not log secrets. For a function-sized integration you do not need a custodian at all: `sign` accepts a function `(algorithm, base, context) => Result<Uint8Array>`, synchronous or asynchronous.
 
 ## OpenSSH agent custody
 
 `@request-seal/core/custody-ssh-agent` signs through a running `ssh-agent`, so the private key stays inside the agent.
 
-`createSshAgent(algorithm, socketPath, publicKey)` needs three things from you: an absolute POSIX socket path of 1 to 103 bytes, the algorithm, and the branded `PublicKey` that you expect the agent to hold. It reads no environment variable and starts no agent. At construction it proves the agent holds that key. Each signature opens a new connection, checks the agent's current identities, bounds every frame, and verifies the returned signature locally with the public key before it releases the bytes. A bad reply, a missing key, or a closed socket becomes a bounded error with no socket path in it.
+`createSshAgent(algorithm, socketPath, publicKey, options)` needs three things from you: an absolute POSIX socket path of 1 to 103 UTF-8 bytes, the algorithm, and the branded `PublicKey` that you expect the agent to hold. Options are `{ context }` or `{ timeoutMs }`, not both. It reads no environment variable and starts no agent. At construction it proves the agent holds that key. Each signature opens a new connection, checks the agent's current identities, bounds every frame, and verifies the returned signature locally with the public key before it releases the bytes. A bad reply, a missing key, or a closed socket becomes a bounded error with no socket path in it.
 
 Supported algorithms are `ed25519`, `rsa-v1_5-sha256`, `ecdsa-p256-sha256`, and `ecdsa-p384-sha384`, plus the JOSE selectors `EdDSA`, `RS256`, `ES256`, and `ES384`. RSA-PSS and HMAC are rejected, because the agent protocol cannot produce them.
 
@@ -132,4 +132,5 @@ try {
 
 - [Signing and verifying](signing-and-verifying.md) passes handles to `sign`.
 - [JOSE](jose.md) uses handles bound to JOSE algorithms.
+- [Rotating keys](key-rotation.md) replaces a signing key without failed requests.
 - The [threat model](../design/threat-model.md) explains what custody does not defend against: holders who misuse their handle, memory disclosure, debugger access, malicious custodian code, and code that patches globals before RequestSeal loads.

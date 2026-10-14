@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00 and the shared v0.4.0 conformance corpus · **Review when:** profile acceptance, discovery, or replay contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00 and the shared v0.4.0 conformance corpus · **Review when:** profile acceptance, discovery, or replay contracts change
 
 # Web Bot Auth
 
@@ -16,7 +16,10 @@ is forbidden. Optional choices are `components` (default `"()"`),
 `maxLifetime` (1–604,800 seconds, default 86,400), `testKeys` (`"reject"` by
 default or explicit `"allow"` for published test material), `untagged`
 (`"ignore"` by default or `"reject"`), `maxSignatures` (1–64, default 16),
-`fieldSchemas`, and `unresolved` (`"reject"` or `{heldKeys: resolver}`).
+`fieldSchemas`, and `unresolved` (`"reject"` or `{heldKeys: resolver}`). A held-key
+resolver receives `({label, keyid, tag}, context)` and returns a Result containing
+`{algorithm, key}` or null; the algorithm must equal one of the policy's algorithms,
+or the signature is `agent_unresolved` with detail `unknown_key`.
 Construction invokes no callbacks. Each own option value is read once.
 
 Trust receives `{identifier, location, type}` and returns a Result containing a
@@ -91,7 +94,9 @@ Required replay commits once after every selected signature, content check, and
 nested-coverage check succeeds. The commitment callback receives frozen
 `{profile: {name: "web_bot_auth", revision}, signatures: [...]}`. Each entry
 contains `label`, `identifier` (nonce), `algorithm`, `keyid`, stable `agent`
-facts, `created`, and `expires`. Agent facts omit cache revision and fetch time.
+facts, `created`, and `expires`. Agent facts are `{kind, identifier, type, origin, thumbprint}`
+without `provenance`, so they omit source proof, cache revision, and fetch time;
+held-key facts are `{kind: "key", thumbprint}`.
 Include the profile name and revision in the caller's commitment encoding to
 separate generic and Web Bot Auth claims. The library does not prefix the
 namespace or commitment output with the profile; a nonce-only commitment in a
@@ -112,7 +117,7 @@ between those checks and cause rejection.
 
 `WebBotAuth.sign(message, spec, signer, {fieldSchemas?, context?})` requires a
 request, `label`, `agent: {location, type}`, branded public `key`, `algorithm`,
-explicit `created`, `expires`, and `nonce` (nonempty string or null). A signer
+explicit `created`, `expires`, and `nonce` (1 to 1,024 characters, or null). A signer
 function of any arity receives `(algorithm, base, context)` and returns
 a Result containing real signature bytes, synchronously or asynchronously.
 A branded KeyHandle is also accepted. Function length is not a contract;

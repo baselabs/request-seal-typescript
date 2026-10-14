@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** AGENTS.md, the shared conformance corpus, and the executed examples in this guide · **Review when:** an advertised capability, test runner, or evidence source changes
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** AGENTS.md, the shared conformance corpus, and the executed examples in this guide · **Review when:** an advertised capability, test runner, or evidence source changes
 
 # Testing
 
@@ -113,10 +113,11 @@ Some checks need extra tools and say so when they skip:
 | Check | Needs |
 | --- | --- |
 | SSH agent custody | `ssh-agent`, `ssh-add`, `ssh-keygen` |
-| JOSE and signature cross-checks | the `openssl` command-line tool, with development headers and a C compiler for the AES-GCM peer |
+| JOSE and signature cross-checks | OpenSSL 3 or later as `openssl`, plus its development headers, pkg-config, and a C compiler for the AES-GCM peer |
 | PostgreSQL replay store | a database you provide, with its URL in `REQUESTSEAL_REPLAY_PG_URL` |
 | Express and Fastify adapters | `npm ci --prefix interop/adapters --ignore-scripts` |
-| Error vocabulary extraction, reciprocal exchange | an Elixir toolchain and a checkout of the RequestSeal reference release |
+| Error vocabulary extraction | Elixir with Erlang/OTP 29, and a RequestSeal for Elixir checkout named by `REQUEST_SEAL_REPO` |
+| Reciprocal exchange | Elixir 1.20.3, Erlang/OTP 29, Hex, rebar3, and a PostgreSQL URL in `REQUESTSEAL_REPLAY_PG_URL`; see [reciprocity](../reference/reciprocity.md) |
 
 The tests start no database and no container. A local run prints the reason when it skips an optional check; CI supplies the tools and fails when one is missing.
 
@@ -133,9 +134,11 @@ Dependencies that are not part of the package live in separate workspaces under 
 
 | Runtime | What the tests prove |
 | --- | --- |
-| Node 22.12.0, 24.21.0, and current 26 | The full suite, build, conformance corpus, and packed-package import checks. |
+| Node 22.12.0, 24.21.0, and 26.11.1 | The full suite, build, conformance corpus, and packed-package import checks. |
 | Deno 2.5.6 | The core suite and conformance on Deno's own WebCrypto. Fetch verification runs only here. |
 | Bun 1.3.14 | The core suite and conformance. On macOS arm64, Bun's WebCrypto rejected two valid ECDSA P-256 vectors; a declared limitation, scoped to the exact version and platform, reports them instead of weakening a check. |
+| Deno 2.9.7 | Only that discovery refuses OS trust roots when the system permission is denied. |
+| Chromium 156.0.8078.4, Firefox 157.0, WebKit 27.2 | The browser suite: core signing and verification, and Fetch signing. |
 
 The Node adapters run in real Node subprocesses even when the suite is started by Deno or Bun. HTTPS key discovery is Node only. Linux is the only CI platform; macOS and Linux are supported for development.
 

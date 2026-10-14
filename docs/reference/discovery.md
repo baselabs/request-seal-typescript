@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 discovery behavior, RFC 7517, RFC 7638, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 discovery behavior, RFC 7517, RFC 7638, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
 
 # Discovery
 
@@ -38,7 +38,9 @@ Sources accept `keyId`, `cacerts`, `permittedAddresses`, `revoked`,
 `requireSignedDirectory`, `redirectScope`, and the numeric settings below.
 Numeric settings may instead appear together in `limits`; supplying a setting
 in both places rejects. Unknown keys reject. Options are owned snapshots.
-DER CA certificates and body buffers are copied on entry.
+DER CA certificates and body buffers are copied on entry. `cacerts` defaults to
+`"os"` or holds 1–256 DER certificates; `revoked` holds at most 256 thumbprints;
+`permittedAddresses` holds at most 16 entries; `minTtl` must not exceed `maxTtl`.
 
 | Setting | Default | Ceiling |
 | --- | --- | --- |
@@ -68,8 +70,7 @@ Directory snapshots verify possession before exposing keys: required coverage
 includes `@authority;req` and `content-digest`, with created/expires, thumbprint
 key ID, and the directory tag. A proof establishes possession; caller trust and
 authorization remain explicit. `requireSignedDirectory: false` permits an
-unsigned directory with `proof: "unsigned"`. `Discovery.parseBody()` is the
-explicit unproven JWKS/directory parsing path and refuses a required proof.
+unsigned directory with `proof: "unsigned"`.
 
 Key sets and resolutions are frozen and separately branded. They retain source
 type, location, normalized origin, fetch/expiry times, proof status and a SHA-256
@@ -78,7 +79,8 @@ selects only a compatible HTTP or explicit JOSE algorithm from the caller's allo
 An asserted HTTP `alg` must match exactly; an unstamped key may bind an explicit
 JOSE choice. HMAC public keys remain forbidden.
 `Discovery.resolver(snapshot, {algorithms})` returns a Result containing an async
-bridge that accepts `keyid` and returns only the algorithm and public key.
+bridge that accepts `keyid` and returns only the algorithm and public key. Over a
+key set, the bridge checks freshness against the system clock, not the policy clock.
 
 ## Explicit Node transport
 
@@ -118,7 +120,8 @@ Redirects are manual, bounded and re-vetted. The default scope is `same_origin`;
 same deadline and intersected freshness. A core snapshot with only `jwks_uri`
 returns `source_unavailable`; inline `jwks` works without networking.
 
-Fetch options are `timeoutMs`, `clock`, `context` and `dnsServers`. The default
+Fetch options are `timeoutMs`, `clock`, `context` and `dnsServers`. `timeoutMs` can
+only shorten the source's `timeoutMs`. The default
 resolver uses `dns.lookup(host, {all: true})`. An explicit `dnsServers` list uses
 an independent real DNS resolver for A and AAAA, without changing process or OS
 settings; it has at most 16 IP server endpoints, with optional ports. Every
@@ -141,7 +144,9 @@ evicted, and no timers or refresh jobs run while the cache is idle.
 `refresh(source)` invokes the explicitly configured fetch function;
 `refresh(source, snapshot)` installs a validated branded snapshot.
 `resolve(source, keyId, {algorithms?, clock?, context?, timeoutMs?})` reuses fresh
-keys and fetches on expiry only through that configured function. A fresh unknown
+keys and fetches on expiry only through that configured function. `algorithms`
+defaults to every supported HTTP algorithm, and `timeoutMs` can only shorten the
+source's `timeoutMs`. A fresh unknown
 ID does not trigger a fetch. Without a fetch function, a miss returns
 `source_unavailable`. The resolver bridge also accepts `{cache, source}`.
 
@@ -151,7 +156,8 @@ extended by `minTtl`. No-cache/no-store responses serve current waiters only.
 Failures never extend the last observed snapshot; stale keys are never served.
 CIMD failures are never negatively cached. Concurrent callers share one fetch;
 last-waiter cancellation, invalidation, and `close()` cancel owned work.
-`remove(source, thumbprint)` persists a denial through refresh and invalidation.
+`remove(source, thumbprint)` persists a denial through refresh and invalidation,
+at most 256 per source.
 `invalidate(source)` discards freshness while retaining removals.
 
 ## Compatibility

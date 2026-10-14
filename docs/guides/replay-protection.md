@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** RFC 9421 and the executed examples in this guide · **Review when:** replay contracts, retention bounds, or store interfaces change
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421 and the executed examples in this guide · **Review when:** replay contracts, retention bounds, or store interfaces change
 
 # Replay protection
 
@@ -11,7 +11,7 @@ You choose it per policy. RequestSeal does the cryptography and the ordering; yo
 A required replay policy has five parts: `identifier: "nonce"`, a `namespace`, a `commitment` function, a `store`, and a `timeoutMs`. Verification does this, in order:
 
 1. It checks the signature, covered components, freshness, and any required content digest. Nothing touches the store until all of those pass, so an attacker cannot fill your store with unauthenticated junk.
-2. It calls your `commitment` once with the authenticated facts: the nonce, the algorithm, the `keyid`, the tag, the created and expires times, and the profile. You return 1 to 256 bytes, usually a hash. Together with the namespace, that is the key of the claim.
+2. It calls your `commitment` once with the authenticated facts: the nonce, the algorithm, the `keyid`, the tag, the created and expires times, and the profile. You return 1 to 256 bytes, usually a hash; anything else, or a throw, fails with `commitment_failed`. Together with the namespace, that is the key of the claim.
 3. It makes one atomic claim in the store. `"claimed"` means this is the first use. `"already_claimed"` becomes the error `replayed`.
 
 The claim is kept until no verifier could still accept the signature: the earlier of `expires + skew` and `created + maxAge + skew + 1`. Expiration is exclusive and the maximum age includes its last second, so those bounds leave no gap. A policy that requires replay protection must therefore set `requireExpires` or a `maxAge`, so a claim never has to live forever.
@@ -20,11 +20,11 @@ Three design choices are yours, and they matter.
 
 - **The commitment is your scope.** A nonce-only commitment treats two different keys that happen to choose the same nonce as one request. Include the `keyid` as well, as the example does, or any other authenticated fact that defines uniqueness for your service.
 - **One namespace, one freshness bound.** Repeated claims never extend a claim's retention, so mixing policies with different lifetimes in one namespace lets an old claim expire early. Use a namespace per freshness bound.
-- **A request with no nonce cannot be tracked.** A policy that requires replay protection refuses a signature without a nonce and returns `missing_replay_identifier`. Generated signatures carry a random nonce by default.
+- **A request with no nonce cannot be tracked.** A policy that requires replay protection refuses a signature without a nonce and returns `missing_replay_identifier`. Signatures from `sign` carry a random nonce by default; `WebBotAuth.sign` takes an explicit `nonce`.
 
 ## In-process store
 
-`createMemoryStore({ maxEntries })` is an atomic, single-process store with no timers. It fits tests, command-line tools, and a service that runs in one process. It never evicts: when it reaches `maxEntries` the next claim returns the store error `store_full`, so a flood of valid signatures turns into refusals and does not silently drop old claims. You reclaim space with `Replay.sweep(store, now, context)`, which removes claims that have expired. Restarting the process loses its claims.
+`createMemoryStore({ maxEntries })` is an atomic, single-process store with no timers. It fits tests, command-line tools, and a service that runs in one process. It never evicts: when it reaches `maxEntries` the next claim returns the store error `store_full` (verification reports it as `store_failed`), so a flood of valid signatures turns into refusals and does not silently drop old claims. You reclaim space with `Replay.sweep(store, now, context)`, which removes claims that have expired. Restarting the process loses its claims.
 
 The program races twenty verifiers against one signed request: exactly one wins and the rest get `replayed`. It then shows the missing-nonce refusal and a sweep.
 
@@ -50,10 +50,10 @@ const policy = must(Policy.create({
   algorithms: ["ed25519"], components, keyResolver,
   freshness: { clock, maxAge: 60, skew: 5, requireExpires: true },
   content: "not_required",
-  replay: { identifier: "nonce", namespace: new TextEncoder().encode("orders-api"), commitment, store, timeoutMs: 1000 },
+  replay: { identifier: "nonce", namespace: new TextEncoder().encode("jobs-api"), commitment, store, timeoutMs: 1000 },
 }));
 
-const request = must(await Message.request("GET", "https://api.example.com/orders", [], ""));
+const request = must(await Message.request("GET", "https://api.example.com/jobs", [], ""));
 const signed = must(await sign(request, { label: "sig", components, algorithm: "ed25519", expiresIn: 60, keyid: "client-1" }, signer));
 
 // Twenty verifiers race to use the same signed request: exactly one wins.
@@ -76,7 +76,7 @@ assert.equal(must(await Replay.sweep(store, clock() + 3600, must(withDeadline())
 
 Several processes need a shared store. `@request-seal/core/replay-postgres` builds one over a database you own. The library opens no connection, starts no pool, and runs no transaction. You give it a `query` function that runs one statement in autocommit mode and returns the affected-row count.
 
-`ddl(table)` returns the schema as a string. Run it with your migration tool. The table name must be lowercase letters, digits, and underscores, so a configuration value can never become SQL.
+`ddl(table)` returns the schema as a string. Run it with your migration tool. The table name must start with a lowercase letter, use only lowercase letters, digits, and underscores, and be at most 63 characters, so a configuration value can never become SQL. Any other name returns `invalid_store`.
 
 ```ts
 import assert from "node:assert/strict";
@@ -107,11 +107,11 @@ if (!created.ok) throw new Error(created.error.reason);
 const store = created.value; // pass as the `store` of a replay policy
 ```
 
-The reference shows the same function for postgres.js and for Neon's HTTP client. Never run these claims inside a surrounding transaction.
+The [replay reference](../reference/replay.md#postgresql) shows the same function for postgres.js and for Neon's HTTP client. Never run these claims inside a surrounding transaction.
 
 ### Failure behavior
 
-A store failure never lets a request through. `store_unavailable`, `store_timeout`, `store_failed`, and `store_full` all reject the verification, and none is marked retryable. Retrying inside the library could hide a claim that did commit: a timed-out claim may have landed. The right response is to answer with a transient error (see the status table in the [README](../../README.md#reason-to-http-status-recommendation)) and have the client sign again.
+A store failure never lets a request through. During verification it becomes the `core` replay error `store_unavailable`, `store_timeout`, or `store_failed` (a full store and any other store error report `store_failed`), and none is marked retryable. Retrying inside the library could hide a claim that did commit: a timed-out claim may have landed. The right response is to answer with a transient error (see the status table in the [README](../../README.md#reason-to-http-status-recommendation)) and have the client sign again.
 
 The replay deadline is capped by the caller's `Context`. If the caller aborts during the replay stage, the error is the nonretryable `store_timeout`, because the claim may already have committed; an abort earlier in verification is the retryable `custody/deadline_exceeded`.
 

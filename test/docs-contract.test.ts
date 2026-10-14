@@ -75,3 +75,12 @@ test("the README status table maps every reason and agrees with the signing guid
   for (const {pattern} of patterns)
     assert.ok(ERROR_PARITY.some(e => pattern.endsWith("*") ? e.rule_id.startsWith(pattern.slice(0, -1)) : e.rule_id === pattern), `unknown pattern: ${pattern}`);
 });
+
+test("the error reasons page explains every reason in the vocabulary exactly once", () => {
+  const rows = [...read("docs/reference/errors.md").matchAll(/^\| `([a-z0-9_]+\/[a-z0-9_.]+)` \| ([^|]+) \| ([^|]+) \|$/gm)];
+  const listed = rows.map(row => row[1]!);
+  const known = ERROR_PARITY.map(entry => entry.rule_id);
+  assert.deepEqual([...new Set(listed)].length, listed.length, "no reason is listed twice");
+  assert.deepEqual([...listed].sort(), [...known].sort(), "every vocabulary reason, and only those, is listed");
+  for (const row of rows) assert.ok(row[2]!.trim() && row[3]!.trim(), `${row[1]} has a meaning and an action`);
+});

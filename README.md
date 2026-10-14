@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** overview · **Updated:** October 11, 2026 · **Governed by:** RFC 9421, RFC 9530, the Web Bot Auth protocol draft, and the executed examples in this file · **Review when:** package scope, installation, or the public API changes
+**Status:** maintained · **Kind:** overview · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9530, the Web Bot Auth protocol draft, and the executed examples in this file · **Review when:** package scope, installation, or the public API changes
 
 # RequestSeal
 
@@ -27,7 +27,7 @@ const key = await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(ne
 const server = createServer((req, res) => res.end(String(req.headers["signature-input"]))).listen(0, "127.0.0.1");
 await new Promise((ready) => server.once("listening", ready));
 const spec = { label: "sig", components: '("@method" "@authority" "@path")', algorithm: "hmac-sha256", expiresIn: 60 };
-const sent = await signedFetch(`http://127.0.0.1:${(server.address() as { port: number }).port}/orders`, { method: "GET" }, { spec, signer: key.ok ? key.value : assert.fail() });
+const sent = await signedFetch(`http://127.0.0.1:${(server.address() as { port: number }).port}/reports`, { method: "GET" }, { spec, signer: key.ok ? key.value : assert.fail() });
 assert.ok(sent.ok && (await sent.value.response.text()).startsWith('sig=("@method" "@authority" "@path")')); server.close();
 ```
 
@@ -44,7 +44,7 @@ const must = <T>(r: Result<T>): T => { assert.ok(r.ok); return (r as { value: T 
 const key = must(await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) }));
 const components = '("@method" "@authority" "@path")';
 const policy = must(Policy.create({ algorithms: ["hmac-sha256"], components, keyResolver: () => ok({ algorithm: "hmac-sha256", key }), freshness: { clock: () => Math.floor(Date.now() / 1000), maxAge: 60, skew: 5, requireExpires: true }, content: "not_required", replay: "not_required" }));
-const signed = must(await sign(must(await Message.request("GET", "https://api.example/orders", [], "")), { label: "sig", components, algorithm: "hmac-sha256", expiresIn: 60 }, key));
+const signed = must(await sign(must(await Message.request("GET", "https://api.example/documents", [], "")), { label: "sig", components, algorithm: "hmac-sha256", expiresIn: 60 }, key));
 must(await verify(signed, policy, { label: "sig" }));
 const altered = must(Message.create({ ...signed, method: "DELETE" }));
 const rejected = await verify(altered, policy, { label: "sig" });
@@ -231,7 +231,7 @@ await server.shutdown();
 
 ## Policy recipes
 
-A verifier states six choices: algorithms, required components, a key resolver, freshness, content checking, and replay. Nothing is defaulted. Copy the recipe closest to your case.
+A verifier states six choices: algorithms, required components, a key resolver, freshness, content checking, and replay. None of the six has a default. Copy the recipe closest to your case.
 
 ### Strict RFC 9421
 
@@ -267,7 +267,7 @@ const policy = must(Policy.create({
 
 // A partner signs a request, and it verifies exactly once.
 const signer = must(await Custody.local("ed25519", pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string));
-const request = must(await Message.request("POST", "https://api.example.com/orders?id=7", [], '{"qty":2}', { digest: ["sha-256"] }));
+const request = must(await Message.request("POST", "https://api.example.com/tickets?id=7", [], '{"priority":2}', { digest: ["sha-256"] }));
 const signed = must(await sign(request, { label: "sig", components, algorithm: "ed25519", expiresIn: 60, keyid: "partner-1", digest: ["sha-256"] }, signer));
 must(await verify(signed, policy, { label: "sig" }));
 const again = await verify(signed, policy, { label: "sig" });
@@ -323,7 +323,7 @@ assert.ok(!again.ok && again.error.kind === "core" && again.error.reason === "re
 
 ## Reason to HTTP status (recommendation)
 
-Every failure is a `Result` with a bounded `error`; branch on `error.kind` and `error.reason`. This table is a recommendation, not a requirement. It is derived from the error vocabulary in [error parity](docs/reference/error-parity.md), and the [signing guide](docs/guides/signing-and-verifying.md#respond-to-a-rejection) holds the same mapping as a program that checks it covers every reason. Selectors use `kind/layer.reason` or `kind/reason`; `*` covers that family. An exact reason overrides its family row. The guide program is authoritative. Adapters wrap the underlying reason in `error.source`; map that. Any `retryable: true` error overrides the table with 503. For `adapter/limit`, 413 is an optional alternative to 400.
+Every failure is a `Result` with a bounded `error`; branch on `error.kind` and `error.reason`. This table is a recommendation, not a requirement. It is derived from the error vocabulary in [error parity](docs/reference/error-parity.md); [error reasons](docs/reference/errors.md) explains each reason and what to do about it, and the [signing guide](docs/guides/signing-and-verifying.md#respond-to-a-rejection) holds the same mapping as a program that checks it covers every reason. Selectors use `kind/layer.reason` or `kind/reason`; `*` covers that family. An exact reason overrides its family row. The guide program is authoritative. Adapters wrap the underlying reason in `error.source`; map that. Any `retryable: true` error overrides the table with 503. For `adapter/limit`, 413 is an optional alternative to 400.
 
 The reasoning, stated once: 400 means the message cannot be read, so resending the same bytes cannot help. 401 means the sender did not prove what your policy requires, and a fresh correct signature can. 403 means your configuration refuses a sender it understood. 500 means your own code or configuration is wrong. 503 means the failure is transient or the replay store is in trouble.
 
@@ -378,12 +378,13 @@ RequestSeal reports what was cryptographically established and nothing more: the
 - [Key discovery](docs/guides/key-discovery.md)
 - [Signed and encrypted tokens (JOSE)](docs/guides/jose.md)
 - [Key custody](docs/guides/key-custody.md)
+- [Rotating keys](docs/guides/key-rotation.md)
 - [Testing](docs/guides/testing.md)
 - [Migrating from http-message-signatures](docs/guides/migrating-from-http-message-signatures.md)
 
 API: [generated reference](https://baselabs.github.io/request-seal-typescript/). Build it locally with `npm ci --ignore-scripts && npm run docs`, then open the generated `site-dist/index.html`.
 
-Reference: [signing and verification](docs/reference/sign-and-verify.md), [adapters](docs/reference/adapters.md), [Web Bot Auth](docs/reference/web-bot-auth.md), [replay](docs/reference/replay.md), [discovery](docs/reference/discovery.md), [JOSE](docs/reference/jose.md), [wire APIs](docs/reference/wire.md), [multiple signatures](docs/reference/quorum.md), [extension profiles](docs/reference/profiles.md), [error parity](docs/reference/error-parity.md), and [corpus format](docs/reference/corpus-format.md). Design records: the [threat model](docs/design/threat-model.md) and the [architecture decisions](docs/adr/README.md). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Reference: [glossary](docs/reference/glossary.md), [error reasons](docs/reference/errors.md), [signing and verification](docs/reference/sign-and-verify.md), [adapters](docs/reference/adapters.md), [Web Bot Auth](docs/reference/web-bot-auth.md), [replay](docs/reference/replay.md), [discovery](docs/reference/discovery.md), [JOSE](docs/reference/jose.md), [wire APIs](docs/reference/wire.md), [multiple signatures](docs/reference/quorum.md), [extension profiles](docs/reference/profiles.md), [error parity](docs/reference/error-parity.md), and [corpus format](docs/reference/corpus-format.md). Design records: the [threat model](docs/design/threat-model.md) and the [architecture decisions](docs/adr/README.md). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Compatibility
 

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** RFC 9421, RFC 9530, and the executed examples in this guide · **Review when:** signing, policy, digest, or verification contracts change
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9530, and the executed examples in this guide · **Review when:** signing, policy, digest, or verification contracts change
 
 # Signing and verifying
 
@@ -10,24 +10,25 @@ This guide covers the core of RequestSeal: building messages, signing them, and 
 
 - `Message.request(method, url, headers, body, { digest })` builds a request from an absolute URL, an ordered list of `[name, value]` pairs, and a body. Passing `digest: ["sha-256"]` adds a `Content-Digest` header computed over the body.
 - `Message.response(status, headers, body, { request, digest })` builds a response. Link the `request` when the response signature covers request components such as `"@authority";req`.
-- `Message.create(fields)` builds a message from every field by hand. Use it for HTTP/2 pseudo-headers, trailers, a body you stream, or transport facts that an adapter observed.
+- `Message.create(attributes)` builds a message from every attribute by hand. Use it for HTTP/2 pseudo-headers, trailers, a body you stream, or transport facts that an adapter observed.
 
 The [Node HTTP](node-http.md) and [Fetch](fetch.md) adapters build messages from live requests for you, so you rarely construct one by hand on a server.
 
 ## Sign
 
-`sign(message, spec, signer, options)` appends one `Signature-Input` and one `Signature` header occurrence and returns a new message. Existing signatures stay in place. A generated spec has four required members and sensible optional ones:
+`sign(message, spec, signer, options)` appends one `Signature-Input` and one `Signature` header occurrence and returns a new message. Existing signatures stay in place. A generated spec has four required members and several optional ones:
 
 | Member | Meaning |
 | --- | --- |
 | `label` | The dictionary key for this signature, for example `"sig"`. |
 | `components` | The covered components as an RFC 9421 inner list, for example `'("@method" "@authority")'`. |
-| `algorithm` | A registered HTTP algorithm: `ed25519`, `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `rsa-pss-sha512`, `rsa-v1_5-sha256`, or `hmac-sha256`. |
-| `expiresIn` | Seconds until the signature expires. It is required, so no signature lives forever by accident. |
-| `created`, `nonce`, `alg`, `keyid`, `tag` | Metadata. Defaults are `created: true`, a random `nonce`, and `alg: true`. `keyid` and `tag` are optional. |
-| `digest` | `["sha-256"]` or `["sha-512"]` to add or check `Content-Digest` while signing. |
+| `algorithm` | A registered HTTP algorithm: `ed25519`, `ecdsa-p256-sha256`, `ecdsa-p384-sha384`, `rsa-pss-sha512`, `rsa-v1_5-sha256`, or `hmac-sha256`. A `{ jws: name }` selection is also accepted; it omits the `alg` parameter. |
+| `expiresIn` | Seconds until the signature expires. It is required, so no signature lives forever by accident. A numeric `expiresIn` needs `created: true`. |
+| `created`, `nonce`, `alg`, `keyid`, `tag` | Metadata. Defaults are `created: true`, a random `nonce`, and `alg: true` for HTTP algorithms. `keyid` and `tag` are optional printable ASCII. You can nest these choices, with `expiresIn`, under `parameters` instead; the two forms cannot be mixed. |
+| `digest` | `["sha-256"]`, `["sha-512"]`, or both. Adds `Content-Digest` over the retained body; if the message already has one, it must carry exactly these algorithms. |
+| `fieldSchemas` | Structured Fields schemas, by lowercase field name, for covered fields that need one. |
 
-The signer is a `KeyHandle` from [key custody](key-custody.md), or any function `(algorithm, base, context) => Result<Uint8Array>`. A function is how you reach a key management service. The signature base is built for you; the function receives its bytes and returns signature bytes. For exact control over the serialized parameters, use an exact-input spec with `signatureInput` in place of `components`; nothing is generated.
+The signer is a `KeyHandle` from [key custody](key-custody.md), or any function `(algorithm, base, context) => Result<Uint8Array>`. A function is how you reach a key management service. The signature base is built for you; the function receives its bytes and returns signature bytes. A function returns 1 to 1,024 signature bytes; anything else is `signer_failed`. For exact control over the serialized parameters, use an exact-input spec with `signatureInput` in place of `components`; nothing is generated. Generated specs refuse the `host` component, the `;tr` parameter, and `;req` on a request with `unsupported_component`.
 
 The next program signs through a function and through an exact-input spec, then verifies both with a strict policy. `extraComponents: "reject"` makes the policy accept only the coverage you named, so a sender cannot pad a signature with extra components you did not plan for.
 
@@ -43,7 +44,7 @@ const trusted = must(await PublicKey.import(pair.publicKey.export({ format: "jwk
 const signer: Signer = async (_algorithm, base) => ok(new Uint8Array(nodeSign(null, base, pair.privateKey)));
 
 const components = '("@method" "@authority" "@path")';
-const request = must(await Message.request("GET", "https://api.example.com/orders", [], ""));
+const request = must(await Message.request("GET", "https://api.example.com/documents", [], ""));
 const generated = must(await sign(request, { label: "g", components, algorithm: "ed25519", expiresIn: 60, keyid: "client-1" }, signer));
 const now = Math.floor(Date.now() / 1000);
 const exact = must(await sign(request, {
@@ -70,7 +71,7 @@ Cover `@scheme` as well as `@authority` when the scheme matters. RFC 9421 omits 
 
 ## Verify
 
-`Policy.create` requires six choices. None has a default, because each is a security decision.
+`Policy.create` requires six choices. None of the six has a default, because each is a security decision.
 
 | Choice | What you decide |
 | --- | --- |
@@ -78,12 +79,12 @@ Cover `@scheme` as well as `@authority` when the scheme matters. RFC 9421 omits 
 | `components` | Which components every accepted signature must cover. |
 | `keyResolver` | Which key a `keyid`, label, and tag select. Return `ok(null)` for an unknown key. The resolver's algorithm is authoritative. |
 | `freshness` | `"not_evaluated"`, or a clock, `maxAge`, `skew`, and whether `expires` is required. |
-| `content` | `"not_required"`, or which digest algorithms must be present and recomputed. |
+| `content` | `"not_required"`, or which digest algorithms you accept. Every SHA-256 or SHA-512 digest the message carries must be one you listed, at least one must be present, and each is recomputed. |
 | `replay` | `"not_required"`, or a nonce commitment and a store. See [replay protection](replay-protection.md). |
 
 On NTP-synchronized hosts, a few seconds of `skew` accommodates small clock differences; a wider window accepts older signatures.
 
-Optional members are `extraComponents` (`"allow"` or `"reject"`), `maxSignatures`, and `fieldSchemas` for Structured Fields you cover.
+Optional members are `extraComponents` (`"allow"`, the default, or `"reject"`), `maxSignatures` (1 to 64, default 16), and `fieldSchemas` for Structured Fields you cover.
 
 `verify(message, policy, { label })` checks exactly the signature you name. It does not try every label and accept the first that passes. It returns a frozen `Verification` only after the cryptography, coverage, freshness, content, and replay layers all succeed. Calling `serializeVerification` gives the ordered, language-neutral facts if you need to log or compare them; the default JSON form hides parameters and key identifiers.
 
@@ -140,7 +141,7 @@ The function below maps any error to an HTTP status. It is a recommendation, not
 
 - **400** when the message cannot be read: malformed signature fields, a covered component the message lacks, an unreadable body, or input over a limit. Retrying the same bytes cannot succeed.
 - **401** when the sender did not prove what your policy requires: no signature, a bad signature, a stale or replayed one, an unknown key, or coverage your policy refuses. A fresh, correct signature can succeed.
-- **403** when the signature is understood and your configuration refuses it: a revoked key, an untrusted agent, a published test key, or no principal bound to the actor.
+- **403** when the signature is understood and your configuration refuses it: a revoked key, an untrusted agent, or a published test key.
 - **500** when your own code or configuration is wrong: an invalid policy, a resolver that threw, or an adapter used in the wrong order. The sender cannot fix these.
 - **503** when the failure is transient: anything the library marks `retryable`, a replay store that is down or slow, or key discovery that timed out. A timed-out replay claim may have committed, so the same signed request can come back as `replayed`; the sender should sign again.
 

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 11, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 Profile contract (reference ADR 0013, the extension-profile boundary), RFC 9421, and the shared conformance corpus · **Review when:** extension surface, stamps, or verification facts change
+**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 Profile contract (RequestSeal for Elixir ADR 0013, the extension-profile boundary), RFC 9421, and the shared conformance corpus · **Review when:** extension surface, stamps, or verification facts change
 
 # Extension profiles
 
@@ -7,31 +7,43 @@ and replay with independently maintained extension packages. This surface is uns
 pin `@request-seal/core` exactly. Extensions enforce their source-specific predicates
 and select their profile name as a constant in their code.
 
-API sketches below use caller-supplied values; runnable examples are in the [guides](../../README.md#guides).
+The program below plays both sides: it signs a request, then verifies it the way an
+extension package would, with its own constant stamp.
 
-```text
-import { Profile, type ProfileStamp } from "@request-seal/core";
+```ts
+import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
+import { Custody, Message, Policy, Profile, PublicKey, ok, sign, type ProfileStamp, type Result } from "@request-seal/core";
 
-const stamp: ProfileStamp<"revision"> = Object.freeze({
-  name: Object.freeze(["example_pkg", "example"] as const),
-  revision: "1",
-});
-const parsed = Profile.dictionaries(message, 16);
-if (parsed.ok) {
-  const [entries, signatures] = parsed.value;
-  const input = new Map(entries).get(label);
-  const prepared = await Profile.preflight(input, '("@method")', "allow", policy.freshness);
-  if (prepared.ok) {
-    const verified = await Profile.verifyLabel(
-      message, policy, label, input, signatures[label], stamp,
-    );
-    // Apply application decisions to verified.ok and verified.value explicitly.
-  }
-}
+const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
+const pair = generateKeyPairSync("ed25519");
+const signer = must(await Custody.local("ed25519", pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string));
+const trusted = must(await PublicKey.import(pair.publicKey.export({ format: "jwk" })));
+const components = '("@method" "@authority" "@path")';
+const policy = must(Policy.create({
+  algorithms: ["ed25519"], components, keyResolver: () => ok({ algorithm: "ed25519", key: trusted }),
+  freshness: { clock: () => Math.floor(Date.now() / 1000), maxAge: 60, skew: 5, requireExpires: true },
+  content: "not_required", replay: "not_required",
+}));
+const label = "reading";
+const message = must(await sign(must(await Message.request("GET", "https://sensors.example/readings/7", [], "")),
+  { label, components, algorithm: "ed25519", expiresIn: 60 }, signer));
+
+// The extension selects its profile name as a constant in its own code.
+const stamp: ProfileStamp<"revision"> = Object.freeze({ name: Object.freeze(["example_pkg", "example"] as const), revision: "1" });
+const [entries, signatures] = must(Profile.dictionaries(message, 16));
+const input = new Map(entries).get(label);
+assert.ok(input && Profile.validSignatureInput(input));
+// Check coverage and freshness before any discovery or key resolution.
+must(await Profile.preflight(input, components, "reject", policy.freshness));
+const verified = must(await Profile.verifyLabel(message, policy, label, input, signatures[label], stamp));
+assert.equal(JSON.stringify(verified.profile), JSON.stringify({ name: ["example_pkg", "example"], revision: "1" }));
+assert.equal(verified.authorization, "not_evaluated"); // The stamp records selection; you still authorize.
+
+// Reserved package names are refused.
+const reserved = await Profile.verifyLabel(message, policy, label, input, signatures[label], { name: ["request_seal", "example"] });
+assert.ok(!reserved.ok && reserved.error.kind === "core" && reserved.error.reason === "invalid_profile");
 ```
-
-`message`, `policy`, and `label` above are caller-selected values; policy must be
-created by `Policy.create`. See [signing and verification](sign-and-verify.md).
 
 `Profile.validSignatureInput(input)` returns a boolean for the semantic rules of a
 parsed Signature-Input inner list. Malformed values return false. It does not parse
@@ -73,8 +85,8 @@ names and the [BEAM atom limit](https://www.erlang.org/doc/system/system_limits.
 Every stamp string must contain Unicode scalar values; lone surrogates reject.
 Class instances, symbol keys,
 compound values, and additional tuple keys reject. Own values and tuple elements are
-read once into owned null-prototype snapshots. Keys are inserted in UTF-16 code-unit
-order, so equal stamps share one key order; as for every JavaScript object,
+read once into owned null-prototype snapshots. `name` is inserted first and the
+remaining keys in UTF-16 code-unit order, so equal stamps share one key order; as for every JavaScript object,
 array-index keys are listed first in ascending order. Metadata
 negative zero normalizes to zero. Returned stamp objects and tuples are frozen.
 
@@ -88,8 +100,10 @@ input through overloads; both execute the same validation.
 
 Rejection precedence is stamp, policy, label, message, signature shape, paired
 fields, unknown label, selected input, selected signature, and input semantics.
-Failures return bounded Results without caller bytes or callback diagnostics;
-unexpected boundary faults become `invalid_policy` at `input`.
+A malformed stamp returns `invalid_profile` at `input`; a malformed signature returns
+`invalid_signature_field` and a malformed selected input `invalid_signature_input`, both
+at `fields`. Failures return bounded Results without caller bytes or callback
+diagnostics; unexpected boundary faults become `invalid_policy` at `input`.
 
 Successful verification carries the stamp in `Verification.profile` and in replay
 commitment `facts.profile`. Commitments must bind the whole stamp to distinguish

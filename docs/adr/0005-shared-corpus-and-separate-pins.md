@@ -1,4 +1,4 @@
-**Status:** accepted · **Kind:** record · **Updated:** October 11, 2026 · **Governed by:** the shared conformance corpus format and the vendoring and extraction scripts · **Review when:** a pin moves, a corpus surface is added, or the error vocabulary changes
+**Status:** accepted · **Kind:** record · **Updated:** October 14, 2026 · **Governed by:** the shared conformance corpus format and the vendoring and extraction scripts · **Review when:** a pin moves, a corpus surface is added, or the error vocabulary changes
 
 # ADR 0005: The shared corpus is the only oracle, with separate corpus and error-vocabulary pins
 
@@ -16,7 +16,7 @@ The two implementations release independently. The Elixir release `v0.4.1` chang
 1. **The shared corpus is the semantic oracle.** `conformance/` holds public source bytes, canonical case manifests, and an `index.json` with every file digest. This package vendors it from one upstream release tag. Neither implementation regenerates an expected value during a run.
 2. **Two pins, two artifacts.** `CORPUS_PIN` in `src/constants.ts` names the corpus release tag, commit, and index SHA-256; it is `v0.4.0`. `ELIXIR_ERROR_PIN` in `src/errors/parity.ts` names the Elixir commit that the error vocabulary is extracted from; it is the commit behind `v0.4.1`. The pins move separately, each with its own reviewed commit, and each states why it differs from the other.
 3. **Vendoring is verified.** `scripts/vendor-corpus.ts` downloads the release assets and checks the asset checksum, archive paths, inventory digests, release commit, and index digest before it replaces the corpus and updates the pin in one change.
-4. **Consumption ties out.** The runner (`tools/conformance/cli.ts`) checks the index pin and every file digest, executes each case once, and requires `executed + not_applicable + runtime_limited + pending` to equal the listed items. A known-positive case must execute and match. `--pending-ok` is a development flag; the release workflow runs the corpus without it.
+4. **Consumption ties out.** The runner (`tools/conformance/cli.ts`) checks the index pin and every file digest, executes each case once, and requires `executed + not_applicable + runtime_limited` to equal the listed items; with `--pending-ok`, declared pending items are added to that sum. A known-positive case must execute and match. `--pending-ok` is a development flag; the release workflow runs the corpus without it.
 5. **The error vocabulary is generated, not typed.** `scripts/extract-elixir-reasons.ts` reads the pinned Elixir source through `git show`, and `scripts/render-parity.ts` renders `docs/reference/error-parity.md` from the same table. CI re-extracts from the pinned tag and compares.
 
 ## Strongest alternatives

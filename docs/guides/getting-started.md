@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 11, 2026 · **Governed by:** RFC 9421, RFC 9530, and the executed examples in this guide · **Review when:** the public signing or verification API changes
+**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9530, and the executed examples in this guide · **Review when:** the public signing or verification API changes
 
 # Getting started
 
@@ -31,13 +31,13 @@ const trusted = must(await PublicKey.import(pair.publicKey.export({ format: "jwk
 
 // Sign a request. The body digest is computed over the exact bytes.
 const components = '("@method" "@scheme" "@authority" "@path" "content-digest")';
-const request = must(await Message.request("POST", "https://api.example.com/orders",
-  [["content-type", "application/json"]], '{"item":"book"}', { digest: ["sha-256"] }));
+const request = must(await Message.request("POST", "https://api.example.com/notes",
+  [["content-type", "application/json"]], '{"title":"draft"}', { digest: ["sha-256"] }));
 const signed = must(await sign(request,
-  { label: "sig", components, algorithm: "ed25519", expiresIn: 60, keyid: "orders-client", digest: ["sha-256"] }, signer));
+  { label: "sig", components, algorithm: "ed25519", expiresIn: 60, keyid: "notes-client", digest: ["sha-256"] }, signer));
 
 // Verify under a policy that states every acceptance choice.
-const keyResolver: KeyResolver = ({ keyid }) => ok(keyid === "orders-client" ? { algorithm: "ed25519", key: trusted } : null);
+const keyResolver: KeyResolver = ({ keyid }) => ok(keyid === "notes-client" ? { algorithm: "ed25519", key: trusted } : null);
 const policy = must(Policy.create({
   algorithms: ["ed25519"],
   components,
@@ -50,7 +50,7 @@ const verification = must(await verify(signed, policy, { label: "sig" }));
 assert.equal(verification.authorization, "not_evaluated"); // RequestSeal authenticates; you authorize.
 
 // A body changed after signing is rejected with a named reason.
-const forged = must(Message.create({ ...signed, body: { ...signed.body, bytes: new TextEncoder().encode('{"item":"car"}') } }));
+const forged = must(Message.create({ ...signed, body: { ...signed.body, bytes: new TextEncoder().encode('{"title":"final"}') } }));
 const rejected = await verify(forged, policy, { label: "sig" });
 assert.ok(!rejected.ok && rejected.error.kind === "core" && rejected.error.reason === "digest_mismatch");
 ```
@@ -60,10 +60,10 @@ assert.ok(!rejected.ok && rejected.error.kind === "core" && rejected.error.reaso
 1. `Custody.local` imported the private key into a handle. The handle can sign but never gives the key back. The receiver gets only a `PublicKey`.
 2. `Message.request` built a lossless request model and added a `Content-Digest` header over the body bytes (RFC 9530).
 3. `sign` appended `Signature-Input` and `Signature` header occurrences and returned a new `Message`. It never modifies the message you passed in.
-4. `Policy.create` took the six choices a verifier must make: allowed `algorithms`, required `components`, a `keyResolver` that maps `keyid` to a trusted key, `freshness`, `content` checking, and `replay`. Nothing is defaulted, so a policy never accepts more than you wrote down.
+4. `Policy.create` took the six choices a verifier must make: allowed `algorithms`, required `components`, a `keyResolver` that maps `keyid` to a trusted key, `freshness`, `content` checking, and `replay`. None of the six has a default, so a policy never guesses a security choice. Optional `extraComponents` defaults to `"allow"`; set `"reject"` to refuse coverage beyond what you listed.
 5. `verify` checked the signature, the covered components, the clock, and the digest, then returned a frozen `Verification`. It records `authorization: "not_evaluated"` and a principal of `"unattributed"`: a valid signature proves the holder of the key sent these covered bytes, and says nothing about what that sender may do.
 
-Every function returns a `Result`: `{ ok: true, value }` or `{ ok: false, error }`. Errors are small frozen objects with a stable `kind` and `reason`, never stack traces and never your bytes. Branch on `error.reason`; the [error reference](../reference/error-parity.md) lists every one.
+Every operation that can fail returns a `Result`: `{ ok: true, value }` or `{ ok: false, error }`. Errors are small frozen objects with a stable `kind` and `reason`, never stack traces and never your bytes. Branch on `error.reason`; the [error reasons](../reference/errors.md) page explains every one.
 
 ## Habits that keep you safe
 

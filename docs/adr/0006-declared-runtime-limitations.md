@@ -1,4 +1,4 @@
-**Status:** accepted · **Kind:** record · **Updated:** October 11, 2026 · **Governed by:** tools/conformance/runtime-limits.json and the Fetch verification allowlist · **Review when:** a supported runtime version changes, or a runtime divergence is found or fixed
+**Status:** accepted · **Kind:** record · **Updated:** October 14, 2026 · **Governed by:** tools/conformance/runtime-limits.json and the Fetch verification allowlist · **Review when:** a supported runtime version changes, or a runtime divergence is found or fixed
 
 # ADR 0006: Declare runtime limitations instead of weakening assertions
 
@@ -7,7 +7,7 @@
 
 ## Context
 
-The package runs on Node, Deno, and Bun, and all three implement WebCrypto and `fetch` differently. Real divergences exist. Bun 1.3.14 on `darwin-arm64` rejects two valid ECDSA P-256 signatures from the Wycheproof vectors (items 261 and 262). Deno 2.5.6 and Bun 1.3.14 return `invalid_response` from `node:https` for a valid key set through the vetted TLS agent. Fetch implementations differ in how they treat repeated-field whitespace, cookies, and request targets.
+The package runs on Node, Deno, and Bun, and all three implement WebCrypto and `fetch` differently. Real divergences exist. Bun 1.3.14 on `darwin-arm64` rejects two valid ECDSA P-256 signatures from the Wycheproof vectors (items 261 and 262). Deno 2.5.6 and Bun 1.3.14 return `invalid_response` from `node:https` for a valid key set through the vetted TLS agent. WebKit 27.2 refuses an Ed25519 empty-message key check on macOS and PKCS8 import of an Ed25519 seed that begins with a zero byte on Linux. Fetch implementations differ in how they treat repeated-field whitespace, cookies, and request targets.
 
 A test suite can respond in three bad ways: skip the runtime, loosen the assertion until every runtime passes, or add a fallback implementation. Each hides the defect from the next reader and can turn a real regression into a pass.
 
