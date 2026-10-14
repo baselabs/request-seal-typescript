@@ -64,7 +64,7 @@ The library overwrites the byte buffers it copies while importing. It cannot ove
 
 Every operation on a handle takes a `Context`, which is an absolute deadline plus an abort signal. `withDeadline({ timeoutMs, signal, parent })` creates one. A deadline expiring returns `deadline_exceeded`, which is retryable, and a late result is discarded. Cancellation cannot interrupt a native operation that WebCrypto already started, so a canceled signing call may still finish in the background; its result is never returned.
 
-When `sign` takes a handle, the signing deadline begins just before the custody call and is capped at `signingTimeout` (5,000 ms by default, up to 300,000). A caller `Context` can only shorten it.
+When `sign` takes a handle, the signing deadline begins just before the custody call and is capped at `signingTimeout` (5,000 ms by default, up to 300,000). A caller `Context` can only shorten it. When `sign` takes a signing function, the function runs under your `Context` if you pass one, and otherwise under `signingTimeout`.
 
 ## Hardware, vaults, and key services
 

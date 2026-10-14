@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Bound exact-input function signers by `signingTimeout` when no `context` is passed, as generated specs already did; the option was accepted and ignored, and such signers always ran under a fixed 5,000 ms deadline. A function that outlasts its `signingTimeout` now returns `signer_failed`.
 - Generate `Content-Digest` in `Message.request` and `Message.response` with the `crypto.subtle.digest` captured at load, as every other cryptographic operation already did; code that replaces the global after RequestSeal loads can no longer change a generated digest.
 - Declare a WebKit 27.2 limitation on Linux x64: the engine rejects PKCS8 import of an Ed25519 private key whose seed begins with `0x00`, so `Custody.local` returns `custody/invalid_key` for that form; pass such keys as JWK. The browser suite executes it with a fixed seed and uses published RFC 8032 keys instead of generating Ed25519 keys, which this engine intermittently fails to do. Correct the runtime matrix: Node 22.12.0 and Deno 2.5.6 refuse `cacerts: "os"`, Fetch verification is refused on every runtime except Deno 2.5.6 (including Node 22.12.0 and Bun 1.3.14), and WebKit verifies empty-message Ed25519 signatures on Linux.
 - Document supported versions and how to verify release provenance with `npm audit signatures` in SECURITY.md.

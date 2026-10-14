@@ -46,7 +46,8 @@ test('explicit timeout accepts both bounds, rejects malformed values, and snapsh
     // A one-millisecond budget is valid, but real crypto may exhaust it.
     const lower = await sign(message, explicit, local, {signingTimeout: 1});
     if (!lower.ok) failure(lower, 'signing_failed', 'deadline_exceeded');
-    value(await sign(message, explicit, (a: unknown, b: unknown, c: Context) => local.sign(a, b, c), {signingTimeout: 1}));
+    const callable = await sign(message, explicit, (a: unknown, b: unknown, c: Context) => local.sign(a, b, c), {signingTimeout: 1});
+    if (!callable.ok) failure(callable, 'signer_failed');
     for (const signingTimeout of [0, -1, 300001, 1.5, Infinity, NaN, null, undefined, '5000']) {
       const r = await sign(message, explicit, local, {signingTimeout}); assert.equal(!r.ok && r.error.reason, 'invalid_options');
     }
@@ -58,14 +59,16 @@ test('explicit timeout accepts both bounds, rejects malformed values, and snapsh
     }
   } finally {await local.release();}
 });
-test('explicit handle and callable preserve identical wire bytes and callable timeout behavior', async () => {
+test('explicit handle and callable preserve identical wire bytes, and signingTimeout bounds the callable', async () => {
   const {local, message} = await setup();
   try {
     const expected = value(await sign(message, explicit, (a: unknown, b: unknown, c: Context) => local.sign(a, b, c)));
     assert.deepEqual(value(await sign(message, explicit, local)), expected);
-    assert.deepEqual(value(await sign(message, explicit, async (a: unknown, b: unknown, c: Context) => {
+    const delayed = async (a: unknown, b: unknown, c: Context) => {
       const r = await local.sign(a, b, c); await new Promise(resolve => setTimeout(resolve, 30)); return r;
-    }, {signingTimeout: 1})), expected);
+    };
+    assert.deepEqual(value(await sign(message, explicit, delayed, {signingTimeout: 1000})), expected);
+    failure(await sign(message, explicit, delayed, {signingTimeout: 1}), 'signer_failed');
   } finally {await local.release();}
 });
 for (const [form, spec] of [['explicit', explicit], ['generated', generated]] as const) {
@@ -188,3 +191,20 @@ for (const [form, spec] of [['explicit', explicit], ['generated', generated]] as
     } finally {parent.signal.removeEventListener('abort', callerListener); await local.release();}
   });
 }
+test('explicit function signers run under signingTimeout like generated function signers', async () => {
+  const {local, message} = await setup();
+  const pending = new Set<Promise<unknown>>();
+  const slow = (a: unknown, b: unknown, c: Context) => {
+    const work = new Promise(resolve => setTimeout(resolve, 60)).then(() => local.sign(a, b, c));
+    pending.add(work);
+    return work as Promise<Result<Uint8Array>>;
+  };
+  try {
+    // A 20 ms budget ends before the 60 ms signer settles, on both spec forms.
+    failure(await sign(message, generated, slow, {signingTimeout: 20}), 'signer_failed');
+    failure(await sign(message, explicit, slow, {signingTimeout: 20}), 'signer_failed');
+    // A budget longer than the signer still signs, and a caller Context still governs when supplied.
+    value(await sign(message, explicit, slow, {signingTimeout: 5000}));
+    value(await sign(message, explicit, slow, {signingTimeout: 20, context: value(withDeadline({timeoutMs: 5000}))}));
+  } finally {await Promise.all(pending); await local.release();}
+});

@@ -218,7 +218,7 @@ export async function sign(
       }
       input = r.value;
       if (Object.hasOwn(o, "context") || !isKeyHandle(signer)) {
-        c = Object.hasOwn(o, "context") ? (isContext(o.context) ? ok(o.context) : err(bounded(null, "invalid_options", "input"))) : withDeadline({timeoutMs: 5000});
+        c = Object.hasOwn(o, "context") ? (isContext(o.context) ? ok(o.context) : err(bounded(null, "invalid_options", "input"))) : withDeadline({timeoutMs: signingTimeout});
         ensure(c.ok, "invalid_options", "input");
       }
     } else {

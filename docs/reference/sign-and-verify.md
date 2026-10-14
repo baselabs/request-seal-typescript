@@ -20,11 +20,10 @@ Deadlines depend on the signer:
 - A KeyHandle's deadline starts immediately before the custody call, after
   signature-base construction, and is capped at `signingTimeout` even under a longer
   caller Context. A caller Context can shorten it.
-- A function signer on a generated spec runs under the caller's `context` when one is
-  passed, and otherwise under `signingTimeout`.
-- A function signer on an exact-input spec runs under the caller's `context` when one
-  is passed, and otherwise under a fixed 5,000 ms deadline; `signingTimeout` does not
-  apply to it.
+- A function signer, on either spec form, runs under the caller's `context` when one
+  is passed, and otherwise under `signingTimeout`. A function that has not settled by
+  then returns `signer_failed`. This differs from RequestSeal for Elixir, whose
+  synchronous function signers are not interrupted.
 
 Errors: an exact-input handle algorithm mismatch returns `signer_algorithm_mismatch`
 at `input` with message `"signer algorithm does not match signature specification"`;
