@@ -3,7 +3,8 @@ import type { IncomingMessage } from "node:http";
 import { promises as dns } from "node:dns";
 import { isIP } from "node:net";
 import * as tls from "node:tls";
-import { connect, checkServerIdentity, type TLSSocket } from "node:tls";
+import { connect, checkServerIdentity, type PeerCertificate, type TLSSocket } from "node:tls";
+import { X509Certificate } from "node:crypto";
 import { err, type Result } from "../result.ts";
 import {
   withDeadline,
@@ -121,6 +122,24 @@ function systemCertificates(): string[] | undefined {
     systemCertificateError(error);
   }
 }
+/**
+ * Check that the peer certificate names the host. An IP literal is matched against the
+ * certificate's iPAddress names by OpenSSL (`X509Certificate.checkIP`), never against DNS
+ * names or the subject. Node 22.23.1's `tls.checkServerIdentity` IDNA-normalizes the host
+ * before testing for an IP, and `domainToASCII("::1")` is "", so every IPv6 literal fails
+ * there with ERR_TLS_CERT_ALTNAME_INVALID; DNS hosts keep `tls.checkServerIdentity`.
+ */
+function checkHostIdentity(host: string, cert: PeerCertificate): Error | undefined {
+  if (!isIP(host)) return checkServerIdentity(host, cert);
+  try {
+    if (new X509Certificate(cert.raw).checkIP(host) !== undefined) return undefined;
+  } catch {
+    // A certificate OpenSSL cannot parse names no address.
+  }
+  return Object.assign(new Error("certificate does not name the IP address"), {
+    code: "ERR_TLS_CERT_ALTNAME_INVALID",
+  });
+}
 function tlsSocket(
   ip: string,
   url: URL,
@@ -150,10 +169,8 @@ function tlsSocket(
         minVersion: "TLSv1.2",
         ALPNProtocols: ["http/1.1"],
         ca,
-        checkServerIdentity: (
-          _name: string,
-          cert: Parameters<typeof checkServerIdentity>[1],
-        ) => checkServerIdentity(host, cert),
+        checkServerIdentity: (_name: string, cert: PeerCertificate) =>
+          checkHostIdentity(host, cert),
         lookup: () => {
           throw discoveryError("address_denied");
         },

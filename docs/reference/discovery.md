@@ -112,7 +112,10 @@ if (source.ok) {
 The Node subpath vets every literal and every DNS answer using the pinned IANA
 special-purpose table, connects to a numeric address, validates the connected
 peer after the TLS handshake and before sending HTTP bytes, verifies TLS hostname and CA trust, and uses a
-private agent that excludes environment proxies. `permittedAddresses` allows
+private agent that excludes environment proxies. A DNS host is checked with
+`tls.checkServerIdentity`; an IP-literal host must appear as an iPAddress name in the
+certificate, checked by OpenSSL through `X509Certificate.checkIP`, because Node
+22.23.1's `checkServerIdentity` never matches an IPv6 literal. `permittedAddresses` allows
 at most 16 exact IP exceptions. Embedded IPv4 in mapped, NAT64 and 6to4 forms
 undergoes the same IPv4 denial policy. IPv6 additionally requires allocated
 global-unicast space and denies the pinned special-purpose ranges. See the

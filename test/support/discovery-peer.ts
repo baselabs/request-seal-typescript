@@ -19,6 +19,7 @@ export type Peer = {
 export async function peer(
   listener: RequestListener,
   address = "127.0.0.1",
+  altNames = "DNS:localhost,DNS:directory.test,IP:127.0.0.1,IP:::1",
 ): Promise<Peer> {
   const root = await mkdtemp(resolve("test/.tmp-discovery-tls-"));
   let server: Server | undefined;
@@ -63,7 +64,7 @@ export async function peer(
     ]);
     await writeFile(
       join(root, "ext.cnf"),
-      "subjectAltName=DNS:localhost,DNS:directory.test,IP:127.0.0.1,IP:::1\nbasicConstraints=critical,CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n",
+      `subjectAltName=${altNames}\nbasicConstraints=critical,CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n`,
     );
     run([
       "x509",

@@ -192,3 +192,14 @@ for (const order of ['tls-first', 'connect-first']) test(`address retries preser
   assert.equal(child.status, 0, child.stdout + child.stderr);
   assert.equal(child.stdout, 'tls_failed retryable=false connections=1 order=::1,127.0.0.1\n');
 });
+test('an IP-literal source requires that exact IP in the certificate, on IPv4 and IPv6', async () => {
+  // Each peer listens on one loopback address but its certificate names only the other one.
+  for (const [address, altNames, host] of [['::1', 'DNS:localhost,IP:127.0.0.1', '[::1]'], ['127.0.0.1', 'DNS:localhost,IP:::1', '127.0.0.1']] as const) {
+    const p = await peer((_q,r) => {r.setHeader('content-type','application/json');r.end(jwks());}, address, altNames);
+    try {
+      const s = value(NodeSource.create({type:'jwks_uri',location:`https://${host}:${p.port}/keys`,cacerts:[p.ca],permittedAddresses:[address]}));
+      reason(await NodeDiscovery.fetch(s), 'tls_failed');
+      assert.equal(p.requests, 0, `${address}: no HTTP bytes after a certificate that does not name it`);
+    } finally {await p.close();}
+  }
+});
