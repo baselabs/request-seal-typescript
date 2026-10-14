@@ -12,7 +12,6 @@
 - Document supported versions and how to verify release provenance with `npm audit signatures` in SECURITY.md.
 - Documentation pass, with no library behavior change: correct option lists, defaults, limits, and error reasons across the guides and references against the source; add a key rotation guide and a glossary; replace the extension-profile sketch with an executed program and add an executed AES key-wrapping JOSE example; describe parameters, results, and errors in the API reference for `sign`, `verify`, and `Policy.create`; vary example domains; add npm keywords.
 
-
 ### Migrating from 0.2.x
 - `capture(server, { context })` now returns `adapter/invalid_options`. Replace `context` with `timeoutMs` (1 to 300,000 ms, default 5,000), which gives each request its own deadline. Pass a `context` per call to `captureRequest` instead if you need one.
 - A function signer used with an exact-input spec (`signatureInput`) and no `context` now runs under `signingTimeout` (default 5,000 ms). A signer slower than its `signingTimeout` now fails with `signer_failed`; raise `signingTimeout` or pass a `context` with the deadline you want.

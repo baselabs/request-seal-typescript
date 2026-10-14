@@ -4,7 +4,7 @@
 
 Every failure is a `Result` whose `error` has a stable `kind` and `reason`, and for `core` and `jose` a `layer`. This page says what each reason means and what to do about it. Branch on these values, never on message text. The [error vocabulary](error-parity.md) is the generated list with its pin, and the [README](../../README.md#reason-to-http-status-recommendation) recommends an HTTP status for each. A test checks that this page lists every reason in the vocabulary.
 
-Adapters wrap the underlying error in `error.source`; read that for the cause. A few reasons are part of the vocabulary shared with RequestSeal for Elixir and are never returned by this package; they are marked "Not returned here".
+Adapter errors can carry the underlying error in `error.source`; the [adapter section](#adapter) says when. A few reasons are part of the vocabulary shared with RequestSeal for Elixir and are never returned by this package; they are marked "Not returned here."
 
 ## core
 
@@ -77,7 +77,7 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/replay.commitment_failed` | Your commitment threw or returned anything but 1 to 256 bytes. | Fix the commitment. |
 | `core/replay.missing_replay_identifier` | Replay protection is required and the signature has no nonce. | The sender adds a nonce. |
 | `core/replay.replayed` | The signature was already used. | Reject the request. |
-| `core/replay.retention_exceeded` | The claim would have to be kept past the largest supported time. | Reject; the signature's window is too long. |
+| `core/replay.retention_exceeded` | The claim would have to be kept past the largest supported time (253,402,300,799), during verification or from `Replay.retainUntil`. | Reject; the signature's window is too long. |
 | `core/replay.store_failed` | The replay store failed or is full; the claim may or may not have landed. | Answer with a transient error; the sender signs again. |
 | `core/replay.store_timeout` | The replay claim ran out of time; it may have committed. | Answer with a transient error; the sender signs again. |
 | `core/replay.store_unavailable` | The replay store could not be reached. | Answer with a transient error. |
@@ -227,7 +227,7 @@ Returned by discovery sources, snapshots, key sets, caches, and the Node transpo
 | `discovery/limit` | The response exceeds a size, key, or removal bound. | Reject, or raise the source limits. |
 | `discovery/redirect_denied` | A redirect is not allowed: `maxRedirects` is 0, the `Location` is malformed, or it leaves `redirectScope`. | Fix the source URL, or allow the redirect. |
 | `discovery/redirect_limit` | More redirects than `maxRedirects`. | Raise `maxRedirects` if intended. |
-| `discovery/resolution_failed` | DNS resolution failed. | Retry later or fix DNS. |
+| `discovery/resolution_failed` | DNS resolution failed. Not marked retryable. | Check the host name and DNS servers. |
 | `discovery/revoked_key` | The key was removed or revoked. | Reject. |
 | `discovery/source_unavailable` | No usable keys are available for the source now, such as a miss without a fetch function. Retryable. | Fetch or refresh the source. |
 | `discovery/tls_failed` | The TLS handshake or certificate check failed. | Check the certificate and `cacerts`. |
@@ -244,7 +244,7 @@ Returned by `JWS`, `JWE`, `Nested`, and `KeyManagement`.
 | --- | --- | --- |
 | `jose/crypto.deadline_exceeded` | The operation ran out of time. Retryable. | Retry with a fresh deadline. |
 | `jose/crypto.decryption_failed` | Decryption failed. Every secret-dependent failure returns this one error. | Reject. |
-| `jose/crypto.entropy_failure` | Random generation failed. | Retry; check the runtime. |
+| `jose/crypto.entropy_failure` | The runtime's random generator, or a recipient wrapper, reported an entropy failure. Not marked retryable. | Treat it as a runtime fault and check the runtime. |
 | `jose/crypto.invalid_signature` | The signature does not verify, or is empty. | Reject. |
 | `jose/crypto.signer_failed` | A signer or recipient function failed. | Fix the function. |
 | `jose/input.algorithm_not_permitted` | The token's algorithm is not in your policy. | Reject, or allow it. |
@@ -260,7 +260,7 @@ Returned by `JWS`, `JWE`, `Nested`, and `KeyManagement`.
 | `jose/input.invalid_tag` | The authentication tag is malformed. | Reject. |
 | `jose/input.limit` | Input exceeds a size, depth, or member bound. | Reject. |
 | `jose/input.unsupported_critical_header` | The header carries `crit`. | Reject. |
-| `jose/input.unsupported_header` | The header carries `jku`, `x5u`, `jwk`, or `b64`. | Reject. |
+| `jose/input.unsupported_header` | The header carries `jku`, `x5u`, `jwk`, or `b64`; or, during JWE encryption, a recipient wrapper returned header members other than at most `iv` and `tag` (and those only for GCM key wrapping). | Reject the token, or fix the recipient wrapper. |
 | `jose/input.unsupported_serialization` | The token uses JSON serialization. | Use compact serialization. |
 | `jose/key.algorithm_mismatch` | The resolved or signing key is bound to another algorithm. | Return a key for the token's algorithm. |
 | `jose/key.key_resolver_failed` | Your resolver threw or returned a malformed entry. | Fix the resolver. |
@@ -278,13 +278,13 @@ Returned by replay claims, stores, and `Replay` helpers. During verification the
 | `replay/invalid_options` | Options, a sweep time, or retention inputs are malformed. | Fix the input. |
 | `replay/invalid_store` | A store port or PostgreSQL table name is malformed. | Fix the store. |
 | `replay/store_failed` | The store failed. | Check the store. |
-| `replay/store_full` | The memory store reached `maxEntries`. | Sweep, or use a larger or shared store. |
+| `replay/store_full` | The store is full: the memory store reached `maxEntries`, or a caller store port returned `"full"`. | Sweep, or use a larger or shared store. |
 | `replay/store_timeout` | The store operation ran out of time; it may have committed. | Treat the outcome as unknown. |
 | `replay/store_unavailable` | The store could not be reached. | Check the database. |
 
 ## adapter
 
-Returned by the Node HTTP and Fetch adapters. `source` holds the underlying error, `stage` the step, and `attempt` the client attempt.
+Returned by the Node HTTP and Fetch adapters. `stage` names the step and `attempt` the client attempt. `source` is set only when the adapter wraps a failed core, custody, or message Result, such as a rejected verification or signature; it is null when the adapter's own check failed, when the underlying error has another kind, or when an unexpected exception was caught. An expired Context is returned as `custody/deadline_exceeded`, not wrapped.
 
 | Reason | Meaning | What to do |
 | --- | --- | --- |
@@ -293,14 +293,14 @@ Returned by the Node HTTP and Fetch adapters. `source` holds the underlying erro
 | `adapter/cross_origin_redirect` | A redirect leaves the origin and is not in `allowedOrigins`. | Add the origin, or do not follow. |
 | `adapter/digest_conflict` | Signing found an existing `Content-Digest` that disagrees. | Remove or fix the existing digest. |
 | `adapter/invalid_options` | Options are malformed, or used in the wrong order. | Fix the call. |
-| `adapter/invalid_request` | The request or URL is not acceptable here, such as a GET with a body, a bad method, or an ineligible Fetch runtime. | Fix the request or runtime. |
+| `adapter/invalid_request` | The request or URL is not acceptable here: on Fetch, a GET or HEAD with a body, an empty-query URL on Node below 24, or verification on a runtime outside `FETCH_VERIFICATION_RUNTIMES`; on Node, a URL with userinfo or a fragment, a method that is not a token, a value that is not a Node request, or `captureBody` on a request that is already captured. (A GET or HEAD body on the Node client is `invalid_options`.) | Fix the request, or verify on a supported runtime. |
 | `adapter/limit` | The body exceeds `maxBytes`. | Reject, or answer 413. |
 | `adapter/not_captured` | The request was not captured before verification. | Call `captureRequest` or `capture(server)` first. |
 | `adapter/not_final_step` | Not returned here. | None. |
 | `adapter/parser_order` | Another consumer read the request stream while capture owned it. | Capture before any body parser. |
-| `adapter/request_rejected` | Request verification failed; `source` holds the reason. | Map `source`. |
-| `adapter/response_rejected` | Response verification failed; `source` holds the reason. | Map `source`. |
-| `adapter/signing_failed` | Signing failed; `source` holds the reason. | Map `source`. |
-| `adapter/unsupported_component` | Coverage includes a field the transport controls, such as `content-length`. | Cover `@authority` or `content-digest` instead. |
+| `adapter/request_rejected` | Request verification failed. `source` holds the core error when verification returned one, and is null when an unexpected exception was caught. | Map `source` when present; otherwise treat it as a failed verification. |
+| `adapter/response_rejected` | Response verification failed. `source` holds the core error when verification returned one, and is null when an unexpected exception was caught. | Map `source` when present; otherwise treat it as a failed verification. |
+| `adapter/signing_failed` | Signing failed. `source` holds the core or custody error when signing returned one, and is null when an unexpected exception was caught. | Map `source` when present; otherwise check the spec and signer. |
+| `adapter/unsupported_component` | Fetch signing covers a field the runtime controls (`host`, `content-length`, `accept-encoding`, `connection`, `transfer-encoding`, `trailer`, `keep-alive`, `proxy-connection`, `te`, `upgrade`, and `sec-fetch-mode` on Node) or a `;tr` component. Node response signing covers `transfer-encoding`, `connection`, `trailer`, `keep-alive`, `proxy-connection`, `te`, or `upgrade`. Fetch verification refuses a policy or signature covering `@request-target`, `@target-uri`, `@path`, `@query`, `cookie`, or a `bs` or `tr` parameter, because Fetch cannot show those bytes as sent. | For signing, cover `@authority` instead of `host` and `content-digest` instead of `content-length`. For verification of those components, use the Node HTTP adapter or core `verify` with a Message built from the wire. |
 | `adapter/unsupported_delivery` | The response cannot be signed as delivered: headers already sent, an informational status, or pending cookies covered. | Sign before writing the response. |
 | `adapter/untrusted_proxy` | The socket peer is not in `trustedProxies`. | Add the proxy, or reject. |

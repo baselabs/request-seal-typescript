@@ -16,7 +16,8 @@ uniqueness scope; include additional authenticated facts when their scope needs 
 
 Replay reasons: `Claim.create` returns `replay/invalid_claim` for bad bytes or
 retention; `Replay.retainUntil`, `Replay.sweep`, and `createMemoryStore` return
-`replay/invalid_options`; `createReplayStore`, the PostgreSQL `createStore`, and `ddl` return
+`replay/invalid_options`, and `Replay.retainUntil` returns `core/replay.retention_exceeded`
+when the end is past 253,402,300,799; `createReplayStore`, the PostgreSQL `createStore`, and `ddl` return
 `replay/invalid_store` for a malformed port or table name; stores return `store_unavailable`, `store_timeout`,
 `store_failed`, or `store_full`. During verification, a commitment that throws or
 returns anything but 1–256 bytes is `core/replay.commitment_failed`, a repeat is
