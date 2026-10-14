@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Unreleased (next release: 0.3.0, a minor release with breaking changes)
 - Test on Node 22.23.1 in CI, beside 22.12.0, 24.21.0, and 26.11.1 (Linux only).
 - Match IP-literal discovery hosts against the certificate's IP addresses with OpenSSL (`X509Certificate.checkIP`). On Node 22.23.1, `tls.checkServerIdentity` normalizes the host with `domainToASCII` before its IP test, which turns `::1` into an empty string, so every `https://[IPv6]` source failed with `discovery/tls_failed`. DNS hosts still use `tls.checkServerIdentity`.
 - Report a missing or empty OS trust store as `discovery/transport_unavailable` instead of custody `unsupported_format` when `@request-seal/core/discovery-node` creates or fetches a `cacerts: "os"` source. Node before 22.15.0, including 22.12.0, and Deno 2.5.6 have no `tls.getCACertificates`; the refusal stays (bundled roots are never a fallback) but now has a discovery kind, the same as a denied store. Callers matching the old custody reason must update.
@@ -11,6 +11,12 @@
 - Declare a WebKit 27.2 limitation on Linux x64: the engine rejects PKCS8 import of an Ed25519 private key whose seed begins with `0x00`, so `Custody.local` returns `custody/invalid_key` for that form; pass such keys as JWK. The browser suite executes it with a fixed seed and uses published RFC 8032 keys instead of generating Ed25519 keys, which this engine intermittently fails to do. Correct the runtime matrix: Node 22.12.0 and Deno 2.5.6 refuse `cacerts: "os"`, Fetch verification is refused on every runtime except Deno 2.5.6 (including Node 22.12.0 and Bun 1.3.14), and WebKit verifies empty-message Ed25519 signatures on Linux.
 - Document supported versions and how to verify release provenance with `npm audit signatures` in SECURITY.md.
 - Documentation pass, with no library behavior change: correct option lists, defaults, limits, and error reasons across the guides and references against the source; add a key rotation guide and a glossary; replace the extension-profile sketch with an executed program and add an executed AES key-wrapping JOSE example; describe parameters, results, and errors in the API reference for `sign`, `verify`, and `Policy.create`; vary example domains; add npm keywords.
+
+
+### Migrating from 0.2.x
+- `capture(server, { context })` now returns `adapter/invalid_options`. Replace `context` with `timeoutMs` (1 to 300,000 ms, default 5,000), which gives each request its own deadline. Pass a `context` per call to `captureRequest` instead if you need one.
+- A function signer used with an exact-input spec (`signatureInput`) and no `context` now runs under `signingTimeout` (default 5,000 ms). A signer slower than its `signingTimeout` now fails with `signer_failed`; raise `signingTimeout` or pass a `context` with the deadline you want.
+- `@request-seal/core/discovery-node` now reports a missing or empty OS trust store as `discovery/transport_unavailable`. Code that matched custody `unsupported_format` for `cacerts: "os"` should match `discovery/transport_unavailable`, or supply DER roots in `cacerts`.
 
 ## 0.2.0 - October 11, 2026
 - Rewrite the README and add eleven usage guides, architecture decisions, and threat-model documentation. Every complete TypeScript example runs in CI; README verification excerpts are checked against the programs they come from. Generate the API reference with TypeDoc and publish it to GitHub Pages at https://baselabs.github.io/request-seal-typescript/. The migration guide compares behavior with `http-message-signatures` 1.0.6 using executed examples.
