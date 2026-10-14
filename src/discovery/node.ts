@@ -12,7 +12,7 @@ import {
   remainingMs,
   type Context,
 } from "../context.ts";
-import { discoveryError, custodyError } from "../errors/types.ts";
+import { discoveryError } from "../errors/types.ts";
 import { encodeBase64 } from "../bytes.ts";
 import { Discovery as CoreDiscovery } from "./index.ts";
 import {
@@ -106,6 +106,12 @@ async function resolve(
   ensure(addresses.length >= 1 && addresses.length <= 64, "resolution_failed");
   return addresses;
 }
+/**
+ * The OS trust store, or undefined when this runtime provides no usable one: Node before
+ * 22.15.0 (and Deno 2.5.6) lack `tls.getCACertificates`, and a host can return an empty
+ * store. Bundled roots are never a fallback (ADR 0007); callers get
+ * `discovery/transport_unavailable`, the same refusal as a denied store.
+ */
 function systemCertificates(): string[] | undefined {
   if (typeof tls.getCACertificates !== "function") return undefined;
   try {
@@ -133,7 +139,7 @@ function tlsSocket(
             encodeBase64(der) +
             "\n-----END CERTIFICATE-----",
         );
-  if (!ca) throw custodyError("unsupported_format");
+  if (!ca) throw discoveryError("transport_unavailable");
   return new Promise((done, fail) => {
     const socket = connect(
       Object.assign(Object.create(null), {
@@ -467,7 +473,7 @@ export async function fetch(
 ): Promise<Result<KeySet>> {
   try {
     ensure(isDiscoverySource(source), "invalid_source");
-    if (source.cacerts === "os" && !systemCertificates()) return err(custodyError("unsupported_format"));
+    if (source.cacerts === "os" && !systemCertificates()) return err(discoveryError("transport_unavailable"));
     const a = options(input, ["timeoutMs", "clock", "context", "dnsServers"]);
     const timeout = Object.hasOwn(a, "timeoutMs")
       ? a.timeoutMs
@@ -604,7 +610,7 @@ export const DiscoverySource = Object.freeze({
     try {
       const result = CoreSource.create(input);
       if (result.ok && result.value.cacerts === "os" && !systemCertificates())
-        return err(custodyError("unsupported_format"));
+        return err(discoveryError("transport_unavailable"));
       return result;
     } catch (error) {
       return failure(error, "invalid_source");

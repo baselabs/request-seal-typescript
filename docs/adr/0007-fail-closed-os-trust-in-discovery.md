@@ -1,4 +1,4 @@
-**Status:** accepted · **Kind:** record · **Updated:** October 11, 2026 · **Governed by:** src/discovery/node.ts, src/discovery/source.ts, and the discovery transport tests · **Review when:** Node's certificate APIs change, or a trust-store policy is proposed
+**Status:** accepted · **Kind:** record · **Updated:** October 14, 2026 · **Governed by:** src/discovery/node.ts, src/discovery/source.ts, and the discovery transport tests · **Review when:** Node's certificate APIs change, or a trust-store policy is proposed
 
 # ADR 0007: Discovery trusts the operating system store, and fails closed when it is unavailable
 
@@ -12,7 +12,7 @@ HTTPS key discovery fetches a publisher's keys, so the certificate chain it acce
 ## Decision
 
 1. **A source trusts the operating system store by default.** `cacerts` defaults to `"os"`. The transport reads `tls.getCACertificates("system")` and uses exactly those certificates as the only trust anchors for the connection.
-2. **The bundled roots are never a fallback.** If `tls.getCACertificates` is missing, or returns an empty list, creating a source with `cacerts: "os"` through `@request-seal/core/discovery-node` returns custody `unsupported_format`, and so does `Discovery.fetch`. The caller must then supply explicit DER roots.
+2. **The bundled roots are never a fallback.** If `tls.getCACertificates` is missing, or returns an empty list, creating a source with `cacerts: "os"` through `@request-seal/core/discovery-node` returns `discovery/transport_unavailable`, and so does `Discovery.fetch`, the same refusal as a runtime that denies access to the store. The caller must then supply explicit DER roots. (Until October 14, 2026 this refusal was custody `unsupported_format`, a custody reason for a discovery transport condition.)
 3. **Explicit roots replace the system store.** `cacerts` may be a list of DER certificates (1 to 256). They are the only anchors for that source. Core source creation, which opens no connection, accepts `"os"` without checking the store, so snapshots stay portable.
 4. **Each connection is verified in full.** The transport connects to a vetted numeric address, requires TLS 1.2 or newer, verifies the host name and chain with `rejectUnauthorized: true`, and checks the connected peer before it sends any HTTP bytes.
 
@@ -25,7 +25,7 @@ HTTPS key discovery fetches a publisher's keys, so the certificate chain it acce
 
 ## Deciding evidence and deletion test
 
-`src/discovery/node.ts` checks that `tls.getCACertificates("system")` exists and returns a nonempty store; source creation and fetching enforce that result. `test/discovery-fixes.test.ts` exercises a real untrusted TLS peer, expecting `unsupported_format` when the store is unavailable and `tls_failed` when usable system roots reject that peer. `test/discovery-os-trust.test.ts` also checks denied OS-root permission on Deno. These tests observe the available host branches; no bundled-roots fallback or empty-list-check mutation is claimed.
+`src/discovery/node.ts` checks that `tls.getCACertificates("system")` exists and returns a nonempty store; source creation and fetching enforce that result. `test/discovery-fixes.test.ts` exercises a real untrusted TLS peer, expecting `transport_unavailable` when the store is unavailable and `tls_failed` when usable system roots reject that peer. `test/discovery-os-trust.test.ts` also checks denied OS-root permission on Deno. These tests observe the available host branches; no bundled-roots fallback or empty-list-check mutation is claimed.
 
 ## Consequences
 

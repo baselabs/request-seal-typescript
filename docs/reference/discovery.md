@@ -175,7 +175,7 @@ runtimes. Published conformance expectations remain unchanged.
 `cacerts: "os"` uses the operating-system store when Node exposes a non-empty
 `tls.getCACertificates("system")` list, never Node's bundled roots. If the API
 is absent or the system list is empty, Node source creation and fetch both
-refuse with custody `unsupported_format`; supply explicit DER roots instead.
+refuse with `discovery/transport_unavailable`; supply explicit DER roots instead.
 The API was introduced in Node 22.15.0 and 24.0.0, but its presence alone does
 not establish system-store availability. Node 22.12.0 lacks the API. Core
 snapshot creation is portable and starts no TLS connection.

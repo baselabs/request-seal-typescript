@@ -14,10 +14,10 @@ assertions use exact patch versions.
 
 | Runtime lane | Version | Declared runtime limitations |
 | --- | --- | --- |
-| Node 22.12.0 | 22.12.0 | No `tls.getCACertificates`, so `cacerts: "os"` returns `custody/unsupported_format`. Empty-query Fetch signing returns `adapter/invalid_request`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
+| Node 22.12.0 | 22.12.0 | No `tls.getCACertificates`, so `cacerts: "os"` returns `discovery/transport_unavailable`. Empty-query Fetch signing returns `adapter/invalid_request`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Node 24.21.0 | 24.21.0 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Node 26.11.1 | 26.11.1 | Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
-| Deno 2.5.6 | 2.5.6 | No `tls.getCACertificates`, so `cacerts: "os"` returns `custody/unsupported_format`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
+| Deno 2.5.6 | 2.5.6 | No `tls.getCACertificates`, so `cacerts: "os"` returns `discovery/transport_unavailable`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
 | Deno 2.9.7 | 2.9.7 | Denied OS roots check only; without `--allow-sys=ca`, source creation and fetch return `discovery/transport_unavailable`. Full-suite support is not asserted. |
 | Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Chromium | 156.0.8078.4 | Browser Fetch verification returns `adapter/invalid_request`. |
@@ -36,9 +36,9 @@ exited 0 and returned 150 bundled roots and 0 system roots. The previously
 reported crash did not reproduce in this execution environment. Therefore
 `engines.node` does not exclude 23 based on that report. Node 23 is outside the
 CI lane set; its full suite is not asserted here. An absent or empty system
-store refuses `cacerts: "os"` as `custody/unsupported_format` without falling
-back to bundled roots. Denied system-store access has the distinct bounded
-result below.
+store refuses `cacerts: "os"` as `discovery/transport_unavailable` without falling
+back to bundled roots. Denied system-store access returns the same result, as
+described below.
 
 Fetch signing on Node majors below 24 refuses a target ending in an empty query
 delimiter as `adapter/invalid_request`. The exact Node 22 and Node 24 contracts
@@ -93,7 +93,8 @@ OBSERVED using `deno run` on Deno 2.9.7:
 
 OBSERVED in direct `node:tls` probes on macOS arm64: Node 24.21.0, 26.11.1, and
 Bun 1.3.14 return an empty system-store array, so `cacerts: "os"` returns
-`custody/unsupported_format` there. Through the built `discovery-node` module on
+`discovery/transport_unavailable` there (custody `unsupported_format` before
+October 14, 2026). Through the built `discovery-node` module on
 October 11, 2026, all five native lane versions returned that result on macOS
 arm64. An invalid store name throws `TypeError` with code
 `ERR_INVALID_ARG_VALUE`. Node 22.12.0 and Deno 2.5.6 have no `getCACertificates` function; calling it directly throws `TypeError`

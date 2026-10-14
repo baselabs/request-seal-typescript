@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Report a missing or empty OS trust store as `discovery/transport_unavailable` instead of custody `unsupported_format` when `@request-seal/core/discovery-node` creates or fetches a `cacerts: "os"` source. Node before 22.15.0, including 22.12.0, and Deno 2.5.6 have no `tls.getCACertificates`; the refusal stays (bundled roots are never a fallback) but now has a discovery kind, the same as a denied store. Callers matching the old custody reason must update.
 - Add an optional `clock` to `Discovery.resolver`, so a key set's freshness is checked on the same clock as the policy; with a cache, it is passed to `resolve`. Without it the key set bridge keeps system time, which disagreed with a policy running on a fixed or offset clock.
 - Give each request captured by `capture(server)` its own deadline: the new `timeoutMs` option (1 to 300,000 ms, default 5,000) applies per request, and `context` is now refused with `adapter/invalid_options`. A Context passed to `capture(server)` was one absolute deadline shared by every later request, so once it passed, every capture on that server failed with `custody/deadline_exceeded`.
 - Bound exact-input function signers by `signingTimeout` when no `context` is passed, as generated specs already did; the option was accepted and ignored, and such signers always ran under a fixed 5,000 ms deadline. A function that outlasts its `signingTimeout` now returns `signer_failed`.

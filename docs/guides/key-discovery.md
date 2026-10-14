@@ -97,7 +97,7 @@ A signed directory carries a proof that its publisher holds the keys in it. By d
 - Redirects are manual, bounded, and checked again. The default scope is the same origin. `redirectScope: "any_https"` permits cross-origin HTTPS redirects: for SSRF protection, allow only destinations your application intends to contact, especially if you configured private `permittedAddresses`.
 - Context cancellation and the deadline destroy the sockets it owns. Errors carry only bounded facts, such as the reason and whether a retry may help.
 
-`cacerts` takes 1 to 256 DER certificates, or `"os"` (the default) for the operating system trust store. `"os"` needs a Node that exposes a non-empty system store (22.15 or newer on the 22 line, or 24 and newer); otherwise the `discovery-node` `DiscoverySource.create` and `Discovery.fetch` both refuse with `custody/unsupported_format`, and you should supply DER roots.
+`cacerts` takes 1 to 256 DER certificates, or `"os"` (the default) for the operating system trust store. `"os"` needs a Node that exposes a non-empty system store (22.15 or newer on the 22 line, or 24 and newer); otherwise the `discovery-node` `DiscoverySource.create` and `Discovery.fetch` both refuse with `discovery/transport_unavailable`, and you should supply DER roots.
 
 Wrap the fetch in a cache. `createCache({ fetch: Discovery.fetch })` returns a capability that fetches on demand and reuses fresh keys. Concurrent callers share one fetch. It follows `Cache-Control` and `Expires`, capped by your maximum, caches negative results briefly, serves nothing stale, and starts no background timers; call `cache.close()` when you are done.
 

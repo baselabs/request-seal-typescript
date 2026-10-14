@@ -14,10 +14,9 @@ test('unavailable or permission-denied system roots produce a bounded source rej
   const input = {type: 'jwks_uri', location: 'https://127.0.0.1/keys', cacerts: 'os', permittedAddresses: ['127.0.0.1']};
   const result = DiscoverySource.create(input);
   assert.equal(result.ok, available);
-  if (!result.ok) assert.deepEqual(result.error, denied
-    ? {kind: 'discovery', reason: 'transport_unavailable', retryable: false}
-    : {kind: 'custody', reason: 'unsupported_format', retryable: false});
-  if (denied) {
+  // Denied, absent, and empty system stores are one condition: no usable OS trust roots.
+  if (!result.ok) assert.deepEqual(result.error, {kind: 'discovery', reason: 'transport_unavailable', retryable: false});
+  if (!available) {
     const core = CoreSource.create(input); assert.ok(core.ok);
     const fetched = await Discovery.fetch(core.value);
     assert.equal(fetched.ok, false);

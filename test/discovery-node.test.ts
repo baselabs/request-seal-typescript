@@ -179,8 +179,8 @@ test(
       else {
         assert.equal(osResult.ok, false);
         if (!osResult.ok) {
-          assert.equal(osResult.error.kind, "custody");
-          assert.equal(osResult.error.reason, "unsupported_format");
+          assert.equal(osResult.error.kind, "discovery");
+          assert.equal(osResult.error.reason, "transport_unavailable");
         }
       }
       refused(
@@ -188,7 +188,7 @@ test(
         "address_denied",
       );
       t.diagnostic(
-        `TLS JWKS: success; OS roots: ${systemStore ? "tls_failed" : "unsupported_format"}; private DNS: address_denied`,
+        `TLS JWKS: success; OS roots: ${systemStore ? "tls_failed" : "transport_unavailable"}; private DNS: address_denied`,
       );
     } finally {
       await p.close();

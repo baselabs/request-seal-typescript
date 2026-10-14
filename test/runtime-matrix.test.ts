@@ -24,7 +24,7 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   const limitationBoundary = (entries: Limit[]) => entries.map(entry =>
     `\`${entry.id}\` ${entry.items.length === 1 ? 'item' : 'items'} ${entry.items.join(', ')}${entry.platforms ? ' on ' + entry.platforms.join(', ') : ''}: \`${entry.observed}\`.`).join(' ');
   // Runtime facts without a repository source; Fetch verification derives from the allowlist.
-  const noSystemStore = 'No `tls.getCACertificates`, so `cacerts: "os"` returns `custody/unsupported_format`.';
+  const noSystemStore = 'No `tls.getCACertificates`, so `cacerts: "os"` returns `discovery/transport_unavailable`.';
   const nativeFacts: Record<string, string> = {
     'node:22.12.0': noSystemStore + ' Empty-query Fetch signing returns `adapter/invalid_request`.',
     'deno:2.5.6': noSystemStore,

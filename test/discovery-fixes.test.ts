@@ -67,16 +67,16 @@ test('future and rolled-back snapshots reject without replacing the held set', a
 test('OS trust rejects an untrusted TLS peer or refuses an unavailable system store', async () => {
   const system = typeof tls.getCACertificates === 'function' ? tls.getCACertificates('system') : [];
   const supported = system.length > 0;
-  console.log(`OS trust branch: ${supported ? 'non-empty system store; tls_failed' : 'system store absent or empty; unsupported_format'}`);
+  console.log(`OS trust branch: ${supported ? 'non-empty system store; tls_failed' : 'system store absent or empty; transport_unavailable'}`);
   const p = await peer((_q,r) => {r.setHeader('content-type','application/json');r.end(jwks());});
   try {
     const input = {type:'jwks_uri',location:`https://127.0.0.1:${p.port}/keys`,cacerts:'os',permittedAddresses:['127.0.0.1']};
     const created = NodeSource.create(input);
     if (supported) value(created);
-    else {reason(created,'unsupported_format'); if (!created.ok) assert.equal(created.error.kind,'custody');}
+    else {reason(created,'transport_unavailable'); if (!created.ok) assert.equal(created.error.kind,'discovery');}
     const fetched = await NodeDiscovery.fetch(value(DiscoverySource.create(input)));
-    reason(fetched, supported ? 'tls_failed' : 'unsupported_format');
-    if (!supported && !fetched.ok) assert.equal(fetched.error.kind,'custody');
+    reason(fetched, supported ? 'tls_failed' : 'transport_unavailable');
+    if (!supported && !fetched.ok) assert.equal(fetched.error.kind,'discovery');
     assert.equal(p.requests,0);
     assert.equal(p.connections,supported ? 1 : 0);
   } finally {await p.close();}

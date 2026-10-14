@@ -203,7 +203,7 @@ Returned by `Custody.local`, KeyHandle methods, `createKeyHandle`, `createSshAge
 | `custody/limit` | Input exceeds a bound. | Send less. |
 | `custody/no_public_key` | The handle has no public key, as for HMAC. | Do not ask an HMAC handle for a public key. |
 | `custody/unsupported_algorithm` | The algorithm is not supported by this custody. | Use a supported algorithm. |
-| `custody/unsupported_format` | The key format, or the `"os"` trust store on this runtime, is not supported. | Use a supported format, or DER roots. |
+| `custody/unsupported_format` | The key format is not supported. | Import a supported format. |
 | `custody/unsupported_operation` | The handle lacks the capability, such as `sign`. | Use a handle with that capability. |
 
 ## discovery
@@ -231,7 +231,7 @@ Returned by discovery sources, snapshots, key sets, caches, and the Node transpo
 | `discovery/revoked_key` | The key was removed or revoked. | Reject. |
 | `discovery/source_unavailable` | No usable keys are available for the source now, such as a miss without a fetch function. Retryable. | Fetch or refresh the source. |
 | `discovery/tls_failed` | The TLS handshake or certificate check failed. | Check the certificate and `cacerts`. |
-| `discovery/transport_unavailable` | The runtime denies access to the OS trust store. | Grant the permission or supply DER roots. |
+| `discovery/transport_unavailable` | `cacerts: "os"` has no usable OS trust store: the runtime lacks the API (Node before 22.15.0), the store is empty, or access is denied. | Supply DER roots in `cacerts`, or run where the system store is available. |
 | `discovery/unexpected_media_type` | The response content type does not match the source type. | Reject, or pass the correct `content-type`. |
 | `discovery/unexpected_status` | The response status was not 200. Retryable for 5xx. | Retry 5xx later; reject 4xx. |
 | `discovery/unknown_key` | The key set has no fresh, compatible key with that ID. | Reject, or refresh the set. |
