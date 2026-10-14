@@ -1,4 +1,5 @@
 import { byteString, encodeBase64 } from '../bytes.ts';
+import { digest as capturedDigest } from '../crypto/subtle.ts';
 import { snapshotOptions } from '../brand.ts';
 import {
   BODY_MAX_BYTES,
@@ -424,7 +425,7 @@ async function builder(
       const digests: string[] = [];
       for (const alg of algorithms) {
         try {
-          const hash = await crypto.subtle.digest(
+          const hash = await capturedDigest(
             alg === 'sha-256' ? 'SHA-256' : 'SHA-512',
             new Uint8Array(content.bytes!),
           );

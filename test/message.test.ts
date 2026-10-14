@@ -349,3 +349,33 @@ test('every field octet has an explicit accept or reject boundary', async () => 
     if (!r.ok) assert.equal(r.error.reason, 'invalid_field');
   }
 });
+
+test('generated Content-Digest uses the captured digest after instance and prototype replacement', async () => {
+  const { Message } = await model();
+  const { createHash } = await import('node:crypto');
+  const body = new TextEncoder().encode('{"title":"draft"}');
+  const expected = 'sha-256=:' + createHash('sha256').update(body).digest('base64') + ':';
+  const header = async () => {
+    const m = await Message.request('POST', 'https://api.example/notes', [], body, { digest: ['sha-256'] });
+    assert.ok(m.ok, JSON.stringify(m));
+    return text(m.value.fields.find((f) => f.name === 'content-digest')!.value);
+  };
+  const subtle = crypto.subtle;
+  const prototype = Object.getPrototypeOf(subtle);
+  const own = Object.getOwnPropertyDescriptor(subtle, 'digest');
+  const inherited = Object.getOwnPropertyDescriptor(prototype, 'digest')!;
+  const forged = async () => new Uint8Array(32).buffer;
+  try {
+    Object.defineProperty(subtle, 'digest', { value: forged, configurable: true });
+    assert.equal(crypto.subtle.digest, forged, 'the instance replacement is visible to callers');
+    assert.equal(await header(), expected);
+    delete (subtle as unknown as Record<string, unknown>).digest;
+    Object.defineProperty(prototype, 'digest', { value: forged, configurable: true });
+    assert.equal(crypto.subtle.digest, forged, 'the prototype replacement is visible to callers');
+    assert.equal(await header(), expected);
+  } finally {
+    Object.defineProperty(prototype, 'digest', inherited);
+    if (own) Object.defineProperty(subtle, 'digest', own);
+    else delete (subtle as unknown as Record<string, unknown>).digest;
+  }
+});

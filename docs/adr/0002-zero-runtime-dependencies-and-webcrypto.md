@@ -36,6 +36,6 @@ The library owns and must test its parsers, and it relies on property tests and 
 
 - `scripts/pack-check.ts` asserts `pkg.dependencies === undefined` and the exact development dependency names.
 - `tsconfig.web.json` and `npm run typecheck:web` compile the portable core with no Node types.
-- `src/crypto/subtle.ts` captures `crypto.subtle` for every cryptographic operation. The one other reader is Content-Digest generation in `src/message/index.ts`, which calls the global `crypto.subtle.digest` at call time.
+- `src/crypto/subtle.ts` is the only module that reads `crypto.subtle`; `test/message.test.ts` and `test/crypto-fixes.test.ts` replace the global methods after load and check that results do not change.
 - `test/crypto.test.ts`, `test/crypto-corpus.test.ts`, and `test/openssl.test.ts` check the primitives against published vectors and OpenSSL; `test/custody.test.ts` and `test/support/zeroing.ts` check key handling.
 - `package-lock.json` is committed, and CI runs `npm audit --audit-level=high`.
