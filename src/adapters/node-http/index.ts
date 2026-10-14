@@ -26,7 +26,8 @@ import { parseAddress } from "../../discovery/address.ts";
 import type { Verification } from "../../verification.ts";
 import { isPolicy } from "../../policy.ts";
 import { isAcceptSignature } from "../../accept-signature.ts";
-import { type Context, run } from "../../context.ts";
+import { type Context, run, withDeadline } from "../../context.ts";
+import { timeoutMs as validTimeout } from "../../numbers.ts";
 import { err, ok, type Result } from "../../result.ts";
 import {
   MESSAGE_MAX_FIELD_BYTES,
@@ -689,7 +690,14 @@ export async function captureRequest(
     return S.caught(e, "node-http", "capture", "invalid_options");
   }
 }
-/** Install early Node request capture on a server with explicit limits. */
+/**
+ * Install early Node request capture on a server with explicit limits.
+ *
+ * Options are `maxBytes`, `timeoutMs` (1 to 300,000 ms, default 5,000), and
+ * `trustedProxies`. Each request is captured under its own fresh `timeoutMs` deadline.
+ * A `context` is refused with `invalid_options`: one Context is one absolute deadline,
+ * and the registration outlives it.
+ */
 export function capture(
   server: unknown,
   options: unknown = {},
@@ -697,13 +705,19 @@ export function capture(
   /** Close this capability and release its retained state. */
   close: () => Result<true> }>> {
   try {
+    // A Context is one absolute deadline, so a registration that outlives it takes
+    // a per-request timeoutMs instead; each request gets its own fresh deadline.
     const a = captureOptions(
       options,
-      ["maxBytes", "context", "trustedProxies"],
+      ["maxBytes", "timeoutMs", "trustedProxies"],
       "attach",
     );
     S.maximum(a, "node-http", "attach");
-    S.context(a, "node-http", "attach");
+    const timeout = validTimeout(Object.hasOwn(a, "timeoutMs") ? a.timeoutMs : 5000);
+    S.need(timeout.ok, "node-http", "attach", "invalid_options");
+    const perRequest: Record<string, unknown> = Object.create(null);
+    for (const key of ["maxBytes", "trustedProxies"])
+      if (Object.hasOwn(a, key)) perRequest[key] = a[key];
     S.need(
       server !== null &&
         typeof server === "object" &&
@@ -716,7 +730,11 @@ export function capture(
       "invalid_options",
     );
     const listener = (req: Request) => {
-      void captureRequest(req, a);
+      const context = withDeadline({ timeoutMs: timeout.ok ? timeout.value : 5000 });
+      void captureRequest(
+        req,
+        context.ok ? Object.freeze({ ...perRequest, context: context.value }) : perRequest,
+      );
     };
     server.prependListener("request", listener);
     const close = (): Result<true> => {

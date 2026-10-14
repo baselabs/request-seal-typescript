@@ -26,9 +26,12 @@ middleware. It retains rawHeaders in occurrence order, the exact target,
 method, trailers after EOF, and body bytes. Capture retains at most `maxBytes`
 body bytes per request before any policy decision. The default and maximum
 ceiling are 1 MiB; `maxBytes` can lower that ceiling. Peak memory also includes
-transport buffers and copies of retained bytes. `context` supplies an absolute deadline;
-without it, each capture gets its own 5-second deadline. A `context` passed to
-`capture(server)` is one deadline shared by every later request on that server.
+transport buffers and copies of retained bytes. For `captureRequest`, `context`
+supplies an absolute deadline; without it, each capture gets its own 5-second deadline.
+`capture(server, {maxBytes?, timeoutMs?, trustedProxies?})` gives every request its own
+fresh deadline of `timeoutMs` (1–300,000 ms, default 5,000). It refuses `context` with
+invalid_options, because one Context is one absolute deadline and the registration
+outlives it.
 Capture registration options cannot be changed by later middleware. Capture owns
 stream consumption: another data listener or a flowing consumer during the read
 rejects with `parser_order`. A present Content-Length must equal retained bytes; a mismatch returns

@@ -898,3 +898,45 @@ test("snapshots trusted proxy options once before middleware can change them", a
     }
   }
 });
+
+import { connect as netConnect } from "node:net";
+import { withDeadline } from "../src/index.ts";
+test("capture(server) refuses a shared Context and bounds each request with its own timeoutMs", { timeout: 15_000 }, async () => {
+  // One Context is one absolute deadline; a server registration outlives it, so it is refused.
+  const refusedServer = createServer();
+  const refused = adapter.capture(refusedServer, { context: value(withDeadline({ timeoutMs: 1000 })) });
+  assert.ok(!refused.ok && refused.error.kind === "adapter" && refused.error.reason === "invalid_options");
+  assert.equal(refusedServer.listenerCount("request"), 0);
+  for (const timeoutMs of [0, 300_001, 1.5, "100"]) {
+    const bad = adapter.capture(createServer(), { timeoutMs });
+    assert.ok(!bad.ok && bad.error.reason === "invalid_options", String(timeoutMs));
+  }
+
+  const outcomes: Promise<string>[] = [];
+  const server = createServer((req, res) => {
+    const outcome = adapter.captureRequest(req).then((r) => r.ok ? "captured" : `${r.error.kind}/${r.error.reason}`);
+    outcomes.push(outcome);
+    void outcome.then((o) => res.end(o));
+  });
+  const registration = value(adapter.capture(server, { timeoutMs: 150 }));
+  try {
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const port = (server.address() as { port: number }).port;
+    // Well after 150 ms from registration, a fresh request still gets its own full budget.
+    await new Promise((r) => setTimeout(r, 300));
+    await rawRequest(port, "GET / HTTP/1.1\r\nHost: a.example\r\nConnection: close\r\n\r\n");
+    assert.equal(await outcomes[0], "captured");
+    // A request whose body stalls past its own 150 ms budget ends at that deadline.
+    const socket = netConnect(port, "127.0.0.1");
+    await once(socket, "connect");
+    socket.write("POST / HTTP/1.1\r\nHost: a.example\r\nContent-Length: 10\r\n\r\nabc");
+    while (outcomes.length < 2) await new Promise((r) => setTimeout(r, 10));
+    assert.equal(await outcomes[1], "custody/deadline_exceeded");
+    socket.destroy();
+  } finally {
+    value(registration.close());
+    server.closeAllConnections();
+    await new Promise<void>((r) => server.close(() => r()));
+  }
+});
