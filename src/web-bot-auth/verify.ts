@@ -36,6 +36,7 @@ import {
   ensure,
   fail,
   bounded,
+  envelope,
 } from "../signature-fields.ts";
 import { CLOCK_MAX_SECONDS } from "../constants.ts";
 import { retentionEnd } from "../replay/claim.ts";
@@ -505,7 +506,7 @@ export async function verifyWebBotAuth(
     return completedEnvelope(results, evidence, ignored, replay);
   } catch (e) {
     if (isRequestSealError(e)) return err(e);
-    return err(bounded(e, "invalid_options", "input"));
+    return err(envelope(e));
   } finally {
     if (owned) releaseContext(owned);
   }

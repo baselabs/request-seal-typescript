@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { ERROR_PARITY } from "../src/index.ts";
 import { documentationFiles } from "./support/docs-links.ts";
@@ -20,29 +20,12 @@ test("every document starts with the metadata line", () => {
 
 test("repository paths named in code spans exist", () => {
   const roots = /^(?:src|test|tools|scripts|docs|interop|conformance|bench|\.github)\//;
-  for (const document of documents.filter((path) => path === "README.md" || path.startsWith("docs/guides/") || path.startsWith("docs/adr/") || path === "docs/design/threat-model.md")) {
+  for (const document of documents.filter((path) => path === "README.md" || path.startsWith("docs/guides/") || path === "docs/design/threat-model.md")) {
     for (const match of read(document).matchAll(/`([^`\s]+)`/g)) {
       const token = match[1]!.replace(/[.,;:]+$/, "");
       if (!roots.test(token) || /[*<>{}]/.test(token)) continue;
       assert.ok(existsSync(token.replace(/\/$/, "")), `${document}: ${token} does not exist`);
     }
-  }
-});
-
-test("decision records keep the reference format and are indexed", () => {
-  const index = read("docs/adr/README.md");
-  const records = readdirSync("docs/adr").filter((name) => /^\d{4}-.+\.md$/.test(name)).sort();
-  assert.ok(records.length >= 7);
-  records.forEach((name, i) => assert.equal(name.slice(0, 4), String(i + 1).padStart(4, "0"), "record numbers are consecutive"));
-  for (const name of records) {
-    const text = read(`docs/adr/${name}`);
-    assert.ok(index.includes(`(${name})`), `${name} is listed in the index`);
-    assert.match(text, /^# ADR \d{4}: .+$/m);
-    for (const heading of ["Context", "Decision", "Strongest alternatives", "Deciding evidence and deletion test", "Consequences", "Acceptance"]) {
-      assert.match(text, new RegExp(`^## ${heading}$`, "m"), `${name} needs a ${heading} section`);
-    }
-    assert.match(text, /`test\/[^`]+`/, `${name} cites the tests that enforce it`);
-    assert.match(text, /`(?:src|tools|scripts)\/[^`]+`|`package\.json`/, `${name} cites the code that enforces it`);
   }
 });
 

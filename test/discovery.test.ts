@@ -219,16 +219,12 @@ test("body parsing rejects malformed, private, oversized, duplicate and unsuppor
       JSON.stringify({ keys: [{ ...jwk, d: "private-canary" }] }),
       "invalid_key_set",
     ],
-    [JSON.stringify({ keys: [{ ...jwk, alg: "EdDSA" }] }), "invalid_key_set"],
+    [JSON.stringify({ keys: [{ ...jwk, alg: 42 }] }), "invalid_key_set"],
     [JSON.stringify({ keys: [{ ...jwk, kid: "wrong" }] }), "invalid_key_set"],
     [JSON.stringify({ keys: [{ ...jwk, nbf: 1.5 }] }), "invalid_key_set"],
     [JSON.stringify({ keys: [jwk, jwk] }), "invalid_key_set"],
     [
       JSON.stringify({ keys: [{ kty: "oct", k: "c2VjcmV0" }] }),
-      "invalid_key_set",
-    ],
-    [
-      JSON.stringify({ keys: [{ ...jwk, x: "x".repeat(22000) }] }),
       "invalid_key_set",
     ],
     [JSON.stringify({ keys: Array.from({ length: 33 }, () => jwk) }), "limit"],

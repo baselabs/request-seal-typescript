@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, and the v0.4.0 corpus · **Review when:** JOSE policies or custody boundaries change
+**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, and the v0.4.0 corpus · **Review when:** JOSE policies or custody boundaries change
 
 # Compact JOSE
 
@@ -57,8 +57,7 @@ complete `jose/crypto.decryption_failed` error. Deadlines remain distinct.
 
 `Nested.decrypt(compact, {jwe: outerPolicy, jws: innerPolicy}, options)` verifies
 one JWS inside one authenticated JWE. Options require a unique nonempty
-`content_types` array. The outer `cty` must match; an inner envelope or inner JWS
-with `cty` rejects. Each stage retains its own policy timeout. All APIs accept an
+`content_types` array. The outer `cty` must match your `content_types` exactly. An inner JWS `cty` that names a JOSE media type rejects as `nesting_depth` — `application/jose`, `application/jose+json`, `application/jws`, `application/jwe`, and `application/jwt`, case-insensitively, with parameters stripped before the RFC 7515 Section 4.1.10 abbreviation rule (a value with no `/` prepends `application/`, so `JWT`, `jose`, and `JWT;x="a/b"` all classify) — because it declares another envelope level. Any other inner `cty` (`application/json`, `json`, `application/example+jws`) names ordinary typed payload content and verifies. Each stage retains its own policy timeout. All APIs accept an
 optional branded `context` to share a parent deadline. Signing and encryption
 also accept `timeout` (1–300,000 ms, default 5,000); all other option keys reject
 with `invalid_options`.

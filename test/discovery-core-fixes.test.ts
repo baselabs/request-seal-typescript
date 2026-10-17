@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Discovery, DiscoverySource, createCache, withDeadline, type Result} from '../src/index.ts';
+import {Discovery, DiscoverySource, PublicKey, createCache, withDeadline, type Result} from '../src/index.ts';
 import {bodyKeys, bodyDocument} from '../src/discovery/body.ts';
 import {fromResource} from '../src/discovery/snapshot.ts';
 import {fields} from '../src/discovery/headers.ts';
@@ -77,9 +77,11 @@ test('future fetch results cannot install or poison cache high-water marks', asy
     value(await cache.refresh(s, legitimate)); assert.ok((await cache.resolve(s, kid)).ok);
   } finally {cache.close();}
 });
-test('quoted and parameterized cache directives preserve the pinned comma-split contract', async () => {
+test('quoted and parameterized cache directives pin comma-split and qualified-name contracts', async () => {
   const s = source();
-  for (const [directive, offset] of [['no-store="x", max-age=20', 20], ['x="a,no-store,b", max-age=20', 0]] as const) {
+  // Qualified no-store/no-cache zero freshness; a directive name inside a quoted
+  // value still lands between commas of the pinned split; look-alike names do not.
+  for (const [directive, offset] of [['no-store="x", max-age=20', 0], ['x="a,no-store,b", max-age=20', 0], ['no-cacheable="a", max-age=20', 20]] as const) {
     const set = value(await Discovery.resolver.fromSnapshot(s, bytes(jwks()), 100, [...headers, ['cache-control', directive]]));
     assert.equal(set.expiresAt, 100 + offset);
   }
@@ -130,4 +132,77 @@ test('a resolver clock decides freshness but never stamps the shared cache',asyn
     assert.equal(value(await value(Discovery.resolver({cache:c,source:s},{algorithms:['ed25519'],clock:()=>cacheNow+60}))({keyid:kid})).algorithm,'ed25519');
     assert.equal(fetches.length,1);
   } finally {c.close();}
+});
+
+// RFC 7517 Appendix A.1 public members (vendored at
+// test/fixtures/upstream/custody/rfc7517.json): the published vector asserts
+// the JOSE name RS256, the standard spelling an RFC 7517 source uses.
+const rsa={kty:'RSA',n:'0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw',e:'AQAB'};
+const snapshotKeys=async(s:ReturnType<typeof source>,keys:unknown[])=>Discovery.resolver.fromSnapshot(s,bytes(JSON.stringify({keys})),100,headers);
+test('JWKS alg assertions accept both registry spellings normalized once at import',async()=>{
+  const s=source();
+  // Either spelling of the assertion normalizes to the JOSE name, which exists
+  // for every registry entry (PS256 and PS384 have no HTTP identifier).
+  for(const asserted of ['ed25519','EdDSA']) {
+    const set=value(await snapshotKeys(s,[{...jwk,alg:asserted}]));
+    const entry=set.keys[kid]!;
+    assert.equal(entry.assertedAlgorithm,'EdDSA');
+    assert.deepEqual(entry.algorithm,{jws:'EdDSA'});
+    // Either allowlist spelling selects the key; an unrelated one does not.
+    value(await set.lookup(kid,['ed25519'],101));
+    value(await set.lookup(kid,[{jws:'EdDSA'}],101));
+    reason(await set.lookup(kid,['ecdsa-p256-sha256'],101),'unknown_key');
+  }
+  // The published RSA vector asserts RS256: the HTTP identifier spelling
+  // rsa-v1_5-sha256 selects it, the JOSE tuple selects it, and the
+  // rsa-pss-sha512 HTTP name (JOSE id PS512) does not.
+  const rid=value(await value(await PublicKey.import(rsa)).thumbprint());
+  const rs=value(await snapshotKeys(s,[{...rsa,alg:'RS256'}]));
+  value(await rs.lookup(rid,['rsa-v1_5-sha256'],101));
+  value(await rs.lookup(rid,[{jws:'RS256'}],101));
+  reason(await rs.lookup(rid,['rsa-pss-sha512'],101),'unknown_key');
+  assert.equal(rs.keys[rid]!.assertedAlgorithm,'RS256');
+  // An unasserted RSA key defaults to rsa-pss-sha512 and still selects the
+  // JOSE-only spellings PS256 and PS384 by tuple.
+  const bare=value(await snapshotKeys(s,[rsa]));
+  value(await bare.lookup(rid,['rsa-pss-sha512'],101));
+  value(await bare.lookup(rid,[{jws:'PS256'}],101));
+  value(await bare.lookup(rid,[{jws:'PS384'}],101));
+});
+test('out-of-registry alg and unsupported kty or curve skip the key, keeping the set',async()=>{
+  const encryption={...rsa,alg:'RSA-OAEP',use:'enc'};
+  const unsupported={...jwk,alg:'ES512'};
+  // RFC 8037 Appendix A.3 public bytes on the wrong curve: well-formed,
+  // unsupported for signature work (RFC 7517 Section 5).
+  const x25519={kty:'OKP',crv:'X25519',x:jwk.x};
+  const set=value(await snapshotKeys(source(),[encryption,unsupported,x25519,jwk]));
+  assert.deepEqual(Object.keys(set.keys),[kid]);
+  assert.equal(set.keys[kid]!.assertedAlgorithm,null);
+  value(await set.lookup(kid,['ed25519'],101));
+  // An explicit null alg is a well-formed key import rejects: skipped like any
+  // other unusable entry, not a set rejection.
+  const nulled=value(await snapshotKeys(source(),[{...jwk,alg:null},jwk]));
+  assert.deepEqual(Object.keys(nulled.keys),[kid]);
+  // A set where every key is skipped resolves empty and lookups fail closed.
+  const empty=value(await snapshotKeys(source(),[encryption,unsupported]));
+  assert.deepEqual(Object.keys(empty.keys),[]);
+  reason(await empty.lookup(kid,['ed25519'],100),'unknown_key');
+  // An import failure this verifier classifies as an invalid key — here an
+  // oversized component — skips like an unsupported kty, not a set rejection.
+  const oversized=value(await snapshotKeys(source(),[{...jwk,x:'x'.repeat(22000)},jwk]));
+  assert.deepEqual(Object.keys(oversized.keys),[kid]);
+  // Skipped keys still count toward the source's maxKeys bound.
+  reason(await snapshotKeys(source({maxKeys:2}),[encryption,unsupported,jwk]),'limit');
+});
+test('leaked private members reject the whole set loudly before any skip decision',async()=>{
+  const s=source();
+  // The leak must reject even when a skip-eligible neighbor, or the leaked
+  // key's own out-of-registry alg, could otherwise hide it.
+  for(const keys of [
+    [{...jwk,d:'private-canary'}],
+    [jwk,{...jwk,d:'private-canary'}],
+    [{...jwk,alg:'ES512',d:'private-canary'}],
+    [{...rsa,p:'private-canary'},{...jwk,alg:'RSA-OAEP'}],
+    [{kty:'oct',k:'c2VjcmV0'}],
+  ]) reason(await snapshotKeys(s,keys),'invalid_key_set');
 });

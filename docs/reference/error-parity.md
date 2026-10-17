@@ -1,16 +1,16 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** Elixir release 0.4.1 at 0a6568aa246326617f760e94e21b359285c6ddfc · **Review when:** the shared error vocabulary changes
+**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 · **Governed by:** Elixir release 0.5.2 at 53b6690ccd5036d58b280d08cf0cacc6427262fe · **Review when:** the shared error vocabulary changes
 
 # Error parity
 
-OBSERVED: extraction with `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 0a6568aa246326617f760e94e21b359285c6ddfc <output.json>` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
+OBSERVED: extraction with `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 53b6690ccd5036d58b280d08cf0cacc6427262fe <output.json>` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
 
-The error vocabulary is pinned to v0.4.1; the shared corpus stays at v0.4.0. The corpus index is byte-identical between those tags, and v0.4.1 supplied no corpus release assets. These pins track different artifacts.
+The error vocabulary is pinned to v0.5.2 (release commit 53b6690ccd5036d58b280d08cf0cacc6427262fe); the shared corpus is vendored at v0.5.2 from the same release's verified assets. These pins track different artifacts.
 
 Extension-profile reasons are defined by extension packages and arrive with the profile row. The core layer union does not include `profile`.
 
 Errors are frozen plain objects, branded by a private WeakSet for their type. Fields mirror the corresponding Elixir struct, with `kind` as the discriminant. Core and Adapter generate a 16-character lowercase hex correlation; JOSE correlation is null. Other kinds carry no correlation. Core `message` is null except for `signer_algorithm_mismatch`, which uses "signer algorithm does not match signature specification". Core `source` is null except for handle `signing_failed`, where it carries a branded, bounded custody error; the outer retryable value remains false. Constructors are internal. Every constructor takes a per-kind reason literal union. An unknown runtime reason or an invalid core or JOSE (layer, reason) pair throws `TypeError`, a programmer error equivalent to Elixir's `FunctionClauseError`; it never silently substitutes another reason. This TypeScript vocabulary bounds even Elixir's open reason types to the pinned call sites.
 
-Retryable rules: custody: `custody/custodian_unavailable`, `custody/deadline_exceeded`. · discovery: `discovery/cache_overloaded`, `discovery/connect_failed`, `discovery/deadline_exceeded`, `discovery/source_unavailable`. · discovery/unexpected_status: 500–599 (status-derived) · jose: `jose/deadline_exceeded`. All other retryable fields are false; reason-only structs have no retryable field.
+Retryable rules: core: `core/deadline`. · custody: `custody/custodian_unavailable`, `custody/deadline_exceeded`. · discovery: `discovery/cache_overloaded`, `discovery/connect_failed`, `discovery/deadline_exceeded`, `discovery/resolution_failed`, `discovery/source_unavailable`. · discovery/unexpected_status: 500–599 (status-derived) · jose: `jose/deadline_exceeded`. All other retryable fields are false; reason-only structs have no retryable field.
 
 Results are frozen on construction. `deepFreeze` returns a Result containing a snapshot of plain data structures. It freezes only the owned snapshot and never the caller's graph. Uint8Array children are copied and remain mutable because JavaScript cannot freeze nonempty typed arrays; accessors and other object types reject.
 
@@ -58,6 +58,7 @@ Results are frozen on construction. `deepFreeze` returns a Result containing a s
 | core | input | limit | core/input.limit |
 | core | input | signer_algorithm_mismatch | core/input.signer_algorithm_mismatch |
 | core | input | unsupported_component | core/input.unsupported_component |
+| core | internal | internal | core/internal.internal |
 | core | key | agent_unresolved | core/key.agent_unresolved |
 | core | key | key_resolver_failed | core/key.key_resolver_failed |
 | core | key | unknown_key | core/key.unknown_key |
@@ -75,6 +76,7 @@ Results are frozen on construction. `deepFreeze` returns a Result containing a s
 | core | policy | unexpected_signature | core/policy.unexpected_signature |
 | core | quorum | ambiguous_key_identity | core/quorum.ambiguous_key_identity |
 | core | quorum | binding_unsatisfied | core/quorum.binding_unsatisfied |
+| core | quorum | deadline | core/quorum.deadline |
 | core | quorum | nonqualifying_signature | core/quorum.nonqualifying_signature |
 | core | quorum | quorum_not_met | core/quorum.quorum_not_met |
 | core | quorum | unexpected_signature | core/quorum.unexpected_signature |
@@ -175,6 +177,7 @@ Results are frozen on construction. `deepFreeze` returns a Result containing a s
 | discovery |  | deadline_exceeded | discovery/deadline_exceeded |
 | discovery |  | directory_signature_invalid | discovery/directory_signature_invalid |
 | discovery |  | directory_unsigned | discovery/directory_unsigned |
+| discovery |  | domain_not_found | discovery/domain_not_found |
 | discovery |  | invalid_key_set | discovery/invalid_key_set |
 | discovery |  | invalid_options | discovery/invalid_options |
 | discovery |  | invalid_response | discovery/invalid_response |

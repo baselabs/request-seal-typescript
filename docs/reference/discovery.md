@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 discovery behavior, RFC 7517, RFC 7638, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
+**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 discovery behavior, RFC 7517, RFC 7638, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
 
 # Discovery
 
@@ -101,7 +101,14 @@ const source = DiscoverySource.create({
 });
 if (source.ok) {
   const fetched = await Discovery.fetch(source.value, { timeoutMs: 5_000 });
-  const cache = createCache({ fetch: Discovery.fetch });
+  // A key set carries the publisher's ETag; conditional revalidation answers
+  // 304 with a NotModified outcome instead of a key set (RFC 9111 Section 4.3.4).
+  const revalidated = await Discovery.fetchWithValidators(source.value, '"keys-v1"', 3_600, { timeoutMs: 5_000 });
+  const cache = createCache({
+    fetch: (s, o) => o.validators
+      ? Discovery.fetchWithValidators(s, o.validators.etag, o.validators.lifetime, o)
+      : Discovery.fetch(s, o),
+  });
   if (cache.ok) {
     const resolution = await cache.value.resolve(source.value, keyId, {
       algorithms: ["ed25519"],

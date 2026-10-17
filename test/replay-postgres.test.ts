@@ -19,13 +19,19 @@ async function database(t: {skip(reason: string): void}, run: (a: Pool, b: Pool,
   const pg = await adapter();
   const {pool, query} = await import('../interop/replay/pg.mjs');
   const a = pool(url), b = pool(url), table = 'fix_replay_' + crypto.randomUUID().replaceAll('-', '');
-  try {await a.query(value(pg.ddl(table))); await run(a, b, table, pg, query);}
+  try {await a.query(value(pg.ddl(table))); await a.query(value(pg.ddlIndex(table))); await run(a, b, table, pg, query);}
   finally {try {await a.query(`DROP TABLE IF EXISTS "${table}"`);} finally {await Promise.all([a.end(), b.end()]);}}
 }
 test('PostgreSQL adapter validates identifiers and returns the exact DDL', async () => {
   const pg = await adapter();
   assert.equal(value(pg.ddl('replay')), 'CREATE TABLE "replay" (namespace bytea NOT NULL, key bytea NOT NULL, retain_until bigint NOT NULL, PRIMARY KEY (namespace, key))');
   for (const name of ['', 'a.b', 'A', '1a', 'a;DROP TABLE a', 'a'.repeat(64), 'a\n']) assert.equal(pg.ddl(name).error.reason, 'invalid_store');
+  // The sweep index turns the retention DELETE from a growing full-table scan
+  // into an index scan; a 46-byte name keeps the derived identifier inside
+  // PostgreSQL's 63-byte limit (mirror of the reference ddl_index/1).
+  assert.equal(value(pg.ddlIndex('replay_claims')), 'CREATE INDEX "replay_claims_retain_until_idx" ON "replay_claims" (retain_until)');
+  assert.equal(value(pg.ddlIndex('c'.repeat(46))), `CREATE INDEX "${'c'.repeat(46)}_retain_until_idx" ON "${'c'.repeat(46)}" (retain_until)`);
+  for (const name of ['c'.repeat(47), 'a'.repeat(64), '', 'A']) assert.equal(pg.ddlIndex(name).error.reason, 'invalid_store');
   assert.equal(pg.createStore({query: 1, table: 'valid'}).error.reason, 'invalid_store');
   assert.equal(pg.createStore({query: () => {}, table: 'valid', unknown: true}).error.reason, 'invalid_store');
 });

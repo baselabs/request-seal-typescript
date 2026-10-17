@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 7517, RFC 7638, draft-ietf-webbotauth-httpsig-protocol-00, and the executed examples in this guide · **Review when:** discovery policy, body formats, or runtime compatibility changes
+**Status:** maintained · **Kind:** guide · **Updated:** October 17, 2026 · **Governed by:** RFC 7517, RFC 7638, draft-ietf-webbotauth-httpsig-protocol-00, and the executed examples in this guide · **Review when:** discovery policy, body formats, or runtime compatibility changes
 
 # Key discovery
 
@@ -30,6 +30,8 @@ Addresses must be HTTPS and may not carry user information, fragments, dot segme
 | Redirects | 0 | 3 |
 | Cache time when the response has no `max-age` or `Expires` (`minTtl`), and the cap on any cache time (`maxTtl`) | 300 s and 86,400 s | 604,800 s each |
 | Negative cache time | 30 s | 300 s |
+
+A JWKS key may assert its algorithm with either registry spelling — the HTTP identifier (`ed25519`, `rsa-v1_5-sha256`) or the JOSE name (`EdDSA`, `RS256`), as RFC 7517 publishers use. Either spelling is accepted and normalized once at import, and either spelling in your algorithm allowlist selects an asserted key; `PS256` and `PS384` exist only as JOSE names and select through the `{jws: "PS256"}` form. A key whose `alg` names an algorithm this verifier never uses (an encryption key such as `RSA-OAEP`, or a name outside both registries) is skipped while the rest of the set still resolves; a well-formed key of an unsupported `kty` or curve is skipped the same way (RFC 7517 Section 5); an all-skipped set resolves empty and lookups fail closed. Leaked private members (`d`, `p`, `q`, `dp`, `dq`, `qi`, `oth`, `k`) reject the whole set loudly before any skip decision, a malformed non-string `alg` still rejects the set, and every listed key counts toward the keys-per-set limit.
 
 A key set is the validated result. Look a key up with `keySet.lookup(thumbprint, algorithms, now)`. Lookup selects only a key compatible with the algorithms you allow, and it returns `unknown_key` for an unknown, stale, or revoked key. Key IDs are RFC 7638 thumbprints by default. A `jwks_uri` or `cimd` source can use `keyId: "directory"` for key sets that assign their own IDs; `directory` sources always use thumbprints.
 
@@ -96,8 +98,28 @@ A signed directory carries a proof that its publisher holds the keys in it. By d
 - It connects to the vetted numeric address, verifies the TLS certificate and host name against the CA list you gave it, and checks the connected peer before it sends any HTTP bytes. It ignores proxy environment variables. Behind an egress proxy, fetch with your own client and validate snapshots instead.
 - Redirects are manual, bounded, and checked again. The default scope is the same origin. `redirectScope: "any_https"` permits cross-origin HTTPS redirects: for SSRF protection, allow only destinations your application intends to contact, especially if you configured private `permittedAddresses`.
 - Context cancellation and the deadline destroy the sockets it owns. Errors carry only bounded facts, such as the reason and whether a retry may help.
+- DNS answers are classified: an authoritative NXDOMAIN on every query is the nonretryable `domain_not_found` (the configured domain does not exist), while any other resolution trouble is the retryable `resolution_failed`. With explicit `dnsServers`, both families must answer NXDOMAIN for `domain_not_found`.
+- Interim 1xx responses are provisional (RFC 9110 Section 15.2): up to four preceding the final response are skipped; a fifth, or a 101 protocol switch, rejects with `unexpected_status`.
 
 `cacerts` takes 1 to 256 DER certificates, or `"os"` (the default) for the operating system trust store. `"os"` needs a Node that exposes a non-empty system store (22.15 or newer on the 22 line, or 24 and newer); otherwise the `discovery-node` `DiscoverySource.create` and `Discovery.fetch` both refuse with `discovery/transport_unavailable`, and you should supply DER roots.
+
+A qualified `no-cache="content-type"` or `no-store="x"` zeroes freshness exactly like its bare form: the directive's name before any `=` decides, so a publisher cannot smuggle a caching directive past the revalidation rule by qualifying it.
+
+A key set carries the publisher's `ETag` when it sent one (at most 512 bytes). `Discovery.fetchWithValidators(source, etag, storedLifetime, options)` sends `If-None-Match` with that validator (RFC 9111 Section 4.3.4); an unchanged source answers `304` and the result is a `NotModified` outcome — no keys, the stored lifetime renewed by the 304's own freshness directives, or persisting unchanged when the 304 carries none. A validator never crosses a redirect, and a 304 naming a different validator rejects with `invalid_response`. To make a cache revalidate conditionally, wire the fetch so the cache's `validators` hint reaches the conditional call:
+
+```ts
+import { createCache } from "@request-seal/core";
+import { Discovery } from "@request-seal/core/discovery-node";
+
+const cache = createCache({
+  fetch: (source, options) =>
+    options.validators
+      ? Discovery.fetchWithValidators(source, options.validators.etag, options.validators.lifetime, options)
+      : Discovery.fetch(source, options),
+});
+```
+
+The cache sends its stored validator only when every stored key is still inside its own expiry — a set with any dead key revalidates unconditionally — and a `cimd` source always does, because its 304 says nothing about the nested key set it names. A plain `Discovery.fetch` ignores the hint and fetches unconditionally, which is always correct and only gives up the bandwidth saving.
 
 Wrap the fetch in a cache. `createCache({ fetch: Discovery.fetch })` returns a capability that fetches on demand and reuses fresh keys. Concurrent callers share one fetch. It follows `Cache-Control` and `Expires`, capped by your maximum, caches negative results briefly, serves nothing stale, and starts no background timers; call `cache.close()` when you are done.
 

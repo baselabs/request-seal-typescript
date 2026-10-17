@@ -175,14 +175,22 @@ export function extract(repo: string, commit: string, output: string, sourceRef 
     const closed = words ? words.trim().split(/\s+/) : union ? atoms(union) : atoms(source.match(/@type t ::([\s\S]*?)\nend/)?.[1] ?? '');
     const call_sites = found.sites.get(kind) ?? [];
     const entries = ['core','jose','structured_fields','digest'].includes(kind) ? found.entries.filter(e => e.kind === kind) : unique(closed).map(reason => ({kind, reason, rule_id: `${kind}/${reason}`}));
-    // Prose cross-checks cannot add reasons to open reason types.
-    const documented = ['structured_fields','digest'].includes(kind) ? unique(atoms(doc)).filter(x => x !== 'max_bytes') : [];
+    // Prose cross-checks cannot add reasons to open reason types. An atom the
+    // moduledoc names as an option ("the `:unique_keys` option of ...") is
+    // configuration vocabulary riding inside a reason's sentence, not a reason.
+    const documented = ['structured_fields','digest'].includes(kind) ? unique(atoms(doc)).filter(x => x !== 'max_bytes' && !doc.includes(`\`:${x}\` option`)) : [];
     const extracted = unique(entries.map(e => e.reason));
     const docOnly = documented.filter(r => !extracted.includes(r));
     if (docOnly.length) throw new Error(`${kind}: documented reasons without call sites: ${docOnly.join(',')}`);
     if (kind === 'jose' && closed.some(r => !extracted.includes(r))) throw new Error('JOSE reason not resolved from call sites');
-    const retryClause = source.match(/retryable:\s*(?:reason in \[([^\]]+)\]|reason == :([a-z_]+))/);
-    const constructor = retryClause ? unique(atoms(retryClause[1] ?? `:${retryClause[2]}`)) : [];
+    // The constructor's retryable expression names its always-retryable
+    // reasons in one of three spellings: "reason in [...]" (the list can
+    // wrap across lines), "reason == :x", or a default argument ORed with
+    // one ("retryable or reason == :x", new at 0.5.2). Struct defaults and
+    // moduledoc prose never match these, so always-false kinds stay empty.
+    const retryList = source.match(/retryable:\s*reason in \[([^\]]+)\]/)?.[1] ?? '';
+    const retryEquality = source.match(/retryable:\s*(?:[a-z_]+ or )?reason == :([a-z_]+)/)?.[1] ?? '';
+    const constructor = unique(atoms(retryList + ' :' + retryEquality));
     // Constructor defaults are only one owner: direct struct call sites can
     // derive retryability from response status. Retain that rule and provenance.
     const rules = Object.fromEntries(extracted.map(reason => {

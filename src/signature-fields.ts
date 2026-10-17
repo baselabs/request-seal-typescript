@@ -13,6 +13,7 @@ import { token, type Message } from "./message/index.ts";
 import {
   coreError,
   isRequestSealError,
+  faultClass,
   type CoreDetail,
 } from "./errors/types.ts";
 import { type Reason, type Layer } from "./errors/parity.ts";
@@ -45,6 +46,14 @@ export function bounded(
   return isRequestSealError(e) && e.kind === "core"
     ? e
     : coreError(reason, layer);
+}
+/** The entry-point fault envelope: verify and sign are total, and an
+ * unexpected fault is a bounded internal error — never an escaping throw —
+ * with the exception class observable in detail. */
+export function envelope(e: unknown) {
+  return isRequestSealError(e)
+    ? e
+    : coreError("internal", "internal", faultClass(e));
 }
 export function label(value: unknown): value is string {
   return (

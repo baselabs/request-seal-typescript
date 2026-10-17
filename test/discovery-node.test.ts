@@ -195,6 +195,108 @@ test(
     }
   },
 );
+test(
+  "qualified no-cache and no-store directives still zero snapshot freshness",
+  { timeout: 15000 },
+  async () => {
+    const { Discovery: NodeDiscovery } = await api();
+    const now = Math.floor(Date.now() / 1000);
+    const date = (t: number) => new Date(t * 1000).toUTCString();
+    // RFC 9111 Sections 5.2.2.3 and 5.2.2.4: no-store and no-cache also arrive
+    // qualified, as in no-cache="content-type" (and the RFC 7234 quoted form whose
+    // member can itself contain commas), and with unquoted values (no-cache=nope).
+    // Every spelling forces revalidation; max-age without them still caches.
+    for (const [controls, others, ttl] of [
+      [["no-cache"], [["expires", date(now + 120)]], 0],
+      [["no-store"], [["expires", date(now + 120)]], 0],
+      [['no-cache="content-type"'], [["expires", date(now + 120)]], 0],
+      [['no-cache="content-type"', "max-age=604800"], [], 0],
+      [['no-cache="Set-Cookie, Foo"'], [["expires", date(now + 120)]], 0],
+      [["no-cache=nope"], [["expires", date(now + 120)]], 0],
+      [['no-store="content-type"'], [["expires", date(now + 120)]], 0],
+      [["max-age=0"], [["expires", date(now + 120)]], 0],
+      [["max-age=10"], [["expires", date(now + 120)]], 10],
+    ] as const) {
+      const p = await peer((_q, r) => {
+        // Two controls travel as two header fields, matching the multi-field
+        // join the same header name produces on a real publisher.
+        r.writeHead(200, [
+          ["content-type", "application/jwk-set+json"],
+          ...controls.map((control) => ["cache-control", control] as [string, string]),
+          ["date", date(now)],
+          ...others.map(([name, value]) => [name, value] as [string, string]),
+        ]);
+        r.end(jwks());
+      });
+      try {
+        const set = value(
+          await NodeDiscovery.fetch(config(p), { clock: () => now }),
+        );
+        assert.equal(p.requests, 1);
+        assert.equal(set.expiresAt, now + ttl, JSON.stringify(controls));
+      } finally {
+        await p.close();
+      }
+    }
+  },
+);
+test(
+  "out-of-registry alg and unusable keys skip while leaked members reject the set",
+  { timeout: 15000 },
+  async () => {
+    const { Discovery: NodeDiscovery } = await api();
+    // RFC 7517 Appendix A.1 public members (vendored at
+    // test/fixtures/upstream/custody/rfc7517.json) beside an ES512-asserted
+    // Ed25519 key and an X25519 OKP key: none can satisfy a signature policy,
+    // so all three skip and the usable key still resolves (RFC 7517 Section 5).
+    const encryption = {
+      kty: "RSA",
+      n: "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+      e: "AQAB",
+      alg: "RSA-OAEP",
+      use: "enc",
+    };
+    const publisher = (keys: unknown[]) =>
+      peer((_q, r) => {
+        r.writeHead(200, [["content-type", "application/jwk-set+json"]]);
+        r.end(JSON.stringify({ keys }));
+      });
+    const mixed = await publisher([
+      encryption,
+      { ...jwk, alg: "ES512" },
+      { kty: "OKP", crv: "X25519", x: jwk.x },
+      jwk,
+    ]);
+    try {
+      const set = value(await NodeDiscovery.fetch(config(mixed)));
+      assert.deepEqual(Object.keys(set.keys), [kid]);
+      assert.equal(set.keys[kid]!.assertedAlgorithm, null);
+      value(await set.lookup(kid, ["ed25519"]));
+    } finally {
+      await mixed.close();
+    }
+    // A leaked private member rejects the whole set loudly even when the
+    // leaked key's own out-of-registry alg would otherwise skip it away.
+    const leaky = await publisher([
+      { ...jwk, alg: "ES512", d: "private-canary" },
+      jwk,
+    ]);
+    try {
+      refused(await NodeDiscovery.fetch(config(leaky)), "invalid_key_set");
+    } finally {
+      await leaky.close();
+    }
+    // A set where every key is skipped resolves empty and lookups fail closed.
+    const none = await publisher([encryption, { ...jwk, alg: "ES512" }]);
+    try {
+      const empty = value(await NodeDiscovery.fetch(config(none)));
+      assert.deepEqual(Object.keys(empty.keys), []);
+      refused(await empty.lookup(kid, ["ed25519"]), "unknown_key");
+    } finally {
+      await none.close();
+    }
+  },
+);
 for (const host of ["127.0.0.1", "[::1]", "2130706433", "[::ffff:127.0.0.1]"])
   test(
     `literal location ${host} is denied before connection`,
@@ -564,6 +666,161 @@ test(
     } finally {
       await dns.close();
       await p.close();
+    }
+  },
+);
+test(
+  "authoritative NXDOMAIN is a nonretryable config error distinct from resolver failures",
+  { timeout: 15000 },
+  async () => {
+    const { Discovery: NodeDiscovery } = await api(),
+      dns = await dnsPublisher();
+    const p = await peer((_q, r) => {
+      r.setHeader("content-type", "application/json");
+      r.end(jwks());
+    });
+    try {
+      const s = config(p, {
+        location: `https://directory.test:${p.port}/keys`,
+      });
+      // SERVFAIL on both families is resolver trouble: retryable.
+      dns.fail(2);
+      const failed = await NodeDiscovery.fetch(s, { dnsServers: [dns.server] });
+      refused(failed, "resolution_failed");
+      assert.equal(
+        !failed.ok && failed.error.kind === "discovery"
+          ? failed.error.retryable
+          : undefined,
+        true,
+      );
+      // An authoritative NXDOMAIN on every query names a domain that does
+      // not exist: a configuration error, never retried.
+      dns.fail(3);
+      refused(
+        await NodeDiscovery.fetch(s, { dnsServers: [dns.server] }),
+        "domain_not_found",
+      );
+      const nxdomain = await NodeDiscovery.fetch(s, { dnsServers: [dns.server] });
+      assert.equal(
+        !nxdomain.ok && nxdomain.error.kind === "discovery"
+          ? nxdomain.error.retryable
+          : undefined,
+        false,
+      );
+      // The OS resolver path splits the same way: RFC 2606 reserves the
+      // .invalid TLD, so the real resolver answers NXDOMAIN.
+      const system = await NodeDiscovery.fetch(
+        config(p, { location: "https://request-seal-nxdomain.invalid/keys" }),
+      );
+      refused(system, "domain_not_found");
+      assert.equal(
+        !system.ok && system.error.kind === "discovery"
+          ? system.error.retryable
+          : undefined,
+        false,
+      );
+    } finally {
+      await dns.close();
+      await p.close();
+    }
+  },
+);
+test(
+  "interim 1xx responses are skipped and never become the final status",
+  { timeout: 15000 },
+  async () => {
+    const { Discovery: NodeDiscovery } = await api();
+    // RFC 9110 Section 15.2: interim responses are provisional and a client
+    // must be able to parse those preceding a final one. Five are skipped,
+    // the reference bound; a sixth names a misbehaving publisher.
+    for (const hints of [1, 5]) {
+      const p = await peer((_q, r) => {
+        for (let i = 0; i < hints; i++)
+          r.writeEarlyHints({ link: "</keys>; rel=preload" });
+        r.writeHead(200, [["content-type", "application/jwk-set+json"]]);
+        r.end(jwks());
+      });
+      try {
+        const set = value(await NodeDiscovery.fetch(config(p)));
+        assert.deepEqual(Object.keys(set.keys), [kid]);
+      } finally {
+        await p.close();
+      }
+    }
+    const many = await peer((_q, r) => {
+      for (let i = 0; i < 6; i++)
+        r.writeEarlyHints({ link: "</keys>; rel=preload" });
+      r.writeHead(200, [["content-type", "application/jwk-set+json"]]);
+      r.end(jwks());
+    });
+    try {
+      refused(await NodeDiscovery.fetch(config(many)), "invalid_response");
+    } finally {
+      await many.close();
+    }
+    // Interims with no final response never yield a snapshot; the platform's
+    // socket teardown surfaces as a bounded discovery failure.
+    const p = await peer((_q, r) => {
+      r.writeEarlyHints({});
+      r.destroy();
+    });
+    try {
+      const result = await NodeDiscovery.fetch(config(p), { timeoutMs: 2000 });
+      assert.equal(result.ok, false);
+    } finally {
+      await p.close();
+    }
+  },
+);
+test(
+  "a CIMD document's nested jwks_uri is checked against the serving origin",
+  { timeout: 15000 },
+  async () => {
+    const { Discovery: NodeDiscovery } = await api();
+    // Under a permissive redirect scope the CIMD document can arrive from a
+    // different origin than the configured one; its jwks_uri legitimately
+    // names that serving origin (the mirror the redirect selected).
+    let document = "";
+    const b = await peer((q, r) => {
+      r.setHeader("content-type", "application/json");
+      r.setHeader(
+        "cache-control",
+        q.url === "/keys" ? "max-age=30" : "max-age=60",
+      );
+      if (q.url === "/keys") {
+        r.end(jwks());
+        return;
+      }
+      r.end(document);
+    });
+    const a = await peer((_q, r) => {
+      r.writeHead(302, { location: `https://localhost:${b.port}/client` });
+      r.end();
+    });
+    try {
+      // The client_id stays the configured location: it identifies the
+      // caller's own registration, not the mirror that served the document.
+      document = JSON.stringify({
+        client_id: `https://localhost:${a.port}/client`,
+        jwks_uri: `https://localhost:${b.port}/keys`,
+      });
+      const s = value(
+        DiscoverySource.create({
+          type: "cimd",
+          location: `https://localhost:${a.port}/client`,
+          redirectScope: "any_https",
+          maxRedirects: 1,
+          cacerts: [a.ca, b.ca],
+          permittedAddresses: ["127.0.0.1", "::1"],
+        }),
+      );
+      const set = value(await NodeDiscovery.fetch(s));
+      assert.equal(set.keys[kid]!.sourceType, "cimd");
+      // Provenance names the origin that actually served the nested JWKS.
+      assert.equal(set.keys[kid]!.origin, `https://localhost:${b.port}`);
+    } finally {
+      await a.close();
+      await b.close();
     }
   },
 );
@@ -1084,3 +1341,199 @@ test('a silent TLS handshake reaches the deadline and a closed port is a connect
   const until = performance.now() + 80; while (performance.now() < until) {}
   refused(await pending, 'connect_failed');
 });
+
+test(
+  "conditional revalidation carries If-None-Match and a 304 keeps the stored set",
+  { timeout: 15000 },
+  async () => {
+    const { Discovery: NodeDiscovery } = await api();
+    const etag = '"keys-v1"';
+    let requests = 0;
+    const conditional: string[] = [];
+    const p = await peer((q, r) => {
+      requests++;
+      const sent = q.headers["if-none-match"];
+      if (sent !== undefined) conditional.push(String(sent));
+      if (sent === etag) {
+        // RFC 9111 Section 15.4.5: the 304 answers the conditional request.
+        r.writeHead(304, [["cache-control", "max-age=30"]]);
+        r.end();
+        return;
+      }
+      r.writeHead(200, [
+        ["content-type", "application/jwk-set+json"],
+        ["etag", etag],
+        ["cache-control", "max-age=1"],
+      ]);
+      r.end(jwks());
+    });
+    const fetcher = (s: unknown, o: { clock: () => number; validators?: { etag: string; lifetime: number } }) =>
+      o.validators
+        ? NodeDiscovery.fetchWithValidators(
+            s,
+            o.validators.etag,
+            o.validators.lifetime,
+            o,
+          )
+        : NodeDiscovery.fetch(s, o);
+    try {
+      const s = config(p);
+      // The first fetch stores the validator with the set.
+      const first = value(await NodeDiscovery.fetch(s));
+      assert.equal(first.etag, etag);
+      assert.deepEqual(Object.keys(first.keys), [kid]);
+      // A direct conditional fetch answers 304: no keys, stored lifetime
+      // renewed by the 304's own max-age.
+      const now = Math.floor(Date.now() / 1000);
+      const revalidated = value(
+        await NodeDiscovery.fetchWithValidators(s, etag, 99, {
+          clock: () => now,
+        }),
+      );
+      assert.ok("notModified" in revalidated && revalidated.notModified === true);
+      assert.equal("notModified" in revalidated ? revalidated.etag : undefined, etag);
+      assert.equal("notModified" in revalidated ? revalidated.expiresAt : undefined, now + 30);
+      // Without the 304's directives, the stored lifetime persists.
+      const bare = await peer((_q, r) => {
+        r.writeHead(304);
+        r.end();
+      });
+      try {
+        const persisted = value(
+          await NodeDiscovery.fetchWithValidators(
+            config(bare),
+            etag,
+            120,
+            { clock: () => now },
+          ),
+        );
+        assert.ok("notModified" in persisted && persisted.notModified === true);
+        assert.equal("notModified" in persisted ? persisted.expiresAt : undefined, now + 120);
+      } finally {
+        await bare.close();
+      }
+      // A 304 naming a different validator identifies a different
+      // representation and rejects.
+      const swapped = await peer((q, r) => {
+        if (q.headers["if-none-match"] !== undefined) {
+          r.writeHead(304, [["etag", '"keys-v2"']]);
+          r.end();
+          return;
+        }
+        r.writeHead(200, [["content-type", "application/jwk-set+json"], ["etag", '"keys-v1"']]);
+        r.end(jwks());
+      });
+      try {
+        refused(
+          await NodeDiscovery.fetchWithValidators(config(swapped), etag, 60),
+          "invalid_response",
+        );
+      } finally {
+        await swapped.close();
+      }
+      // An unsolicited 304 stays an unexpected status.
+      const unsolicited = await peer((_q, r) => {
+        r.writeHead(304);
+        r.end();
+      });
+      try {
+        refused(await NodeDiscovery.fetch(config(unsolicited)), "unexpected_status");
+      } finally {
+        await unsolicited.close();
+      }
+      // A validator never crosses a redirect: the target resource is fetched
+      // unconditionally, so its 200 answers with a full key set.
+      let targetSawConditional = false;
+      const target = await peer((q, r) => {
+        if (q.headers["if-none-match"] !== undefined)
+          targetSawConditional = true;
+        r.writeHead(200, [["content-type", "application/jwk-set+json"], ["etag", '"target-v1"']]);
+        r.end(jwks());
+      });
+      const redirecting = await peer((_q, r) => {
+        r.writeHead(302, { location: `https://localhost:${target.port}/keys` });
+        r.end();
+      });
+      try {
+        const full = value(
+          await NodeDiscovery.fetchWithValidators(
+            value(
+              DiscoverySource.create({
+                type: "jwks_uri",
+                location: `https://localhost:${redirecting.port}/keys`,
+                cacerts: [redirecting.ca, target.ca],
+                permittedAddresses: ["127.0.0.1", "::1"],
+                maxRedirects: 1,
+                redirectScope: "any_https",
+              }),
+            ),
+            etag,
+            60,
+          ),
+        );
+        assert.ok(!("notModified" in full));
+        assert.deepEqual(Object.keys(full.keys), [kid]);
+        assert.equal(full.etag, '"target-v1"');
+        assert.equal(targetSawConditional, false);
+      } finally {
+        await redirecting.close();
+        await target.close();
+      }
+      // Through a revalidating cache: the second resolve reuses the stored
+      // keys and sends the validator, and the merged set carries the 304's
+      // own freshness. The cache clock is the real clock, so the 304's Date
+      // header lines up with it and apparent age does not eat the max-age.
+      const c = value(
+        createCache({
+          clock: () => Math.floor(Date.now() / 1000),
+          fetch: fetcher as never,
+        }),
+      );
+      const before = requests;
+      conditional.length = 0;
+      try {
+        const stored = value(await c.refresh(s));
+        assert.equal(stored.etag, etag);
+        await new Promise((done) => setTimeout(done, 1100));
+        const resolved = value(await c.resolve(s, kid, { algorithms: ["ed25519"] }));
+        assert.equal(resolved.thumbprint, kid);
+        assert.equal(requests - before, 2);
+        assert.deepEqual(conditional, [etag]);
+        // The stored set was kept (not refetched); the 304's max-age=30
+        // renewed its freshness, so the immediate next resolve serves from
+        // the merged entry without another request.
+        const after = value(await c.resolve(s, kid, { algorithms: ["ed25519"] }));
+        assert.equal(after.thumbprint, kid);
+        assert.equal(requests - before, 2);
+      } finally {
+        c.close();
+      }
+      // A dead key forces a full fetch: a source whose keys all expired
+      // revalidates unconditionally, so the next request carries no
+      // If-None-Match.
+      const deadBefore = requests;
+      conditional.length = 0;
+      const dead = value(
+        createCache({
+          clock: () => Math.floor(Date.now() / 1000),
+          fetch: fetcher as never,
+        }),
+      );
+      try {
+        const expiring = config(p, { maxTtl: 1, minTtl: 0 });
+        value(await dead.refresh(expiring));
+        await new Promise((done) => setTimeout(done, 1100));
+        const resolved = value(
+          await dead.resolve(expiring, kid, { algorithms: ["ed25519"] }),
+        );
+        assert.equal(resolved.thumbprint, kid);
+        assert.equal(requests - deadBefore, 2);
+        assert.deepEqual(conditional, []);
+      } finally {
+        dead.close();
+      }
+    } finally {
+      await p.close();
+    }
+  },
+);

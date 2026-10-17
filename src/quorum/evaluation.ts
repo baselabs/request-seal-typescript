@@ -32,7 +32,7 @@ export type Assignment = Readonly<{
   pool: readonly Candidate[];
   count: number;
   nodes: number;
-  exhausted: boolean;
+  exhausted: false | "nodes" | "deadline";
 }>;
 const now = performance.now.bind(performance);
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -269,7 +269,7 @@ function* evaluate(
     );
     let chosen: RecordCandidate[] | null = null,
       nodes = 0,
-      exhausted = false;
+      exhausted: false | "nodes" | "deadline" = false;
     if (q.bindings.length === 0 && !(q.unit === "roles" && !q.sharedPrincipal))
       chosen = polynomial(slots, edges, required, q);
     else {
@@ -306,9 +306,16 @@ function* evaluate(
         bindingValues: ReadonlyMap<QuorumBinding, unknown>,
       ): Generator<void, void, void> {
         if (exhausted) return;
-        if (nodes >= QUORUM_MAX_NODES) { exhausted = true; return; }
+        if (nodes >= QUORUM_MAX_NODES) { exhausted = "nodes"; return; }
         nodes++;
-        if (now() - sliceStart >= 10) { yield; tick(); sliceStart = now(); }
+        if (now() - sliceStart >= 10) {
+          yield;
+          // The caller's wall-clock bound marks deadline exhaustion like the
+          // node bound: best-so-far acceptance is preserved, and only a
+          // rejection surfaces it (retryable, unlike the node limit).
+          if (context && remainingMs(context) <= 0) { exhausted = "deadline"; return; }
+          sliceStart = now();
+        }
         if (i === slots.length) {
           const rs = [...matched.values()];
           if (holds(new Map(rs.map(r => [r.slot.id, r])), q.bindings) &&
@@ -382,13 +389,19 @@ function* evaluate(
         }
       }
       yield* search(0, new Map(), new Map(), new Map());
-      if (exhausted && (chosen === null || !modeMet(chosen, q)))
+      if (exhausted !== false && (chosen === null || !modeMet(chosen, q))) {
+        if (exhausted === "deadline") fail("deadline", "quorum");
         fail("limit", "input");
+      }
       ensure(chosen !== null, "binding_unsatisfied", "quorum");
     }
     ensure(holds(new Map(chosen.map(r => [r.slot.id, r])), q.bindings), "binding_unsatisfied", "quorum");
     ensure(modeMet(chosen, q), "quorum_not_met", "quorum");
-    tick();
+    // A deadline-exhausted acceptance is the whole point of the bound: the
+    // wall clock already passed, and the satisfying assignment still returns.
+    // (The search closure mutates the marker, which narrowing cannot see.)
+    const exhaustedNow = exhausted as false | "nodes" | "deadline";
+    if (exhaustedNow !== "deadline") tick();
     return ok(
       Object.freeze({
         chosen: Object.freeze(chosen),

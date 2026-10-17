@@ -231,7 +231,10 @@ test('assignment search yields so an abort can fire between bounded slices', {ti
   const start = performance.now();
   try {
     const r = await A.evaluateQuorum(records, q, [], context);
-    assert.equal(r.ok, false); assert.equal(r.error.reason, 'deadline_exceeded');
+    // Cancellation and expiry share one Context deadline, so the search
+    // surfaces the retryable quorum deadline reason for both.
+    assert.equal(r.ok, false);
+    if (!r.ok) { assert.equal(r.error.kind, 'core'); if (r.error.kind === 'core') assert.equal(r.error.reason, 'deadline'); if (r.error.kind === 'core') assert.equal(r.error.layer, 'quorum'); }
     assert.equal(controller.signal.aborted, true);
     assert.ok(performance.now() - start < 2000);
     t.diagnostic(`SEARCH_ABORT ms=${(performance.now() - start).toFixed(1)}`);
@@ -316,4 +319,54 @@ test('matching group vertices stay separate from opaque caller slot ids', async 
   const r = value(await A.evaluateQuorum(records, q, []));
   assert.equal(r.count, 2);
   assert.deepEqual(r.chosen.map((c: any) => [c.slot.id, c.label]).sort(), [['\0group:p1', 'a'], ['s1', 'b']]);
+});
+
+test('a caller wall-clock deadline bounds the assignment search and rejects retryably', {timeout: 15_000}, async (t) => {
+  const {policy, quorum, input} = await import('./support/quorum.ts');
+  const p = policy();
+  const slots = Array.from({length: 16}, (_, i) => ({id: `s${String(i).padStart(2, '0')}`, policy: p, required: true}));
+  // An unreachable assignment (16 slots sharing one nonce over a pool whose
+  // every nonce has at most 15 keys) means best-so-far can never satisfy the
+  // mode, so expiry must surface as the bounded deadline rejection rather
+  // than an accepted partial answer.
+  const q = quorum(slots, {maxSignatures: 64, bindings: [{kind: 'same_parameter', name: 'nonce', slots: slots.map(s => s.id)}]});
+  const ids = Array.from({length: 64}, (_, i) => value(api.KeyIdentity.symmetric(`key${i}`)));
+  const edges = q.slots.flatMap((slot: any) => ids.map((identity, i) => ({slot, identity, label: `k${String(i).padStart(2, '0')}`, input: input(`();nonce="${i < 15 ? 0 : 1 + (i - 15) % 15}"`)})));
+  const context = value(api.withDeadline({timeoutMs: 50}));
+  const start = performance.now();
+  try {
+    const r = await A.evaluateQuorum(edges, q, [], context);
+    const elapsed = performance.now() - start;
+    assert.ok(elapsed < 2000, `deadline search took ${elapsed.toFixed(1)} ms`);
+    assert.equal(r.ok, false);
+    if (!r.ok) {
+      assert.equal(r.error.kind, 'core');
+      if (r.error.kind === 'core') {
+        assert.equal(r.error.reason, 'deadline');
+        assert.equal(r.error.layer, 'quorum');
+        assert.equal(r.error.retryable, true);
+      }
+    }
+    t.diagnostic(`DEADLINE_SEARCH ms=${elapsed.toFixed(1)} retryable=deadline`);
+  } finally {
+    // withDeadline owns its timer; nothing to release.
+  }
+});
+test('a generous deadline leaves a satisfiable search accepted', {timeout: 15_000}, async (t) => {
+  const {policy, quorum, input} = await import('./support/quorum.ts');
+  const p = policy();
+  // Four slots share nonce values the 64-key pool can supply. The same
+  // guard that keeps an accepted assignment under node exhaustion
+  // (`chosen !== null && modeMet(chosen)`) also keeps it under deadline
+  // exhaustion: both markers share one rejection gate, so best-so-far
+  // acceptance survives either bound.
+  const slots = Array.from({length: 4}, (_, i) => ({id: `s${String(i).padStart(2, '0')}`, policy: p, required: true}));
+  const q = quorum(slots, {maxSignatures: 64, bindings: [{kind: 'same_parameter', name: 'nonce', slots: slots.map(s => s.id)}]});
+  const ids = Array.from({length: 64}, (_, i) => value(api.KeyIdentity.symmetric(`key${i}`)));
+  const edges = q.slots.flatMap((slot: any) => ids.map((identity, i) => ({slot, identity, label: `k${String(i).padStart(2, '0')}`, input: input(`();nonce="${i < 15 ? 0 : 1 + (i - 15) % 15}"`)})));
+  const context = value(api.withDeadline({timeoutMs: 5000}));
+  const assigned = value(await A.evaluateQuorum(edges, q, [], context));
+  assert.equal(assigned.count, 4);
+  assert.equal(assigned.exhausted, false);
+  t.diagnostic(`GENEROUS_DEADLINE count=${assigned.count} exhausted=false`);
 });

@@ -18,7 +18,7 @@ const source = (more = {}) => value(DiscoverySource.create({type:'jwks_uri', loc
 const snapshot = (s: unknown, now: number) => Discovery.resolver.fromSnapshot(s, bytes(jwks()), now, headers);
 const read = (p: string) => readFileSync(p, 'utf8');
 test('status-derived retryability at the real TLS entry point', async () => {
-  const fixture = JSON.parse(read('test/fixtures/elixir-reasons-0a6568a.json'));
+  const fixture = JSON.parse(read('test/fixtures/elixir-reasons-53b6690.json'));
   assert.equal(fixture.modules.find((m: {kind:string})=>m.kind==='discovery').retryable.rules.unexpected_status.kind, 'status-derived (5xx)');
   let status = 200;
   const p = await peer((_q,r) => { r.writeHead(status, {'content-type':'application/json'}); r.end(); });
@@ -50,9 +50,12 @@ test('chunk-extension amplification and aggregate TLS plaintext are bounded', as
     reason(await NodeDiscovery.fetch(s), 'limit');
   }} finally {await p.close();}
 });
-for (const status of [100,101,103]) test(`first ${status} status rejects and closes TLS`, async () => {
+for (const status of [100,101,103]) test(`first ${status} status ${status === 101 ? 'rejects as a protocol switch' : 'is a skipped interim before the final response'}`, async () => {
   const p = await peer((_q,r) => { if (status === 103) r.writeEarlyHints({link:'</x>; rel=preload'}); else if (status === 100) r.writeContinue(); else {r.writeHead(101, {Connection:'Upgrade',Upgrade:'websocket'}); r.flushHeaders(); return;} r.setHeader('content-type','application/json'); r.end(jwks()); });
-  try { const s = value(DiscoverySource.create({type:'jwks_uri',location:`https://127.0.0.1:${p.port}/keys`,cacerts:[p.ca],permittedAddresses:['127.0.0.1'],timeoutMs:150})); reason(await NodeDiscovery.fetch(s),'unexpected_status'); }
+  try { const s = value(DiscoverySource.create({type:'jwks_uri',location:`https://127.0.0.1:${p.port}/keys`,cacerts:[p.ca],permittedAddresses:['127.0.0.1'],timeoutMs:150}));
+    if (status === 101) reason(await NodeDiscovery.fetch(s),'unexpected_status');
+    else assert.deepEqual(Object.keys(value(await NodeDiscovery.fetch(s)).keys),[kid]);
+  }
   finally {await p.close();}
 });
 test('future and rolled-back snapshots reject without replacing the held set', async () => {

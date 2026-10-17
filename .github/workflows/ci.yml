@@ -51,8 +51,8 @@ jobs:
           elixir-version: '1.20.3'
       - name: Reextract the pinned Elixir error vocabulary
         run: |
-          git clone --depth 1 --branch v0.4.1 https://github.com/baselabs/request_seal.git "$RUNNER_TEMP/request-seal-reference"
-          test "$(git -C "$RUNNER_TEMP/request-seal-reference" rev-parse HEAD)" = 0a6568aa246326617f760e94e21b359285c6ddfc
+          git clone --depth 1 --branch v0.5.2 https://github.com/baselabs/request_seal.git "$RUNNER_TEMP/request-seal-reference"
+          test "$(git -C "$RUNNER_TEMP/request-seal-reference" rev-parse HEAD)" = 53b6690ccd5036d58b280d08cf0cacc6427262fe
           node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts
         env:
           REQUEST_SEAL_REPO: ${{ runner.temp }}/request-seal-reference

@@ -5,7 +5,8 @@ export async function dnsPublisher() {
   let a = "127.0.0.1",
     aaaa = "::1",
     rebind = false,
-    copies = 1;
+    copies = 1,
+    rcode = 0;
   const queries: number[] = [];
   socket.on("message", (query, remote) => {
     let end = 12;
@@ -26,9 +27,11 @@ export async function dnsPublisher() {
     }
     const head = Buffer.alloc(12);
     query.copy(head, 0, 0, 2);
-    head.writeUInt16BE(0x8580, 2);
+    // Authoritative answer with the selected response code: 0 NOERROR,
+    // 2 SERVFAIL, 3 NXDOMAIN.
+    head.writeUInt16BE(0x8580 | rcode, 2);
     head.writeUInt16BE(1, 4);
-    const answers = data ? (type === 1 ? copies : 1) : 0;
+    const answers = data && rcode === 0 ? (type === 1 ? copies : 1) : 0;
     head.writeUInt16BE(answers, 6);
     const rr = Buffer.alloc(12);
     rr.writeUInt16BE(0xc00c, 0);
@@ -59,6 +62,10 @@ export async function dnsPublisher() {
     /** Repeat the A answer; resolvers return every record, duplicates included. */
     repeat(n: number) {
       copies = n;
+    },
+    /** Answer every query with the selected DNS response code and no records. */
+    fail(code: number) {
+      rcode = code;
     },
     rebind() {
       a = "127.0.0.1";

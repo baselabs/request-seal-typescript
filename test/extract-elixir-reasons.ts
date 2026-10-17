@@ -9,10 +9,10 @@ test('extractor derives known call-site reasons from the real pinned reference w
   const repo = process.env.REQUEST_SEAL_REPO;
   assert.ok(repo, 'REQUEST_SEAL_REPO is required for the real extraction check');
   const root = await mkdtemp(join(tmpdir(), 'request-seal-extraction-'));
-  const fixtureUrl = new URL('./fixtures/elixir-reasons-0a6568a.json', import.meta.url);
+  const fixtureUrl = new URL('./fixtures/elixir-reasons-53b6690.json', import.meta.url);
   const before = await readFile(fixtureUrl, 'utf8');
   try {
-    const output = join(root, 'reasons.json'); extract(repo, '0a6568aa246326617f760e94e21b359285c6ddfc', output, 'v0.4.1');
+    const output = join(root, 'reasons.json'); extract(repo, '53b6690ccd5036d58b280d08cf0cacc6427262fe', output, 'v0.5.2');
     const actual = JSON.parse(await readFile(output, 'utf8'));
     for (const rule_id of ['jose/key.algorithm_mismatch', 'structured_fields/revision_type', 'digest/invalid_state']) {
       assert.ok(actual.entries.some((e: {rule_id: string}) => e.rule_id === rule_id), rule_id);

@@ -90,6 +90,19 @@ assert.match(schema.value, /^CREATE TABLE "replay_claims" \(namespace bytea NOT 
 assert.equal(ddl('replay"; DROP TABLE users; --').ok, false);
 ```
 
+`ddlIndex(table)` returns the retention-sweep index. Without it, the periodic `DELETE ... WHERE retain_until <= now` sweeps a growing full table; with it, the sweep walks the index. The table name carries the same safe pattern, additionally bounded to 46 characters so the derived index identifier (`table_retain_until_idx`) fits PostgreSQL's 63-byte identifier limit.
+
+```ts
+import assert from "node:assert/strict";
+import { ddlIndex } from "@request-seal/core/replay-postgres";
+
+const index = ddlIndex("replay_claims");
+assert.ok(index.ok);
+assert.equal(index.value, 'CREATE INDEX "replay_claims_retain_until_idx" ON "replay_claims" (retain_until)');
+// A 47-character name would push the derived identifier past the limit.
+assert.equal(ddlIndex("c".repeat(47)).ok, false);
+```
+
 Then connect your driver. This fragment needs a database, so the guides do not run it. The repository's own tests exercise the adapter against a real PostgreSQL server whenever `REQUESTSEAL_REPLAY_PG_URL` is set, and CI sets it.
 
 ```js

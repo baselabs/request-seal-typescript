@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
 
 # HTTP and custody adapters
 
@@ -100,8 +100,10 @@ a directory snapshot.
 Unsigned requests return adapter `request_rejected` with the bounded core source
 `missing_signature_input`, as the reference does; untrusted agents retain
 `agent_unresolved`. Both rejections consume the attempt and remain available
-through `verification(req)`. A second attempt returns `already_verified` without
-replacing stored facts. Verification before capture returns `not_captured` without
+through `verification(req)`. A second attempt returns `already_verified` without replacing stored facts. This single-shot contract is deliberate: unlike the Elixir package's
+`Plug.Verify`, whose `:name` option lets a declarative pipeline stage assert a repeat is the same verification, the TypeScript adapter is a direct call whose
+result you own — a framework composition that re-enters verification should memoize the returned promise and share it. The fetch adapter verifies immutable
+`Request` objects and has no such guard. Verification before capture returns `not_captured` without
 reserving an attempt. A rejected capture retains its capture stage and reason:
 oversized or non-byte supplied bodies return `limit`, and fields without Host
 return `invalid_request`. These capture rejections remain available to repeated

@@ -83,7 +83,7 @@ test('unknown error reasons and pairs throw TypeError', () => {
   assert.throws(() => errors.adapterError('typo' as never, 'req', 'sign', 1), TypeError);
 });
 test('open reasons retain pinned call-site provenance', () => {
-  const fixture = JSON.parse(read('./fixtures/elixir-reasons-0a6568a.json'));
+  const fixture = JSON.parse(read('./fixtures/elixir-reasons-53b6690.json'));
   for (const id of ['structured_fields/revision_type', 'digest/invalid_state']) {
     assert.ok(fixture.entries.some((e: {rule_id: string}) => e.rule_id === id), id);
     assert.ok(fixture.modules.some((m: any) => m.call_sites?.some((s: any) => s.rule_id === id)), id);

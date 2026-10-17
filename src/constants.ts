@@ -1,7 +1,7 @@
 /** The public package version. */
 export const VERSION = '0.2.0';
 /** The immutable public conformance corpus release and index digest. */
-export const CORPUS_PIN = Object.freeze({tag: 'v0.4.0', commit: 'b2392871933d99641a7cb2ca2726aefd20081dee', indexSha256: 'f37435eca377666ab45c2b8f580287263145268e03d9224c76e324e4afaded6f'});
+export const CORPUS_PIN = Object.freeze({tag: 'v0.5.2', commit: '53b6690ccd5036d58b280d08cf0cacc6427262fe', indexSha256: 'ceb30bf713a6e34e6a15847b658a618d8f7568ee6a6c07bfbbf58fa5d143995e'});
 // RequestSeal.StructuredFields ceilings at v0.4.0 (b239287).
 /** Default bounded Structured Fields parser limits. */
 export const STRUCTURED_FIELDS_LIMITS = Object.freeze({maxBytes: 65_536, maxMembers: 1024, maxInnerItems: 256, maxParameters: 256, maxKeyBytes: 256, maxValueBytes: 16_384, maxNodes: 4096});

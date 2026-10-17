@@ -155,7 +155,7 @@ type Rejection = { kind: string; reason: string; layer?: string; detail?: string
 
 // The default status for every kind (and layer); the exceptions below name single reasons.
 const families: Record<string, number> = {
-  "core/binding": 403, "core/content": 401, "core/crypto": 500, "core/fields": 400, "core/freshness": 401, "core/input": 500, "core/key": 401,
+  "core/binding": 403, "core/content": 401, "core/crypto": 500, "core/fields": 400, "core/freshness": 401, "core/input": 500, "core/internal": 500, "core/key": 401,
   "core/negotiation": 400, "core/policy": 401, "core/quorum": 401, "core/replay": 401,
   message: 400, structured_fields: 400, signature_base: 400, digest: 400, crypto: 500, custody: 500, discovery: 401,
   "jose/crypto": 401, "jose/input": 400, "jose/key": 401, "jose/nesting": 400, replay: 503, adapter: 500,
@@ -168,10 +168,10 @@ const exceptions: Record<string, number> = {
   "core/fields.label_in_use": 500, "core/freshness.invalid_clock": 500,
   "core/input.invalid_message": 400, "core/input.invalid_request": 400, "core/input.limit": 400, "core/input.unsupported_component": 400,
   "core/key.key_resolver_failed": 500, "core/negotiation.negotiation_unfulfilled": 401, "core/policy.test_key_rejected": 403,
-  "core/quorum.ambiguous_key_identity": 500, "core/replay.commitment_failed": 500,
+  "core/quorum.ambiguous_key_identity": 500, "core/internal.internal": 500, "core/replay.commitment_failed": 500,
   "core/replay.store_failed": 503, "core/replay.store_timeout": 503, "core/replay.store_unavailable": 503,
   "crypto/invalid_signature": 401, "crypto/invalid_data": 400, "custody/invalid_signature": 401, "custody/decryption_failed": 401,
-  "discovery/revoked_key": 403, "discovery/invalid_options": 500, "discovery/invalid_source": 500, "discovery/ambiguous_key_source": 500, "discovery/transport_unavailable": 500,
+  "discovery/revoked_key": 403, "discovery/invalid_options": 500, "discovery/invalid_source": 500, "discovery/domain_not_found": 500, "discovery/ambiguous_key_source": 500, "discovery/transport_unavailable": 500,
   "jose/crypto.entropy_failure": 500, "jose/crypto.signer_failed": 500, "jose/input.invalid_options": 500, "jose/input.invalid_policy": 500, "jose/key.key_resolver_failed": 500,
   "replay/invalid_claim": 500, "replay/invalid_options": 500, "replay/invalid_store": 500,
   "adapter/invalid_request": 400, "adapter/limit": 400, "adapter/body_unavailable": 400, "adapter/digest_conflict": 400, "adapter/untrusted_proxy": 400,

@@ -1,6 +1,6 @@
 // Derived from pinned Elixir constructors and call sites; regenerate with scripts/generate-parity.ts or scripts/render-parity.ts --update-table.
 /** The immutable reference release used for the error vocabulary. */
-export const ELIXIR_ERROR_PIN = '0a6568aa246326617f760e94e21b359285c6ddfc';
+export const ELIXIR_ERROR_PIN = '53b6690ccd5036d58b280d08cf0cacc6427262fe';
 const entries = [
   {
     "kind": "core",
@@ -256,6 +256,12 @@ const entries = [
   },
   {
     "kind": "core",
+    "layer": "internal",
+    "reason": "internal",
+    "rule_id": "core/internal.internal"
+  },
+  {
+    "kind": "core",
     "layer": "key",
     "reason": "agent_unresolved",
     "rule_id": "core/key.agent_unresolved"
@@ -355,6 +361,12 @@ const entries = [
     "layer": "quorum",
     "reason": "binding_unsatisfied",
     "rule_id": "core/quorum.binding_unsatisfied"
+  },
+  {
+    "kind": "core",
+    "layer": "quorum",
+    "reason": "deadline",
+    "rule_id": "core/quorum.deadline"
   },
   {
     "kind": "core",
@@ -868,6 +880,11 @@ const entries = [
   },
   {
     "kind": "discovery",
+    "reason": "domain_not_found",
+    "rule_id": "discovery/domain_not_found"
+  },
+  {
+    "kind": "discovery",
     "reason": "invalid_key_set",
     "rule_id": "discovery/invalid_key_set"
   },
@@ -1246,6 +1263,10 @@ const retryableRules = {
       "kind": "constant",
       "value": false
     },
+    "deadline": {
+      "kind": "constant",
+      "value": true
+    },
     "digest_mismatch": {
       "kind": "constant",
       "value": false
@@ -1271,6 +1292,10 @@ const retryableRules = {
       "value": false
     },
     "inapplicable_component": {
+      "kind": "constant",
+      "value": false
+    },
+    "internal": {
       "kind": "constant",
       "value": false
     },
@@ -1852,6 +1877,10 @@ const retryableRules = {
       "kind": "constant",
       "value": false
     },
+    "domain_not_found": {
+      "kind": "constant",
+      "value": false
+    },
     "invalid_key_set": {
       "kind": "constant",
       "value": false
@@ -1882,7 +1911,7 @@ const retryableRules = {
     },
     "resolution_failed": {
       "kind": "constant",
-      "value": false
+      "value": true
     },
     "revoked_key": {
       "kind": "constant",
@@ -1909,7 +1938,7 @@ const retryableRules = {
       "minimum": 500,
       "maximum": 599,
       "path": "lib/request_seal/discovery.ex",
-      "line": 301
+      "line": 517
     },
     "unknown_key": {
       "kind": "constant",

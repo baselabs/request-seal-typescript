@@ -53,6 +53,7 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/input.invalid_request` | Signing covers `content-length`, and the message's `Content-Length` disagrees with its body. | Fix the message. |
 | `core/input.limit` | An input exceeds a size, count, or depth bound. | Reject, or send less. |
 | `core/input.signer_algorithm_mismatch` | An exact-input spec's KeyHandle is bound to another algorithm. | Use a handle for the spec's algorithm. |
+| `core/internal.internal` | An unexpected fault inside the library; `detail` names the bounded exception class. Not marked retryable. | Report it; the same input is not retried blindly. |
 | `core/input.unsupported_component` | Signing would cover a component it refuses (`host`, `;tr`, or `;req` on a request), or a generated base cannot be built. | Cover `@authority` instead of `host`, or fix the components. |
 | `core/key.agent_unresolved` | Web Bot Auth trust could not connect the signature to a key; `detail` says why. | See [Web Bot Auth errors](../guides/web-bot-auth.md#errors-you-will-see). |
 | `core/key.key_resolver_failed` | Your key resolver threw, returned an error, or returned a malformed entry. | Fix the resolver; return `ok(null)` for unknown keys. |
@@ -70,6 +71,7 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/policy.unexpected_component` | The signature covers a component that `extraComponents: "reject"` refuses. | Reject, or allow the component. |
 | `core/policy.unexpected_signature` | With `untagged: "reject"`, a signature lacks the `web-bot-auth` tag. | Reject, or use `untagged: "ignore"`. |
 | `core/quorum.ambiguous_key_identity` | When counting keys, a required slot matched only signatures with no known key identity. | Supply key identities through the resolver. |
+| `core/quorum.deadline` | The caller's wall-clock deadline exhausted the assignment search before a satisfying assignment completed. Retryable. | Retry with a later deadline or under less load. |
 | `core/quorum.binding_unsatisfied` | A nested or same-parameter binding failed. | Reject the request. |
 | `core/quorum.nonqualifying_signature` | With `invalid: "reject"`, a signature failed its slot; `detail` is that slot's reason. | Reject the request. |
 | `core/quorum.quorum_not_met` | Too few qualifying signatures for the mode. | Reject the request. |
@@ -227,7 +229,8 @@ Returned by discovery sources, snapshots, key sets, caches, and the Node transpo
 | `discovery/limit` | The response exceeds a size, key, or removal bound. | Reject, or raise the source limits. |
 | `discovery/redirect_denied` | A redirect is not allowed: `maxRedirects` is 0, the `Location` is malformed, or it leaves `redirectScope`. | Fix the source URL, or allow the redirect. |
 | `discovery/redirect_limit` | More redirects than `maxRedirects`. | Raise `maxRedirects` if intended. |
-| `discovery/resolution_failed` | DNS resolution failed. Not marked retryable. | Check the host name and DNS servers. |
+| `discovery/domain_not_found` | DNS answered authoritatively that the configured domain does not exist. Not marked retryable. | Fix the configured location. |
+| `discovery/resolution_failed` | DNS resolution failed, transiently or otherwise. Retryable. | Retry, or check the DNS servers. |
 | `discovery/revoked_key` | The key was removed or revoked. | Reject. |
 | `discovery/source_unavailable` | No usable keys are available for the source now, such as a miss without a fetch function. Retryable. | Fetch or refresh the source. |
 | `discovery/tls_failed` | The TLS handshake or certificate check failed. | Check the certificate and `cacerts`. |

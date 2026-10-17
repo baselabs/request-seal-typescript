@@ -65,13 +65,13 @@ RequestSeal cannot establish that a caller's trust anchors, proxy configuration,
 
 # TypeScript boundaries
 
-The invariants above hold in this package through the mechanisms below. Each is a decision a maintainer must not undo by accident, so each names the code that enforces it and the tests that fail without it. The [architecture decisions](../adr/README.md) give the reasoning.
+The invariants above hold in this package through the mechanisms below. Each is a decision a maintainer must not undo by accident, so each names the code that enforces it and the tests that fail without it. The reasoning behind each accepted decision is retained in the maintainer's private record store.
 
 ## The WebCrypto boundary
 
 All cryptography runs on WebCrypto. The core imports no Node module, which `npm run typecheck:web` enforces by compiling it against browser-style globals with no Node types; only the four locations that need Node (`src/node_hasher.ts`, `src/discovery/node.ts`, `src/adapters/node-http/`, `src/custody/ssh-agent/`) are excluded, and each ships as its own subpath. `src/crypto/subtle.ts` captures `crypto.subtle` methods and `getRandomValues` once, at module load, so code that replaces those globals later cannot change a verdict. This includes `Content-Digest` generation in `Message.request` and `Message.response`. Verification accepts only a literal `true` from the runtime. The library implements no cryptographic primitive.
 
-This boundary trades portability for exposure to each runtime's WebCrypto behavior, which is why [runtime limitations](#runtime-limitations) are declared and not hidden. See [ADR 0002](../adr/0002-zero-runtime-dependencies-and-webcrypto.md).
+This boundary trades portability for exposure to each runtime's WebCrypto behavior, which is why [runtime limitations](#runtime-limitations) are declared and not hidden. The accepted decision: zero runtime dependencies and WebCrypto primitives only.
 
 ## Option snapshots are read once
 
@@ -83,11 +83,11 @@ Values that carry trust, such as policies, messages, verifications, key handles,
 
 ## Context deadlines
 
-Every operation that can wait takes a `Context`: an absolute deadline plus an `AbortSignal`. A run holds one referenced timer only while it is active, so a callback that never settles still ends with `deadline_exceeded`, and an idle context keeps nothing alive. Contexts with external signals keep one unreferenced timer so their listeners are released at the deadline. The race that decides the outcome uses an owned promise receiver, so replacing `Promise.race` or `Promise.resolve` later cannot forge a result. A callback that ignores the signal is abandoned, not stopped; cancellation cannot interrupt a native operation already submitted to the runtime. See [ADR 0004](../adr/0004-context-deadline-timer-design.md).
+Every operation that can wait takes a `Context`: an absolute deadline plus an `AbortSignal`. A run holds one referenced timer only while it is active, so a callback that never settles still ends with `deadline_exceeded`, and an idle context keeps nothing alive. Contexts with external signals keep one unreferenced timer so their listeners are released at the deadline. The race that decides the outcome uses an owned promise receiver, so replacing `Promise.race` or `Promise.resolve` later cannot forge a result. A callback that ignores the signal is abandoned, not stopped; cancellation cannot interrupt a native operation already submitted to the runtime. The accepted decision: one referenced timer per active run, one unreferenced timer per externally signaled context, and an owned promise receiver for the deciding race.
 
 ## Runtime limitations
 
-Where a runtime's WebCrypto or `node:https` disagrees with a published vector or with the other runtimes, the package records the exact runtime version in `tools/conformance/runtime-limits.json` and reports the affected items as `runtime_limited`. It does not weaken the assertion or add a cryptographic fallback. Stale entries, a different rejection, and an unlisted divergence all fail the run. This keeps a green result meaningful. See [ADR 0006](../adr/0006-declared-runtime-limitations.md) and the [observed runtime conformance](#observed-runtime-conformance) results below.
+Where a runtime's WebCrypto or `node:https` disagrees with a published vector or with the other runtimes, the package records the exact runtime version in `tools/conformance/runtime-limits.json` and reports the affected items as `runtime_limited`. It does not weaken the assertion or add a cryptographic fallback. Stale entries, a different rejection, and an unlisted divergence all fail the run. This keeps a green result meaningful. The accepted decision: divergences are declared per runtime version, never silently weakened. See the [observed runtime conformance](#observed-runtime-conformance) results below.
 
 ## The Fetch verification allowlist
 

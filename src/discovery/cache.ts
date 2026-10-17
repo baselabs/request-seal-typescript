@@ -20,6 +20,7 @@ import {
   keySet,
   lookup,
   type KeySet,
+  type NotModified,
   type Resolution,
 } from "./body.ts";
 import { algorithms } from "../crypto/algorithm.ts";
@@ -32,11 +33,15 @@ import {
   systemClock,
   inspectable,
 } from "./support.ts";
-/** A caller-owned discovery transport callback. */
+/** A caller-owned discovery transport callback. With `validators`, an unchanged source answers 304 and the callback returns a `NotModified` outcome instead of a key set (RFC 9111 Section 4.3.4). */
 export type DiscoveryFetch = (
   source: DiscoverySource,
-  options: { clock: () => number; context: Context },
-) => Promise<Result<KeySet>>;
+  options: {
+    clock: () => number;
+    context: Context;
+    validators?: Readonly<{etag: string; lifetime: number}>;
+  },
+) => Promise<Result<KeySet | NotModified>>;
 /** A caller-owned bounded cache of discovery key sets and failures. */
 export type DiscoveryCache = Readonly<{
   /** Refresh a source from an explicit snapshot or configured fetch callback. */
@@ -130,8 +135,39 @@ export function createCache(input: unknown = {}): Result<DiscoveryCache> {
         if (e.removed.has(key.thumbprint)) delete keys[kid];
       return keySet({ ...set, keys: Object.freeze(keys) });
     }
-    function store(e: Enrollment, result: Result<KeySet>, clock: () => number, snapshot = false): Result<KeySet> {
+    function store(e: Enrollment, result: Result<KeySet | NotModified>, clock: () => number, snapshot = false): Result<KeySet> {
       const now = clockValue(clock);
+      if (result.ok && "notModified" in result.value && result.value.notModified === true) {
+        // RFC 9111 Section 4.3.4: the stored representation stays; the 304's
+        // own freshness directives and validator replace the stored ones. The
+        // set never claims freshness beyond its earliest still-live key.
+        const current = e.set;
+        if (
+          !current ||
+          sourceIdentity(current.source) !== sourceIdentity(e.source)
+        )
+          return err(discoveryError("source_unavailable"));
+        const fresh = result.value;
+        const set = filter(current, e);
+        const earliest = Object.values(set.keys).reduce(
+          (bound, key) => Math.min(bound, key.expiresAt),
+          Infinity,
+        );
+        const merged = keySet({
+          ...set,
+          etag: fresh.etag,
+          fetchedAt: fresh.fetchedAt,
+          expiresAt: Math.min(fresh.expiresAt, earliest),
+        });
+        e.fetchedAtHighWater = Math.max(
+          e.fetchedAtHighWater ?? merged.fetchedAt,
+          merged.fetchedAt,
+        );
+        delete e.failureUntil;
+        if (merged.expiresAt > now) e.set = merged;
+        else delete e.set;
+        return ok(merged);
+      }
       if (result.ok) {
         ensure(
           isKeySet(result.value) &&
@@ -174,14 +210,38 @@ export function createCache(input: unknown = {}): Result<DiscoveryCache> {
           "invalid_options",
         );
         const generation = e.generation;
+        // A stored validator makes the revalidation conditional: an unchanged
+        // source answers 304 and its key set stays put. A CIMD document is not
+        // the key set itself — its 304 says nothing about the nested JWKS it
+        // names — so CIMD sources always revalidate unconditionally.
+        let validators: Readonly<{etag: string; lifetime: number}> | undefined;
+        const stored = e.set;
+        if (stored && stored.etag !== null && e.source.type !== "cimd") {
+          const now = clockValue(clock);
+          // A 304 keeps the stored keys, so it can only renew a set whose
+          // every key is still inside its own expiry; any dead key forces a
+          // full fetch.
+          const alive =
+            Object.keys(stored.keys).length > 0 &&
+            Object.values(stored.keys).every((key) => now < key.expiresAt);
+          if (alive)
+            validators = Object.freeze({
+              etag: stored.etag,
+              lifetime: Math.max(stored.expiresAt - stored.fetchedAt, 0),
+            });
+        }
         flight = {
           controller,
           waiters: 0,
           work: Promise.resolve().then(async () => {
-            let result: Result<KeySet>;
+            let result: Result<KeySet | NotModified>;
             try {
               const r = await run(c, () =>
-                fetcher(e.source, { clock, context: c }),
+                fetcher(e.source, {
+                  clock,
+                  context: c,
+                  ...(validators ? {validators} : {}),
+                }),
               );
               result =
                 !r.ok && r.error.kind !== "discovery"

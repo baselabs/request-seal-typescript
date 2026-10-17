@@ -109,6 +109,11 @@ export async function fromResource(
     }
     const bodyRevision = await revision(decoded);
     ensure(!context || remainingMs(context) > 0, "deadline_exceeded");
+    const storedEtag = header(fs, "etag");
+    ensure(
+      storedEtag === null || storedEtag.length <= 512,
+      "invalid_response",
+    );
     return ok(
       keySet({
         source,
@@ -118,6 +123,7 @@ export async function fromResource(
         expiresAt,
         revision: bodyRevision,
         proof: proven.proof,
+        etag: storedEtag,
       }),
     );
   } catch (e) {

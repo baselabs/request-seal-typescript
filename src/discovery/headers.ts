@@ -103,6 +103,29 @@ export function expiry(
     .toLowerCase()
     .split(",")
     .map((v) => v.trim());
+  return expiryFromControls(fs, source, now, controls);
+}
+/** RFC 9111 Section 4.3.4: whether a response carries freshness directives of its own. */
+export function hasFreshness(fs: readonly Field[]): boolean {
+  if (header(fs, "expires") !== null) return true;
+  const controls = values(fs, "cache-control")
+    .join(",")
+    .toLowerCase()
+    .split(",")
+    .map((v) => v.trim());
+  // Only freshness-changing names count: max-age, no-cache, no-store. A
+  // directive like `public` leaves the stored lifetime in force.
+  return controls.some((v) => {
+    const name = v.split("=", 1)[0]!.trim();
+    return name === "no-store" || name === "no-cache" || name === "max-age";
+  });
+}
+function expiryFromControls(
+  fs: readonly Field[],
+  source: DiscoverySource,
+  now: number,
+  controls: readonly string[],
+): number {
   const ages = controls
     .filter((v) => v.startsWith("max-age="))
     .map((v) => v.slice(8).replace(/^"+|"+$/g, ""));
@@ -119,9 +142,16 @@ export function expiry(
   }
   const age = header(fs, "age") ?? "0";
   ensure(/^[0-9]{1,10}$/.test(age), "invalid_response");
+  // RFC 9111 Sections 5.2.2.3 and 5.2.2.4: no-store and no-cache also arrive
+  // qualified, as in no-cache="content-type" (and the RFC 7234 quoted form whose
+  // member can itself contain commas). Match the directive name before any "=",
+  // so every spelling still forces revalidation.
   return (
     now +
-    (controls.some((v) => v === "no-store" || v === "no-cache")
+    (controls.some((v) => {
+      const name = v.split("=", 1)[0]!.trim();
+      return name === "no-store" || name === "no-cache";
+    })
       ? 0
       : Math.max(
           Math.min(ttl, source.maxTtl) - Math.max(Number(age), now - date, 0),

@@ -36,6 +36,7 @@ import {
   fail,
   ensure,
   bounded,
+  envelope,
 } from "./signature-fields.ts";
 import { coreError, isRequestSealError } from "./errors/types.ts";
 import { timeoutMs } from "./numbers.ts";
@@ -490,6 +491,6 @@ export async function sign(
     return ok(m);
   } catch (e) {
     if (isRequestSealError(e) && e.kind === "custody" && e.reason === "deadline_exceeded") return err(e);
-    return err(bounded(e, "invalid_options", "input"));
+    return err(envelope(e));
   }
 }

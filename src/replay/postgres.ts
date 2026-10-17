@@ -12,6 +12,12 @@ const tableName = (value: unknown): value is string => typeof value === 'string'
 export function ddl(table: unknown): Result<string> {
   return tableName(table) ? ok(`CREATE TABLE "${table}" (namespace bytea NOT NULL, key bytea NOT NULL, retain_until bigint NOT NULL, PRIMARY KEY (namespace, key))`) : err(replayError('invalid_store'));
 }
+/** Validate a table name and return the retention-sweep index SQL: without it the sweep's DELETE is a growing full-table scan. The name is bounded to 46 bytes so the derived index identifier fits PostgreSQL's 63-byte limit. */
+export function ddlIndex(table: unknown): Result<string> {
+  return tableName(table) && table.length <= 46
+    ? ok(`CREATE INDEX "${table}_retain_until_idx" ON "${table}" (retain_until)`)
+    : err(replayError('invalid_store'));
+}
 function failure(error: unknown): ReplayError {
   try {
     if (error !== null && typeof error === 'object') {

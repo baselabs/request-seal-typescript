@@ -125,6 +125,18 @@ const http: Readonly<Record<HttpAlgorithm, JwsAlgorithm>> = Object.freeze({
 export function algorithms(): Result<readonly HttpAlgorithm[]> {
   return ok(Object.freeze(Object.keys(http) as HttpAlgorithm[]));
 }
+/** The JOSE name for a source-asserted alg in either registry spelling; undefined outside both (PS256 and PS384 exist only as JOSE names). */
+export function assertedJose(value: string): JwsAlgorithm | undefined {
+  return Object.hasOwn(http, value)
+    ? http[value as HttpAlgorithm]
+    : Object.hasOwn(jws, value)
+      ? (value as JwsAlgorithm)
+      : undefined;
+}
+/** The JOSE name for either allowlist spelling; total over every validated selector. */
+export function joseId(value: SigningAlgorithm): JwsAlgorithm {
+  return typeof value === 'string' ? http[value] : value.jws;
+}
 export function resolveAlgorithm(
   value: unknown,
   allowUnwrap = false,

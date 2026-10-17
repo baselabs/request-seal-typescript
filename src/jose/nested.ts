@@ -17,6 +17,27 @@ export function innerCompact(input: Uint8Array): Result<readonly string[]> {
   const framed = compact(input, 3, false);
   return !framed.ok && framed.error.reason === 'invalid_serialization' ? err(joseError('nesting_depth', 'nesting')) : framed;
 }
+// RFC 7515 Section 4.1.10: a cty value with no "/" is read with "application/"
+// prepended. The recursion-implying set is the registered JOSE media types
+// (Section 9.2.1: application/jose and application/jose+json), their
+// per-structure spellings application/jws and application/jwe, and RFC 7519's
+// application/jwt (abbreviated "JWT"): each declares the payload is another
+// JOSE envelope, which this one-level module refuses. Any other cty names
+// ordinary typed payload content and is the application's business.
+function nestingCty(cty: unknown): boolean {
+  if (typeof cty !== "string") return false;
+  // Media-type parameters do not change the type/subtype classification, so
+  // strip them before the abbreviation rule.
+  const base = cty.split(";", 1)[0]!.trim();
+  const expanded = base.includes("/") ? base : `application/${base}`;
+  return [
+    "application/jose",
+    "application/jose+json",
+    "application/jws",
+    "application/jwe",
+    "application/jwt",
+  ].includes(expanded.toLowerCase());
+}
 /** Authenticate an outer JWE and verify its inner compact JWS. */
 export async function decrypt(
   input: unknown,
@@ -62,7 +83,7 @@ export async function decrypt(
       const inner = await JWS.verify(plaintext, p.jws, stageOptions);
       if (!inner.ok) return inner;
       need(
-        !inner.value.header.some((pair) => pair[0] === "cty"),
+        !nestingCty(headerValue(inner.value.header, "cty")),
         "nesting_depth",
         "nesting",
       );

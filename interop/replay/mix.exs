@@ -8,7 +8,7 @@ defmodule RequestSealReplayInterop.MixProject do
       elixir: "1.20.3",
       deps: [
         # Exact conformance peer identity, matching the error vocabulary release; corpus remains v0.4.0.
-        {:request_seal, "== 0.4.1"},
+        {:request_seal, "== 0.5.2"},
         {:postgrex, "~> 0.22.4"}
       ]
     ]

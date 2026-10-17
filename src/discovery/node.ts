@@ -5,7 +5,7 @@ import { isIP } from "node:net";
 import * as tls from "node:tls";
 import { connect, checkServerIdentity, type PeerCertificate, type TLSSocket } from "node:tls";
 import { X509Certificate } from "node:crypto";
-import { err, type Result } from "../result.ts";
+import { err, ok, type Result } from "../result.ts";
 import {
   withDeadline,
   isContext,
@@ -35,8 +35,8 @@ import {
   sslError,
   list,
 } from "./support.ts";
-import { fields, header, expiry, mediaType } from "./headers.ts";
-import { bodyDocument, type KeySet } from "./body.ts";
+import { fields, header, expiry, hasFreshness, mediaType } from "./headers.ts";
+import { bodyDocument, type KeySet, type NotModified } from "./body.ts";
 import { fromResource } from "./snapshot.ts";
 import { decodeBody } from "./gzip.ts";
 import {systemCertificateError} from "./node-trust.ts";
@@ -47,6 +47,10 @@ type Resource = {
   fields: ReturnType<typeof fields>;
   encoded: Uint8Array;
   decoded: Uint8Array;
+  location: string;
+} | {
+  notModified: true;
+  fields: ReturnType<typeof fields>;
   location: string;
 };
 function remaining(context: Context): void {
@@ -81,6 +85,14 @@ async function resolve(
         )
       )
         throw discoveryError("deadline_exceeded");
+      // An authoritative NXDOMAIN on every query is a configuration error:
+      // the configured domain does not exist, so retrying cannot help.
+      if (
+        found.every(
+          (r) => r.status === "rejected" && r.reason?.code === "ENOTFOUND",
+        )
+      )
+        throw discoveryError("domain_not_found");
       answers = found.flatMap((r, i) =>
         r.status === "fulfilled"
           ? r.value.map((address) => ({ address, family: i === 0 ? 4 : 6 }))
@@ -92,7 +104,15 @@ async function resolve(
   } else {
     try {
       answers = await lookup(host, { all: true });
-    } catch {
+    } catch (error) {
+      // getaddrinfo's authoritative name-not-found is the same configuration
+      // error; any other resolver trouble may succeed on a later retry.
+      if (
+        error &&
+        typeof error === "object" &&
+        (error as {code?: unknown}).code === "ENOTFOUND"
+      )
+        throw discoveryError("domain_not_found");
       throw discoveryError("resolution_failed");
     }
   }
@@ -233,6 +253,7 @@ async function get(
   source: DiscoverySource,
   context: Context,
   servers?: readonly string[],
+  etag?: string | null,
 ): Promise<{
   status: number;
   fs: ReturnType<typeof fields>;
@@ -269,6 +290,7 @@ async function get(
                 : "application/json, application/jwk-set+json",
             "Accept-Encoding": "gzip",
             Connection: "close",
+            ...(typeof etag === "string" ? {"If-None-Match": etag} : {}),
           },
           lookup: () => {
             throw discoveryError("address_denied");
@@ -333,7 +355,14 @@ async function get(
         } catch (error) { reject(error); }
       };
       socket.prependListener("data", onWire);
-      req.on("information", info => reject(discoveryError("unexpected_status", info.statusCode)));
+      // RFC 9110 Section 15.2: interim responses are provisional and precede
+      // the final status. Five are skipped, the reference bound; a sixth
+      // names a misbehaving publisher and rejects as a malformed response.
+      let interims = 0;
+      req.on("information", (info) => {
+        if (++interims > 5)
+          reject(discoveryError("invalid_response"));
+      });
       req.on("upgrade", (res, upgraded) => {
         reject(discoveryError("unexpected_status", res.statusCode));
         upgraded.destroy();
@@ -455,8 +484,15 @@ async function resource(
   context: Context,
   servers?: readonly string[],
   hops = 0,
+  etag?: string | null,
 ): Promise<Resource> {
-  const { status, fs, encoded } = await get(url, source, context, servers);
+  const { status, fs, encoded } = await get(
+    url,
+    source,
+    context,
+    servers,
+    etag,
+  );
   if ([301, 302, 303, 307, 308].includes(status)) {
     ensure(source.maxRedirects > 0, "redirect_denied");
     ensure(hops < source.maxRedirects, "redirect_limit");
@@ -468,8 +504,15 @@ async function resource(
         sourceOrigin(target) === sourceOrigin(sourceUrl(source.location)),
       "redirect_denied",
     );
-    return resource(target, source, context, servers, hops + 1);
+    // A validator never crosses a redirect: the target is a different
+    // resource representation.
+    return resource(target, source, context, servers, hops + 1, undefined);
   }
+  // RFC 9111 Section 15.4.5: 304 is valid only as the answer to the
+  // conditional this client sent; an unsolicited 304 falls through to the
+  // unexpected-status rejection below.
+  if (status === 304 && typeof etag === "string")
+    return { notModified: true, fields: fs, location: url.href };
   if (status !== 200) throw discoveryError("unexpected_status", status);
   mediaType(fs, source.type);
   const decoded = await decodeBody(
@@ -483,15 +526,50 @@ async function resource(
   remaining(context);
   return { fields: fs, encoded, decoded, location: url.href };
 }
-/** Fetch a discovery key set with bounded HTTPS, address, and redirect policies. */
+/** Fetch a discovery key set with bounded HTTPS, address, and redirect policies, unconditionally. A `validators` option is accepted and ignored, so this function wires directly as a cache's fetch callback; use `fetchWithValidators` for conditional revalidation. */
 export async function fetch(
   source: unknown,
   input: unknown = {},
 ): Promise<Result<KeySet>> {
+  const r = await conditional(source, input, undefined);
+  // No validator was sent, so a 304 cannot occur; keep the total anyway.
+  if (r.ok && "notModified" in r.value && r.value.notModified === true)
+    return err(discoveryError("invalid_response"));
+  return r as Result<KeySet>;
+}
+/** Conditionally fetch a discovery key set (RFC 9111 Section 4.3.4): send `If-None-Match` with the stored validator, and an unchanged source answers 304 as a `NotModified` outcome instead of a key set. `storedLifetime` seconds persist when the 304 carries no freshness directives of its own. */
+export async function fetchWithValidators(
+  source: unknown,
+  etag: unknown,
+  storedLifetime: unknown,
+  input: unknown = {},
+): Promise<Result<KeySet | NotModified>> {
+  try {
+    ensure(
+      typeof etag === "string" &&
+        etag.length >= 1 &&
+        etag.length <= 512 &&
+        Number.isSafeInteger(storedLifetime) &&
+        (storedLifetime as number) >= 0,
+      "invalid_options",
+    );
+  } catch (e) {
+    return failure(e);
+  }
+  return conditional(source, input, {
+    etag: etag as string,
+    lifetime: storedLifetime as number,
+  });
+}
+async function conditional(
+  source: unknown,
+  input: unknown,
+  validator: {etag: string; lifetime: number} | undefined,
+): Promise<Result<KeySet | NotModified>> {
   try {
     ensure(isDiscoverySource(source), "invalid_source");
     if (source.cacerts === "os" && !systemCertificates()) return err(discoveryError("transport_unavailable"));
-    const a = options(input, ["timeoutMs", "clock", "context", "dnsServers"]);
+    const a = options(input, ["timeoutMs", "clock", "context", "dnsServers", "validators"]);
     const timeout = Object.hasOwn(a, "timeoutMs")
       ? a.timeoutMs
       : source.timeoutMs;
@@ -549,8 +627,31 @@ export async function fetch(
           source,
           context,
           servers,
+          0,
+          validator?.etag,
         );
         const now = clockValue(clock);
+        if ("notModified" in outer) {
+          // RFC 9111 Sections 3.2 and 4.3.4: a 304's own directives
+          // recalculate freshness; without them the stored representation's
+          // lifetime persists. A different strong validator identifies a
+          // different representation, so it cannot renew this one.
+          const updated = header(outer.fields, "etag");
+          ensure(updated === null || updated.length <= 512, "invalid_response");
+          ensure(
+            updated === null || updated === validator!.etag,
+            "invalid_response",
+          );
+          const fresh: NotModified = Object.freeze({
+            notModified: true,
+            etag: validator!.etag,
+            fetchedAt: now,
+            expiresAt: hasFreshness(outer.fields)
+              ? expiry(outer.fields, source, now)
+              : now + validator!.lifetime,
+          });
+          return ok(fresh);
+        }
         if (source.type === "cimd") {
           const doc = bodyDocument(outer.decoded, source);
           ensure(doc.client_id === source.location, "client_id_mismatch");
@@ -561,7 +662,11 @@ export async function fetch(
           if (Object.hasOwn(doc, "jwks_uri")) {
             const url = sourceUrl(doc.jwks_uri);
             ensure(
-              sourceOrigin(url) === sourceOrigin(sourceUrl(source.location)),
+              // Compare against the origin that served this document, not the
+              // configured one: a permissive redirect scope can legitimately
+              // move the document to a mirror, and its jwks_uri names that
+              // mirror.
+              sourceOrigin(url) === sourceOrigin(sourceUrl(outer.location)),
               "redirect_denied",
             );
             // The subresource has JWKS media/body ceilings, original CIMD provenance.
@@ -574,6 +679,10 @@ export async function fetch(
               "invalid_source",
             );
             const nested = await resource(url, nestedSource, context, servers);
+            // The nested subresource is always fetched unconditionally, so a
+            // 304 cannot occur here; keep the rejection total anyway.
+            if ("notModified" in nested)
+              throw discoveryError("unexpected_status");
             const result = await fromResource(
               source,
               nested.decoded,
@@ -603,7 +712,7 @@ export async function fetch(
         remaining(context);
         return result;
       } catch (error) {
-        return failure<KeySet>(error);
+        return failure<KeySet | NotModified>(error);
       }
     });
     return !result.ok && result.error.kind === "custody" && result.error.reason === "deadline_exceeded"
@@ -618,7 +727,9 @@ export async function fetch(
 /** Discovery resolution with the explicit Node HTTPS transport. */
 export const Discovery = Object.freeze({ ...CoreDiscovery,
   /** Fetch a discovery key set through the bounded Node HTTPS transport. */
-  fetch });
+  fetch,
+  /** Conditionally fetch a discovery key set (RFC 9111 Section 4.3.4). */
+  fetchWithValidators });
 /** Node source creation fails closed when the OS trust store is unavailable or empty. */
 export const DiscoverySource = Object.freeze({
   ...CoreSource,

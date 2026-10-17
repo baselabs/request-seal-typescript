@@ -1,6 +1,6 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 ·
+**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 ·
 **Governed by:** RFC 9421, RFC 7515, RFC 7516, protocol-00, and RequestSeal
-v0.4.1 · **Review when:** peer pins, exchange protocol, or CI changes
+v0.5.2 · **Review when:** peer pins, exchange protocol, or CI changes
 
 # Reciprocal interoperability
 
@@ -125,11 +125,11 @@ rounds, cases, rejections, and disagreements per family and direction.
 
 ## Pins and CI
 
-The peer is Hex `request_seal == 0.4.1`, checksum
-`834b005ddebd610e647c42f934c3120a659b7f316cdf81f9a064037194daef02`, locked in
-both interop projects. This matches `ELIXIR_ERROR_PIN`'s v0.4.1 release, commit
-`0a6568aa246326617f760e94e21b359285c6ddfc`. The corpus remains v0.4.0.
-v0.4.1 changed no corpus bytes and supplied no corpus release assets. One test checks
+The peer is Hex `request_seal == 0.5.2`, checksum
+`b8632c4cd4ec8ab989cf5d919765c34dbb3a2774939a0e3e7f104f329558229b`, locked in
+both interop projects. This matches `ELIXIR_ERROR_PIN`'s v0.5.2 release, commit
+`53b6690ccd5036d58b280d08cf0cacc6427262fe`, and the vendored corpus pin, which
+the v0.5.2 release assets supplied with bytes identical to v0.4.0. One test checks
 both projects’ Elixir and OTP pins, both Hex versions and checksums, and every
 CI setup-beam input against the error release. The exchange asserts its selector
 sets equal to both implementations’ runtime registries. No local checkout

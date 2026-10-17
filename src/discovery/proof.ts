@@ -16,7 +16,7 @@ import {
 import { SignatureBase } from "../signature-base/index.ts";
 import { Crypto } from "../crypto/index.ts";
 import { digest } from "../crypto/subtle.ts";
-import { algorithms } from "../crypto/algorithm.ts";
+import { algorithms, joseId } from "../crypto/algorithm.ts";
 import { encodeBase64 } from "../bytes.ts";
 import type { DiscoverySource } from "./source.ts";
 import { sourceAuthority, sourceUrl, thumbprintId } from "./source.ts";
@@ -239,7 +239,7 @@ export async function possessionProof(
       ensure(!context || remainingMs(context) > 0, "deadline_exceeded");
       if (
         (entry.assertedAlgorithm === null ||
-          entry.assertedAlgorithm === algorithm) &&
+          entry.assertedAlgorithm === joseId(algorithm)) &&
         entry.key.bind(algorithm).ok &&
         (!p.has("alg") || textParam(p, "alg") === algorithm)
       ) {

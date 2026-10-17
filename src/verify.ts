@@ -34,6 +34,7 @@ import {
   ensure,
   fail,
   bounded,
+  envelope,
 } from "./signature-fields.ts";
 import {
   completed,
@@ -489,11 +490,20 @@ export async function verifyLabel(
       profile, content: contentResult.value, freshness: fresh,
       replay: replayFacts, principal: "unattributed", authorization: "not_evaluated",
     });
-    if (result.ok && identity) observeIdentity!(identity);
+    if (result.ok && identity) {
+      // An extension pipeline step is a caller callback: its fault keeps the
+      // profile's deliberate invalid_policy classification, like a failing
+      // signer keeps signer_failed.
+      try {
+        observeIdentity!(identity);
+      } catch {
+        fail("invalid_policy", "input");
+      }
+    }
     return result;
   } catch (e) {
     if (isRequestSealError(e) && e.kind === "custody" && e.reason === "deadline_exceeded") return err(e);
-    return err(bounded(e, typeof profile.name === "string" ? "invalid_options" : "invalid_policy", "input"));
+    return err(envelope(e));
   }
 }
 

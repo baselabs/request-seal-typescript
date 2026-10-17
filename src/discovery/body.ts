@@ -3,8 +3,9 @@ import { decodeJson, type JsonNode } from "../json.ts";
 import { PublicKey } from "../public_key.ts";
 import {
   resolveAlgorithm,
-  algorithms,
-  type HttpAlgorithm,
+  assertedJose,
+  joseId,
+  type JwsAlgorithm,
   selection, type SigningAlgorithm,
 } from "../crypto/algorithm.ts";
 import { digest } from "../crypto/subtle.ts";
@@ -28,13 +29,16 @@ import {
 } from "./support.ts";
 /** Discovery proof status. @inline */
 export type Proof = "signed" | "unsigned" | "not_applicable";
+/** A conditional revalidation outcome: the stored representation is unchanged (RFC 9111 Section 4.3.4). */
+export type NotModified = Readonly<{notModified: true; etag: string; fetchedAt: number; expiresAt: number}>;
 /** A branded resolved public key with origin, proof, and expiration facts. */
 export type Resolution = Readonly<{
   key: PublicKey;
   keyId: string;
   thumbprint: string;
   algorithm: SigningAlgorithm;
-  assertedAlgorithm: HttpAlgorithm | null;
+  /** The source's alg assertion normalized once at import to its JOSE name. */
+  assertedAlgorithm: JwsAlgorithm | null;
   origin: string;
   sourceType: DiscoverySource["type"];
   location: string;
@@ -72,6 +76,8 @@ export type KeySet = Readonly<{
   expiresAt: number;
   revision: string;
   proof: Proof;
+  /** The source's ETag validator, if it sent one; the cache revalidates with it. */
+  etag: string | null;
   /** Resolve an eligible key by identifier, allowed algorithms, and current time. */
   lookup: (
     keyId: unknown,
@@ -128,7 +134,8 @@ export async function lookup(
     );
     const algorithm = choices.find(
       (a) =>
-        (entry.assertedAlgorithm === null || entry.assertedAlgorithm === a) &&
+        (entry.assertedAlgorithm === null ||
+          entry.assertedAlgorithm === joseId(a)) &&
         entry.key.bind(a).ok,
     );
     ensure(algorithm, "unknown_key");
@@ -219,22 +226,45 @@ export async function bodyKeys(
     );
     const j = input as Record<string, unknown>,
       asserted = j.alg;
+    // Leaked private members are a publisher blunder the whole set rejects
+    // loudly, before any skip decision: skipping must never hide them.
+    ensure(
+      !["d", "p", "q", "dp", "dq", "qi", "oth", "k"].some((k) =>
+        Object.hasOwn(j, k),
+      ),
+      "invalid_key_set",
+    );
+    // A key whose alg names an algorithm this verifier does not use — an
+    // encryption key, or a signing name outside both registries — cannot
+    // satisfy any signature policy: skip it and keep the rest of the set.
+    if (typeof asserted === "string" && assertedJose(asserted) === undefined)
+      continue;
     ensure(
       asserted === undefined ||
         asserted === null ||
-        (typeof asserted === "string" &&
-          unwrap(algorithms(), "invalid_key_set").includes(
-            asserted as HttpAlgorithm,
-          )),
+        typeof asserted === "string",
       "invalid_key_set",
     );
+    // RFC 7517 sources assert standard JOSE names; either spelling normalizes
+    // once, here, to the JOSE name, which exists for every registry entry.
+    const normalized =
+      typeof asserted === "string" ? assertedJose(asserted) : undefined;
     const imported = Object.assign(Object.create(null), j) as Record<
       string,
       unknown
     >;
-    if (typeof asserted === "string")
-      imported.alg = unwrap(resolveAlgorithm(asserted), "invalid_key_set").jose;
-    const key = unwrap(await PublicKey.import(imported), "invalid_key_set");
+    if (normalized !== undefined) imported.alg = normalized;
+    const attempt = await PublicKey.import(imported);
+    if (!attempt.ok) {
+      // A well-formed key this verifier cannot import for signature work (an
+      // unknown kty or curve, RFC 7517 Section 5) is skipped like an
+      // out-of-registry alg; other import failures stay set rejections.
+      if (attempt.error.kind !== "crypto" || attempt.error.reason !== "invalid_key")
+        ensure(false, "invalid_key_set");
+      ensure(!context || remainingMs(context) > 0, "deadline_exceeded");
+      continue;
+    }
+    const key = attempt.value;
     ensure(!context || remainingMs(context) > 0, "deadline_exceeded");
     const thumbprint = unwrap(await key.thumbprint(), "invalid_key_set");
     ensure(!context || remainingMs(context) > 0, "deadline_exceeded");
@@ -249,14 +279,16 @@ export async function bodyKeys(
     const nbf = Object.hasOwn(j, "nbf") ? keyTime(j.nbf) : null,
       exp = Object.hasOwn(j, "exp") ? keyTime(j.exp) : null;
     const publicJwk = unwrap(key.jwk(), "invalid_key_set");
-    const algorithm = (asserted ??
-      (publicJwk.kty === "OKP"
-        ? "ed25519"
-        : publicJwk.kty === "EC"
-          ? publicJwk.crv === "P-256"
-            ? "ecdsa-p256-sha256"
-            : "ecdsa-p384-sha384"
-          : "rsa-pss-sha512")) as HttpAlgorithm;
+    const algorithm: SigningAlgorithm =
+      normalized === undefined
+        ? (publicJwk.kty === "OKP"
+            ? "ed25519"
+            : publicJwk.kty === "EC"
+              ? publicJwk.crv === "P-256"
+                ? "ecdsa-p256-sha256"
+                : "ecdsa-p384-sha384"
+              : "rsa-pss-sha512")
+        : { jws: normalized };
     if (
       key.bind(algorithm).ok &&
       (nbf === null || now >= nbf) &&
@@ -269,7 +301,7 @@ export async function bodyKeys(
         keyId: kid,
         thumbprint,
         algorithm,
-        assertedAlgorithm: (asserted ?? null) as HttpAlgorithm | null,
+        assertedAlgorithm: normalized ?? null,
         origin: sourceOrigin(sourceUrl(location)),
         sourceType: source.type,
         location,

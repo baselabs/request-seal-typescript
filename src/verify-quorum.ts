@@ -14,6 +14,7 @@ import {
   ensure,
   fail,
   bounded,
+  envelope,
 } from "./signature-fields.ts";
 import { verifyCandidate } from "./verify.ts";
 import { evaluateQuorum, type Candidate } from "./quorum/evaluation.ts";
@@ -93,10 +94,27 @@ export async function verifyQuorum(
         last: QuorumVerification["nonqualifying"][number] | undefined;
       const baseCache: import("./verify.ts").BaseCache = new Map();
       for (const slot of slots) {
-        const r = await verifyCandidate(m, slot.policy, {
-          label: l,
-          context: c.value,
-        }, {input, signature: signatures.get(l)! as import("./structured-fields/index.ts").Item, baseCache});
+        let r: Awaited<ReturnType<typeof verifyCandidate>>;
+        try {
+          r = await verifyCandidate(m, slot.policy, {
+            label: l,
+            context: c.value,
+          }, {input, signature: signatures.get(l)! as import("./structured-fields/index.ts").Item, baseCache});
+        } catch (fault) {
+          // Per-label rescue isolates a defective label as its own
+          // nonqualifying internal fact, never a whole-call failure.
+          if (isRequestSealError(fault) && fault.kind === "custody") return err(fault);
+          const faulted = envelope(fault);
+          if (faulted.kind !== "core") throw fault;
+          last = {
+            label: l,
+            slot: slot.id,
+            reason: faulted.reason,
+            layer: faulted.layer,
+          };
+          facts.push(last);
+          continue;
+        }
         if (r.ok) {
           const record = Object.freeze({
             slot,
@@ -157,7 +175,9 @@ export async function verifyQuorum(
       )!;
       results[r.label] = verified.get(original)!;
     }
-    if (remainingMs(c.value) <= 0) throw custodyError("deadline_exceeded");
+    // The wall-clock bound lives in the assignment search: an accepted
+    // assignment, including one accepted at deadline exhaustion, completes.
+    // The remaining work here is synchronous and bounded.
     return completeQuorum({
       profile: { name: "rfc9421" },
       mode: quorum.mode,
@@ -186,6 +206,6 @@ export async function verifyQuorum(
     });
   } catch (e) {
     if (isRequestSealError(e) && e.kind === "custody") return err(e);
-    return err(bounded(e, "invalid_options", "input"));
+    return err(envelope(e));
   }
 }

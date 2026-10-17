@@ -7,13 +7,13 @@ export function renderParity(): string {
     const statuses = Object.entries(rules).flatMap(([reason, rule]) => rule.kind === 'constant' ? [] : [`${kind}/${reason}: ${rule.minimum}–${rule.maximum} (status-derived)`]);
     return [...(constants.length ? [`${kind}: ${constants.join(', ')}.`] : []), ...statuses];
   }).join(' · ');
-  return `**Status:** maintained · **Kind:** reference · **Updated:** October 10, 2026 · **Governed by:** Elixir release 0.4.1 at ${ELIXIR_ERROR_PIN} · **Review when:** the shared error vocabulary changes
+  return `**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 · **Governed by:** Elixir release 0.5.2 at ${ELIXIR_ERROR_PIN} · **Review when:** the shared error vocabulary changes
 
 # Error parity
 
 OBSERVED: extraction with \`REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts ${ELIXIR_ERROR_PIN} <output.json>\` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
 
-The error vocabulary is pinned to v0.4.1; the shared corpus stays at v0.4.0. The corpus index is byte-identical between those tags, and v0.4.1 supplied no corpus release assets. These pins track different artifacts.
+The error vocabulary is pinned to v0.5.2 (release commit ${ELIXIR_ERROR_PIN}); the shared corpus is vendored at v0.5.2 from the same release's verified assets. These pins track different artifacts.
 
 Extension-profile reasons are defined by extension packages and arrive with the profile row. The core layer union does not include \`profile\`.
 

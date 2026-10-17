@@ -1,8 +1,8 @@
 import { ERROR_PARITY, ERROR_RETRYABLE, type ErrorKind, type Reason, type Layer } from './parity.ts';
 /** The bounded detail vocabulary for core failures. */
-export type CoreDetail = Reason<'core'> | Reason<'signature_base'> | 'legacy_string' | 'invalid_dictionary' | 'duplicate_member' | 'invalid_member' | 'missing_member' | 'unsupported_type' | 'not_an_origin' | 'untrusted_agent' | 'source_mismatch' | 'revoked_key' | 'source_unavailable' | 'timeout';
+export type CoreDetail = Reason<'core'> | Reason<'signature_base'> | 'legacy_string' | 'invalid_dictionary' | 'duplicate_member' | 'invalid_member' | 'missing_member' | 'unsupported_type' | 'not_an_origin' | 'untrusted_agent' | 'source_mismatch' | 'revoked_key' | 'source_unavailable' | 'timeout' | 'TypeError' | 'RangeError' | 'URIError' | 'EvalError' | 'ReferenceError' | 'SyntaxError' | 'Error' | 'throw';
 /** A core failure with layer, correlation, and optional bounded source. */
-export type CoreError = Readonly<{ kind: 'core'; reason: Reason<'core'>; layer: Layer<'core'>; correlation: string; retryable: false; detail: CoreDetail | null; message: string | null; source: CustodyError | null }>;
+export type CoreError = Readonly<{ kind: 'core'; reason: Reason<'core'>; layer: Layer<'core'>; correlation: string; retryable: boolean; detail: CoreDetail | null; message: string | null; source: CustodyError | null }>;
 /** Error families carrying only a reason. @inline */
 type SimpleKind = 'message' | 'structured_fields' | 'signature_base' | 'digest' | 'crypto';
 /** A reason-only error for message, field, digest, or crypto operations. */
@@ -33,11 +33,23 @@ function reasonFor<K extends ErrorKind>(kind: K, reason: Reason<K>): Reason<K> {
 const signatureDetails = new Set<string>(['limit', 'wrong_message_kind', 'missing_request_context', 'unavailable_origin', 'unavailable_trailers', 'missing_field', 'non_ascii', 'unknown_field_schema', 'invalid_field_schema', 'invalid_structured_field', 'missing_dictionary_key', 'noncanonical_query_name', 'invalid_query_encoding', 'missing_query_parameter', 'ambiguous_query_parameter']);
 const agentDetails = new Set<string>(['missing_member', 'unsupported_type', 'not_an_origin', 'untrusted_agent', 'source_mismatch', 'unknown_key', 'revoked_key', 'source_unavailable', 'timeout']);
 const fieldDetails = new Set<string>(['legacy_string', 'invalid_dictionary', 'duplicate_member', 'invalid_member']);
+// The bounded exception-class vocabulary an internal fault can name: the
+// global error classes, a closed "Error" for any other Error subclass, and
+// "throw" for non-error throws. No message or stack text ever enters a detail.
+const internalDetails = new Set<string>(['TypeError', 'RangeError', 'URIError', 'EvalError', 'ReferenceError', 'SyntaxError', 'Error', 'throw']);
+/** The bounded exception class for an internal-fault detail. */
+export function faultClass(e: unknown): CoreDetail {
+  if (e instanceof Error) {
+    const name = (e as {constructor?: {name?: unknown}}).constructor?.name;
+    return typeof name === "string" && internalDetails.has(name) ? name as CoreDetail : "Error";
+  }
+  return "throw";
+}
 export function coreError(reason: Reason<'core'>, layer: Layer<'core'>, detail: CoreDetail | null = null, source: CustodyError | null = null): CoreError {
   if (!ERROR_PARITY.some(e => e.kind === 'core' && e.layer === layer && e.reason === reason)) throw new TypeError('Unknown core error pair');
   if (source !== null && (reason !== 'signing_failed' || !isRequestSealError(source) || source.kind !== 'custody')) throw new TypeError('Invalid core source');
-  const allowed = reason === 'signature_base_failed' ? signatureDetails : reason === 'agent_unresolved' ? agentDetails : reason === 'invalid_signature_agent' ? fieldDetails : reason === 'nonqualifying_signature' ? new Set(ERROR_PARITY.filter(e => e.kind === 'core').map(e => e.reason)) : new Set<string>();
-  return freeze({kind: 'core', reason, layer, correlation: correlation(), retryable: false, source, message: reason === 'signer_algorithm_mismatch' ? 'signer algorithm does not match signature specification' : null, detail: typeof detail === 'string' && allowed.has(detail) ? detail : null});
+  const allowed = reason === 'signature_base_failed' ? signatureDetails : reason === 'agent_unresolved' ? agentDetails : reason === 'invalid_signature_agent' ? fieldDetails : reason === 'internal' ? internalDetails : reason === 'nonqualifying_signature' ? new Set(ERROR_PARITY.filter(e => e.kind === 'core').map(e => e.reason)) : new Set<string>();
+  return freeze({kind: 'core', reason, layer, correlation: correlation(), retryable: reason === 'deadline', source, message: reason === 'signer_algorithm_mismatch' ? 'signer algorithm does not match signature specification' : null, detail: typeof detail === 'string' && allowed.has(detail) ? detail : null});
 }
 function simple<K extends SimpleKind>(kind: K, reason: Reason<K>): SimpleError<K> {
   return freeze({ kind, reason: reasonFor(kind, reason) } as SimpleError<K>);
