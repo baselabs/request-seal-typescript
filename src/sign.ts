@@ -41,6 +41,7 @@ import {
 import { coreError, isRequestSealError } from "./errors/types.ts";
 import { timeoutMs } from "./numbers.ts";
 import { ok, err, type Result } from "./result.ts";
+import { span } from "./telemetry.ts";
 /** A caller-owned signing callback receiving the algorithm, base bytes, and context. */
 export type Signer = (
   algorithm: SigningAlgorithm,
@@ -426,7 +427,7 @@ export async function sign(
     try {
       signed = isKeyHandle(signer)
         ? await custodySign(signer, algorithm, base.value, c.value)
-        : await run(c.value, async (context) => {
+        : await span("custodySign", () => run(c.value, async (context) => {
             try {
               const r = await (signer as Signer)(algorithm, new Uint8Array(base.value), context);
               if (
@@ -441,7 +442,7 @@ export async function sign(
             } catch {
               return err(bounded(null, "signer_failed", "crypto"));
             }
-          });
+          }), r => r.ok ? "ok" : "error", r => r.ok ? undefined : r.error);
     } finally {
       if (ownedSigningContext) releaseContext(ownedSigningContext);
     }

@@ -17,6 +17,7 @@ import {
   envelope,
 } from "./signature-fields.ts";
 import { verifyCandidate } from "./verify.ts";
+import { span } from "./telemetry.ts";
 import { evaluateQuorum, type Candidate } from "./quorum/evaluation.ts";
 import {
   completeQuorum,
@@ -26,7 +27,14 @@ import { custodyError, isRequestSealError } from "./errors/types.ts";
 import type { Verification } from "./verification.ts";
 import { ok, err, type Result } from "./result.ts";
 /** Verify bounded HTTP signatures and evaluate the configured quorum policy. */
-export async function verifyQuorum(
+export function verifyQuorum(
+  message: unknown,
+  quorum: unknown,
+  options: unknown,
+): Promise<Result<QuorumVerification>> {
+  return span("verifyQuorum", () => verifyQuorumSpanned(message, quorum, options), r => r.ok ? "ok" : "error", r => r.ok ? undefined : r.error);
+}
+async function verifyQuorumSpanned(
   message: unknown,
   quorum: unknown,
   options: unknown,

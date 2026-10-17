@@ -58,6 +58,7 @@ import {
   type AgentPrincipal,
   type WebBotAuthReplayFacts,
 } from "./verification.ts";
+import { span } from "../telemetry.ts";
 const testKeys = new Set([
   "BHj8s0GPnMEQtkaULIM-PLgEhLBbuGUQ1vMxmBWZzEo",
   "oD0HwocPBSfpNy5W3bpJeyFGY_IQ_YpqxSjQ3Yd-CLA",
@@ -271,7 +272,14 @@ async function resolve(
     };
   }
 }
-export async function verifyWebBotAuth(
+export function verifyWebBotAuth(
+  message: unknown,
+  policy: unknown,
+  options: unknown = {},
+): Promise<Result<WebBotAuthVerification>> {
+  return span("webBotAuthVerify", () => verifyWebBotAuthSpanned(message, policy, options), r => r.ok ? "ok" : "error", r => r.ok ? undefined : r.error);
+}
+async function verifyWebBotAuthSpanned(
   message: unknown,
   policy: unknown,
   options: unknown = {},

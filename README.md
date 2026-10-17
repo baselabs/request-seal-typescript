@@ -384,7 +384,7 @@ RequestSeal reports what was cryptographically established and nothing more: the
 
 API: [generated reference](https://baselabs.github.io/request-seal-typescript/). Build it locally with `npm ci --ignore-scripts && npm run docs`, then open the generated `site-dist/index.html`.
 
-Reference: [glossary](docs/reference/glossary.md), [error reasons](docs/reference/errors.md), [signing and verification](docs/reference/sign-and-verify.md), [adapters](docs/reference/adapters.md), [Web Bot Auth](docs/reference/web-bot-auth.md), [replay](docs/reference/replay.md), [discovery](docs/reference/discovery.md), [JOSE](docs/reference/jose.md), [wire APIs](docs/reference/wire.md), [multiple signatures](docs/reference/quorum.md), [extension profiles](docs/reference/profiles.md), [error parity](docs/reference/error-parity.md), and [corpus format](docs/reference/corpus-format.md). Design record: the [threat model](docs/design/threat-model.md). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Reference: [glossary](docs/reference/glossary.md), [error reasons](docs/reference/errors.md), [signing and verification](docs/reference/sign-and-verify.md), [adapters](docs/reference/adapters.md), [Web Bot Auth](docs/reference/web-bot-auth.md), [replay](docs/reference/replay.md), [discovery](docs/reference/discovery.md), [JOSE](docs/reference/jose.md), [wire APIs](docs/reference/wire.md), [multiple signatures](docs/reference/quorum.md), [extension profiles](docs/reference/profiles.md), [error parity](docs/reference/error-parity.md), [telemetry](docs/reference/telemetry.md), and [corpus format](docs/reference/corpus-format.md). Design record: the [threat model](docs/design/threat-model.md). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Compatibility
 

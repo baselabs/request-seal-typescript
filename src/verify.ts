@@ -36,6 +36,7 @@ import {
   bounded,
   envelope,
 } from "./signature-fields.ts";
+import { emit, monotonicMs, span } from "./telemetry.ts";
 import {
   completed,
   type Verification,
@@ -219,6 +220,23 @@ async function replay(
 }
 /** Internal shared commit boundary; profile facts are supplied only after authentication. */
 export async function commitReplay<F>(
+  facts: F,
+  retainUntil: number,
+  policy: Omit<import('./policy.ts').ReplayPolicy, 'commitment'> & {commitment: (facts: F, context: Context) => Result<Uint8Array> | Promise<Result<Uint8Array>>},
+  context: Context,
+): Promise<Verification['replay']> {
+  const start = monotonicMs();
+  try {
+    const result = await commitReplaySpanned(facts, retainUntil, policy, context);
+    emit("replayClaim", monotonicMs() - start, "claimed");
+    return result;
+  } catch (error) {
+    const replayed = isRequestSealError(error) && error.kind === "core" && error.reason === "replayed";
+    emit("replayClaim", monotonicMs() - start, replayed ? "already_claimed" : "error", error);
+    throw error;
+  }
+}
+async function commitReplaySpanned<F>(
   facts: F,
   retainUntil: number,
   policy: Omit<import('./policy.ts').ReplayPolicy, 'commitment'> & {commitment: (facts: F, context: Context) => Result<Uint8Array> | Promise<Result<Uint8Array>>},
@@ -527,7 +545,8 @@ export async function verifyLabel(
  *   [error reasons](https://github.com/baselabs/request-seal-typescript/blob/main/docs/reference/errors.md).
  */
 export function verify(message: unknown, policy: unknown, options: unknown): Promise<Result<Verification>> {
-  return verifyLabel(message, policy, options);
+  // The public entry carries the telemetry span; internal per-label calls do not.
+  return span("verify", () => verifyLabel(message, policy, options), r => r.ok ? "ok" : "error", r => r.ok ? undefined : r.error);
 }
 /** Internal composition of the single-label pipeline; identities stay private. */
 export async function verifyCandidate(message: unknown, policy: Policy, options: unknown, parsed?: ParsedCandidate): Promise<Result<Readonly<{verification: Verification; identity: KeyIdentity}>>> {

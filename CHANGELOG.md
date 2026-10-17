@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-## 0.3.0 - October 17, 2026
+## 0.4.0 - October 17, 2026
+- Upgrade notes for callers: the new telemetry surface is entirely opt-in — no code changes unless you attach a subscriber; `Telemetry.attach` accepts at most sixteen subscribers and every event is a frozen six-field object whose `reason` values are the same parity rule ids the errors carry.
+- Add the versioned telemetry contract v1, mirroring RequestSeal for Elixir's `:telemetry` surface with zero dependencies: `Telemetry.attach(subscriber)` returns a caller-owned handle whose `detach` stops delivery, and five events carry bounded, low-cardinality payloads — `verify`, `verifyQuorum`, and `webBotAuthVerify` report `ok` or `error` with the parity rule id, layer, and bounded detail exactly as the caller receives them; `replayClaim` reports `claimed`, `already_claimed`, or `error`; `custodySign` reports `ok` or `error` with the custody reason. `durationMs` is monotonic milliseconds over the emitting call. No signature label, key ID, URL, principal, nonce, bytes, or exception message ever enters an event; internal faults (`core/internal.internal`) are countable through the closed reason vocabulary. A throwing subscriber degrades silently and never fails the operation it observes; attachment is bounded to sixteen concurrent subscribers. The event names, outcomes, and fields are additive-only within minor versions.
+
 
 Upgrade notes for callers: the discovery `Resolution.assertedAlgorithm` is now the normalized JOSE name (`JwsAlgorithm | null`) and an asserted key's `Resolution.algorithm` is the `{jws}` selector, so code matching the raw HTTP token string must compare JOSE names; a cache `fetch` callback may now receive a `validators` option and return a `NotModified` outcome (a callback that ignores both still works); `CoreError.retryable` is `boolean` and `discovery/resolution_failed` is retryable; a first `103` no longer fails a discovery fetch.
 - Re-run the reciprocal exchange against the published RequestSeal for Elixir 0.5.2: both interop peers pin Hex `request_seal == 0.5.2` with the release checksum, the CI reference clone tracks the v0.5.2 tag, and the executed exchange agrees with zero disagreements in every family and both directions (receipt under the project's check records).

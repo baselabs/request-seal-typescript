@@ -48,6 +48,10 @@ test('invalid byte options precede algorithm, handle, context and capability che
     }
     reason(await sign('unknown', null, new Uint8Array(1)), 'unsupported_algorithm');
     reason(await h.sign.call(null, 'unknown', new Uint8Array(1), null as never, {maxBytes: 0}), 'invalid_options');
+    // An unbranded receiver stays bounded: the failure is a custody Result,
+    // never an escaping TypeError with a stack.
+    const wrongObject = await (h.sign as unknown as (this: object, ...rest: unknown[]) => Promise<Result<Uint8Array>>).call({}, 'ed25519', new Uint8Array(1), value(withDeadline()));
+    reason(wrongObject, 'invalid_data');
     reason(await h.verify.call(null, 'unknown', new Uint8Array(32), new Uint8Array(1), null as never, {maxBytes: 0}), 'invalid_options');
     await h.release();
     reason(await hsign(h, new Uint8Array(1), {maxBytes: 0}), 'invalid_options');

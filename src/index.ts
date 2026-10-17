@@ -37,6 +37,7 @@ export {KeyManagement, type KeyManagementHandle, isKeyManagementHandle, type Wra
 export {Nested,isNestedResult,type NestedResult} from './jose/nested.ts';
 export {Claim, Replay, createClaim, isReplayClaim, isReplayReceipt, createReplayStore, isReplayStore} from './replay/index.ts';
 export {createMemoryStore} from './replay/memory.ts';
+export {Telemetry, type TelemetryEvent, type TelemetryEventName, type TelemetryHandle, type TelemetryOutcome, type TelemetrySubscriber} from './telemetry.ts';
 export * from './discovery/index.ts';
 export {Quorum,createQuorum,isQuorum} from './quorum.ts';
 export type {QuorumMode,QuorumUnit,SignerSlot,QuorumBinding} from './quorum.ts';

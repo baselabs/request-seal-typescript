@@ -21,6 +21,7 @@ import {dataBytes, boundedBinary, binaryByteLength} from './crypto/primitive.ts'
 import {isPublicKey, type PublicKey} from './public_key.ts';
 import {isKeyIdentity, type KeyIdentity} from './key_identity.ts';
 import {isUnwrappedKey, type UnwrappedKey} from './custody/content_key.ts';
+import { emit, monotonicMs, span } from "./telemetry.ts";
 /** A branded algorithm-bound capability that confines private key operations. */
 export type KeyHandle = Readonly<{
   algorithm: CustodyAlgorithm;
@@ -142,7 +143,32 @@ class ManagedHandle implements KeyHandle {
     context: Context,
     options: unknown = {},
   ): Promise<Result<Uint8Array<ArrayBuffer>>> {
-    const maximum = byteLimit(options);
+    // Byte options precede every handle touch, so a hostile receiver with bad
+    // options still reports invalid_options; the span covers the whole call.
+    const early = byteLimit(options);
+    const start = monotonicMs();
+    if (!early.ok) {
+      const error = custodyError('invalid_options');
+      emit("custodySign", monotonicMs() - start, "error", error);
+      return err(error);
+    }
+    return span("custodySign", () => {
+      try {
+        return this == null ? Promise.resolve(err(custodyError('invalid_data'))) : this.#signSpanned(algorithm, data, context, early);
+      } catch {
+        // An unbranded receiver cannot reach the private path; the failure
+        // stays a bounded custody error, never an escaping TypeError.
+        return Promise.resolve(err(custodyError('invalid_data')));
+      }
+    }, r => r.ok ? "ok" : "error", r => r.ok ? undefined : r.error);
+  }
+  async #signSpanned(
+    algorithm: unknown,
+    data: unknown,
+    context: Context,
+    maximum: ReturnType<typeof byteLimit>,
+  ): Promise<Result<Uint8Array<ArrayBuffer>>> {
+    // Options were read once and validated by the public wrapper.
     if (!maximum.ok) return err(custodyError('invalid_options'));
     try {
       if (!this.#port) return err(custodyError('key_not_found'));
