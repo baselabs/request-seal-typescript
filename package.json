@@ -1,6 +1,6 @@
 {
   "name": "@request-seal/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Standards-based HTTP message signatures and JOSE for web-standard runtimes.",
   "type": "module",
   "license": "Apache-2.0",

@@ -92,6 +92,7 @@ export {
   isKeySet,
   isResolution,
   type KeySet,
+  type NotModified,
   type Resolution,
 } from "./body.ts";
 export {

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RFC 9421 and the shared conformance corpus · **Review when:** quorum assignment, bindings, or negotiation changes
+**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 · **Governed by:** RFC 9421 and the shared conformance corpus · **Review when:** quorum assignment, bindings, or negotiation changes
 
 # Multiple-signature verification
 
@@ -59,9 +59,12 @@ Assignment maximizes counting units, then filled slots, in canonical slot ID
 and label order, preferring requested labels. Declaration and wire order do not
 change the assignment; result lists retain configured slot order. Unbound key,
 principal, and shared-principal role assignment uses polynomial matching.
-Other cases use exact search bounded to 131,072 nodes. On exhaustion a
-best-so-far assignment succeeds only if required slots, mode, and bindings hold;
-otherwise verification returns `limit` at `input`. Search uses matching within
+Other cases use exact search bounded two ways: 131,072 nodes and the caller's
+`Context` wall clock. On exhaustion of either bound a best-so-far assignment
+succeeds if required slots, mode, and bindings hold; node exhaustion returns
+`limit` at `input` when nothing satisfies, while deadline exhaustion returns
+the retryable `deadline` at `quorum` — the same call may succeed with a later
+deadline or under less load. Search uses matching within
 each branch, branches on bound candidates and optional occupancy, and prunes
 using the counting unit's upper bound. It checks context cancellation
 and the deadline and yields to the event loop after about 10 ms of search

@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased (next release: 0.3.0, a minor release with breaking changes)
+## Unreleased
+
+## 0.3.0 - October 17, 2026
+
+Upgrade notes for callers: the discovery `Resolution.assertedAlgorithm` is now the normalized JOSE name (`JwsAlgorithm | null`) and an asserted key's `Resolution.algorithm` is the `{jws}` selector, so code matching the raw HTTP token string must compare JOSE names; a cache `fetch` callback may now receive a `validators` option and return a `NotModified` outcome (a callback that ignores both still works); `CoreError.retryable` is `boolean` and `discovery/resolution_failed` is retryable; a first `103` no longer fails a discovery fetch.
 - Re-run the reciprocal exchange against the published RequestSeal for Elixir 0.5.2: both interop peers pin Hex `request_seal == 0.5.2` with the release checksum, the CI reference clone tracks the v0.5.2 tag, and the executed exchange agrees with zero disagreements in every family and both directions (receipt under the project's check records).
 - Move the seven architecture decision records from `docs/adr/` into the maintainer's private record store and state each accepted decision in place in the threat model, mirroring the Elixir repository's relocation; public documents no longer reference the records and no library behavior changed.
 - Add `ddlIndex(table)` to `@request-seal/core/replay-postgres`, the retention-sweep index DDL mirroring the reference `ddl_index/1`: without it the periodic `DELETE ... WHERE retain_until <= now` scans the whole growing table; the table name is additionally bounded to 46 characters so the derived index identifier fits PostgreSQL's 63-byte limit.
