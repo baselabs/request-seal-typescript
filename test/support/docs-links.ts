@@ -45,14 +45,15 @@ export async function checkDocumentationLinks(root = process.cwd()): Promise<{fi
   let links = 0;
   for (const file of files) {
     const source = await readFile(join(root, file), "utf8"), destinations: string[] = [];
-    const visit = (tokens: ReturnType<MarkdownIt["parse"]>) => {
+    // markdown-it 15 exports the class as a value only; derive the instance type.
+    const visit = (tokens: ReturnType<InstanceType<typeof MarkdownIt>["parse"]>) => {
       for (const token of tokens) {
         const destination = token.type === "link_open" ? token.attrGet("href") : token.type === "image" ? token.attrGet("src") : null;
-        if (destination !== null) destinations.push(destination);
+        if (destination !== null) destinations.push(String(destination));
         if (token.children) visit(token.children);
       }
     };
-    const environment: {references?: Record<string, {href: string}>} = {};
+    const environment: Parameters<typeof markdown.parse>[1] = {};
     visit(markdown.parse(source, environment));
     const knownDestinations = new Set(destinations);
     for (const reference of Object.values(environment.references ?? {}))
