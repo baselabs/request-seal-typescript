@@ -1,7 +1,5 @@
 # RequestSeal contributor and agent contract
 
-**Status:** maintained · **Kind:** contract · **Updated:** October 28, 2026 · **Governed by:** public standards and the shared conformance corpus · **Review when:** scope, tests, or package boundaries change
-
 ## Scope
 
 This is a public, framework-independent TypeScript library for HTTP message signatures
@@ -17,24 +15,12 @@ Do not add a server, database, mandatory fetch, global key store, implicit autho
 or fail-open fallback. Do not copy private material, machine paths, personal information,
 or internal work records into public source, package contents, or documentation.
 
-## Workflow (owner ruling, October 28, 2026)
+## Workflow
 
-Process is sized to the risk of the specific change, never the repository. Each check, gate,
-record or review names the failure it prevents.
-
-- **Heavy** when the diff touches signing, verification, signature-base, structured-fields,
-  digest, crypto, JOSE, custody, key-identity, replay or quorum code under `src/`, or the
-  shared corpus under `conformance/`. Write the failing test first, get one independent
-  review and do one fix round, and run the declared local gate (`npm run check`) once before
-  pushing. Heavy pushes need the owner's approval.
-- **Light** for everything else: focused checks on the changed behavior, then push; hosted CI
-  is the gate. No outcome record, gauge or review; the commit message is the record. A light
-  change the owner asked for lands without a separate push approval.
-- Publishing, deploying and pushes to mirrors always need the owner's approval for that action.
-- A test that fails on every run is a defect: fix it, or quarantine it with a reason, in the
-  change that finds it.
-- Update the CHANGELOG when behavior, a dependency or a contract changes; other docs only when
-  a contract changes.
+Make the change, run the tests that cover it, commit with named paths, and push to `main`.
+CI runs once on `main`; if it goes red, fix forward. CI runs `npm run check`; run the parts
+that cover your change. Publishing to npm, deploying and pushes to mirrors need the owner's
+approval. Update the CHANGELOG when behavior, a dependency or a contract changes.
 
 ## Verification
 
@@ -51,9 +37,10 @@ into null-prototype snapshots; reject unknown keys. Branding uses private WeakSe
 
 ## Documents and releases
 
-Non-record Markdown starts with Status, Kind, Updated, Governed by,
-and Review when metadata. The changelog is a record. Public docs explain technical usage
-and maintenance. Keep this contract below 120 lines.
+README, CONTRIBUTING, SECURITY and `docs/` Markdown start with Status, Kind, Updated,
+Governed by, and Review when metadata (`test/docs-contract.test.ts` checks it). The
+changelog is a record. Public docs explain technical usage
+and maintenance.
 
 The package allowlist governs publication. Corpus data and repository tools stay outside
 the tarball. Release tags run the full battery and stage with provenance through the
