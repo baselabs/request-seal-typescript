@@ -85,7 +85,7 @@
     "docs": "node --import ./scripts/typedoc-register.mjs node_modules/typedoc/bin/typedoc --options typedoc.json"
   },
   "devDependencies": {
-    "@types/markdown-it": "14.1.2",
+    "@types/markdown-it": "14.2.0",
     "@types/node": "26.6.5",
     "fast-check": "4.10.2",
     "github-slugger": "2.0.0",
