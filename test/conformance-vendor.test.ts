@@ -353,7 +353,8 @@ test('release vendoring compares extracted index bytes with the resolved commit'
 });
 test('format documentation states the release and override contract', {timeout: 90_000}, async () => {
   const doc = await readFile('docs/reference/corpus-format.md', 'utf8');
-  assert.match(doc, /"elixir_release": "v0\.4\.0"/);
+  const {CORPUS_PIN} = await import('../src/constants.ts');
+  assert.ok(doc.includes(`"elixir_release": "${CORPUS_PIN.tag}"`));
   assert.match(doc, /valid, invalid, or acceptable/);
   assert.match(doc, /unsupported_overrides/);
   const changelog = await readFile('CHANGELOG.md', 'utf8');
