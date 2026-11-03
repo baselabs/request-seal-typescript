@@ -1,0 +1,9 @@
+RequestSeal (TypeScript)
+Copyright 2026 BaseLabs
+
+This product includes software developed by BaseLabs
+(https://github.com/baselabs).
+
+The error vocabulary corresponds to the Elixir RequestSeal reference
+(https://github.com/baselabs/request_seal) at v0.4.0 (commit b239287).
+No Elixir runtime is included or required.
