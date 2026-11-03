@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RequestSeal for Elixir ADR 0005 (the atomic replay envelope) and the shared v0.4.0 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
+**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** the atomic replay envelope and the shared v0.5.2 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
 
 # Replay protection
 
@@ -105,7 +105,7 @@ with multiple nodes, sweep at `now - maxInternodeSkew` without making `now` nega
 
 ## PostgreSQL
 
-Import `{createStore, ddl}` from `@request-seal/core/replay-postgres`.
+Import `{createStore, ddl, ddlIndex}` from `@request-seal/core/replay-postgres`.
 `ddl(table)` returns a Result containing SQL for the caller to execute. Table names
 start with a lowercase ASCII letter, contain lowercase letters, digits, or
 underscores, and occupy 1–63 bytes. The caller owns the database and connections.
@@ -155,17 +155,20 @@ For real database checks, install the isolated driver with
 `npm test`. Without the URL, local PostgreSQL tests print their skip reason; when `CI` is set,
 they fail instead. Cross-language
 checks additionally require `REQUESTSEAL_REPLAY_ELIXIR=1` and dependencies installed
-with `mix deps.get` in `interop/replay`; the peer pins published RequestSeal 0.4.1. Its lock checksum is
-`834b005ddebd610e647c42f934c3120a659b7f316cdf81f9a064037194daef02`.
-The peer and error vocabulary follow v0.4.1; the corpus stays v0.4.0 because
-its index is byte-identical between the tags and v0.4.1 supplied no corpus assets.
+with `mix deps.get` in `interop/replay`; the peer pins published RequestSeal 0.5.2. Its Hex lock checksum is
+`b8632c4cd4ec8ab989cf5d919765c34dbb3a2774939a0e3e7f104f329558229b`.
+The error vocabulary and released corpus also pin v0.5.2; see
+[reciprocal interoperability](reciprocity.md#pins-and-ci).
 
-`ddl()` preserves the reference table definition byte for byte. For a large table,
-the caller may add an index on `retain_until`; otherwise retention sweep scans the
-table. Index creation remains caller-owned.
+`ddl()` preserves the reference table definition byte for byte.
+`ddlIndex(table)` returns a Result containing a `retain_until` index statement.
+Its table name is limited to 46 characters so the derived index name fits
+PostgreSQL's 63-byte identifier bound. Execute both through your migration tool;
+the library creates neither automatically. Without the index, retention sweeps
+scan the table.
 
 A caller abort during the replay stage reports nonretryable `store_timeout`, since
 the claim may already have committed. An abort during an earlier verification stage
 reports the retryable `custody/deadline_exceeded` deadline.
 
-The cross-language replay check runs only when `REQUESTSEAL_REPLAY_ELIXIR=1` and an Elixir toolchain are present. The main CI workflow does not enable this opt-in replay check.
+The cross-language replay check runs only when `REQUESTSEAL_REPLAY_ELIXIR=1` and an Elixir toolchain are present. The main CI workflow enables this check in its `reciprocal` job.

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 discovery behavior, RFC 7517, RFC 7638, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
+**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** RFC 7517, RFC 7638, the public discovery API, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
 
 # Discovery
 
@@ -61,8 +61,12 @@ output and requires the final block to end at the trailer before runtime inflati
 Default lookup IDs are RFC 7638 thumbprints; a supplied `kid` must match.
 Explicit `keyId: "directory"` supports assigned JWKS/CIMD IDs and preserves
 thumbprints for revocation. Directory proof sources require thumbprint mode.
-`alg`, when supplied, is an HTTP algorithm token, such as `ed25519`, rather than
-a JOSE selector. Private, malformed, duplicate eligible, and unsupported keys
+A JWK `alg` may use either a supported JOSE name (such as `EdDSA` or `RS256`)
+or its HTTP registry spelling. Import normalizes it once to a JOSE name. Keys
+asserting unsupported algorithms, or well-formed keys of unsupported types or
+curves, are skipped; every listed key still counts toward `maxKeys`. An empty
+eligible set remains valid but resolves no keys. Private members, malformed
+keys, non-string `alg` assertions other than null, and duplicate eligible IDs
 reject the set. Expired, future, revoked, and verification-incompatible keys
 are excluded before ID uniqueness is checked.
 
@@ -76,8 +80,10 @@ Key sets and resolutions are frozen and separately branded. They retain source
 type, location, normalized origin, fetch/expiry times, proof status and a SHA-256
 revision over decoded key-resource bytes. `lookup()` rejects stale keys and
 selects only a compatible HTTP or explicit JOSE algorithm from the caller's allowlist.
-An asserted HTTP `alg` must match exactly; an unstamped key may bind an explicit
-JOSE choice. HMAC public keys remain forbidden.
+An asserted algorithm must match after registry normalization; an allowlisted
+HTTP token and its equivalent JOSE selection can resolve the same asserted key.
+An unstamped key may bind any compatible allowlisted choice. HMAC public keys
+remain forbidden.
 `Discovery.resolver(snapshot, {algorithms, clock?})` returns a Result containing an async
 bridge that accepts `keyid` and returns only the algorithm and public key. `clock`
 returns integer Unix seconds; pass the policy's freshness clock so both checks use one
@@ -146,8 +152,31 @@ are tried before IPv4, keeping resolver order within each family; duplicates are
 removed before the 64-address bound applies. A host with an unreachable IPv6 route
 spends the deadline on that address first. Context cancellation and deadlines
 destroy owned sockets. Every refusal returns only bounded discovery facts.
-Non-200 statuses map to `unexpected_status` (except the explicit redirect policy).
+Non-200 statuses map to `unexpected_status`, except for permitted redirects and
+conditional 304 responses described below.
 5xx are retryable; 4xx are not. The rule comes from the pinned status call site.
+
+Up to four interim 1xx responses may precede the final response. A fifth interim
+response or a 101 protocol switch returns `unexpected_status`. Authoritative
+NXDOMAIN across the selected resolver queries returns nonretryable
+`domain_not_found`; other DNS failures return retryable `resolution_failed`.
+
+## Conditional revalidation
+
+`Discovery.fetch` fetches unconditionally.
+`Discovery.fetchWithValidators(source, etag, storedLifetime, options)` sends
+`If-None-Match` and returns either a `KeySet` or a branded `NotModified` outcome.
+A 304 renews the stored set using its freshness directives, or retains
+`storedLifetime` when none are present. A changed ETag on a 304 rejects with
+`invalid_response`; validators never cross redirects. ETags are bounded to
+512 bytes.
+
+A cache fetch callback receives `{context, clock, timeoutMs, validators?}`. To
+enable conditional revalidation, forward a present `validators.etag` and
+`validators.lifetime` to `fetchWithValidators`; otherwise call `fetch`. The cache
+withholds validators if any stored key has expired, and CIMD sources always
+fetch unconditionally because a metadata 304 cannot renew a nested key set.
+See the [complete cache wiring](../guides/key-discovery.md#fetching-over-https-on-node).
 
 ## Caller-owned cache
 
@@ -205,9 +234,12 @@ bounded to `maxBytes * 16 + 32768`; chunk-size lines are limited to 1,024 bytes.
 Snapshots require the source's fetch media type. Cache snapshot refresh rejects
 future `fetchedAt` values against the cache clock and values below the per-source high-water mark.
 Fetched sets are checked and stored against the clock passed to that fetch:
-`resolve({clock})` uses the caller clock, and `refresh(source)` uses the cache
-clock. A shared fetch uses its initiating caller's clock. Future-dated fetch
-results are refused against that same clock.
+direct `cache.resolve(source, keyId, {clock})` uses the caller clock, while
+`refresh(source)` uses the cache clock. A shared direct fetch uses its initiating
+caller's clock. The `Discovery.resolver({cache, source}, {algorithms, clock})`
+bridge instead keeps fetching, storage, and entry expiry on the cache clock;
+its resolver clock checks only whether the returned key is fresh. Future-dated
+fetch results are refused against the selected fetch clock.
 No-store responses, expiry and invalidation retain that mark, preventing an older
 snapshot from restoring rotated-out keys. Snapshot construction already caps
 expiry at fetch time plus `maxTtl`. Body parsing is internal; use `Discovery.resolver.fromSnapshot`.

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** design · **Updated:** October 14, 2026 · **Governed by:** the RequestSeal for Elixir 0.4.1 threat model, WebCrypto, public standards, and executed boundary tests · **Review when:** a trust boundary, profile, adapter, data shape, custody mechanic, or runtime behavior changes
+**Status:** maintained · **Kind:** design · **Updated:** November 3, 2026 · **Governed by:** the public security invariants, the pinned Elixir peer, WebCrypto, public standards, and executed boundary tests · **Review when:** a trust boundary, profile, adapter, data shape, custody mechanic, or runtime behavior changes
 
 # RequestSeal threat model
 
@@ -65,7 +65,7 @@ RequestSeal cannot establish that a caller's trust anchors, proxy configuration,
 
 # TypeScript boundaries
 
-The invariants above hold in this package through the mechanisms below. Each is a decision a maintainer must not undo by accident, so each names the code that enforces it and the tests that fail without it. The reasoning behind each accepted decision is retained in the maintainer's private record store.
+The invariants above hold in this package through the mechanisms below. Each is a decision a maintainer must not undo by accident, so each names the code that enforces it and the tests that fail without it. The explanations and test references below describe the public implementation boundaries.
 
 ## The WebCrypto boundary
 

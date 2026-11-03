@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** policy · **Updated:** October 14, 2026 · **Governed by:** the public error contract · **Review when:** reporting channels or security boundaries change
+**Status:** maintained · **Kind:** policy · **Updated:** November 3, 2026 · **Governed by:** the public error contract · **Review when:** reporting channels or security boundaries change
 
 # Security
 
@@ -10,11 +10,12 @@ Include the affected versions and a reproduction. Avoid private keys or live cre
 
 | Version | Security fixes |
 | --- | --- |
-| 0.2.x | Yes |
-| 0.1.0 | No; upgrade to 0.2.x |
+| 0.4.x | Yes; use the latest patch |
+| 0.3.x and earlier | No; upgrade to 0.4.x |
 
-Fixes ship in the latest 0.2.x release. 0.1.0 was published manually without
-provenance and predates the 0.4.1 parity and hardening in 0.2.0.
+Security fixes ship in the current 0.4.x line. Check the [changelog](CHANGELOG.md)
+for changes before upgrading. Version 0.1.0 was published manually without
+provenance; trusted publishing began with 0.2.0.
 
 ## Verifying a release
 

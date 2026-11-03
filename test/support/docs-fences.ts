@@ -88,6 +88,9 @@ export async function executeFence(fence: Fence, trailingSource = ""): Promise<s
     await writeFile(join(directory, "package.json"), JSON.stringify({type: "module", dependencies: {"@request-seal/core": "*"}}));
     await mkdir(join(directory, "node_modules/@request-seal"), {recursive: true});
     await symlink(process.cwd(), join(directory, "node_modules/@request-seal/core"), "dir");
+    // Framework examples use normal package imports, just as consumers do.
+    for (const name of ["express", "fastify"])
+      await symlink(resolve("interop/adapters/node_modules", name), join(directory, "node_modules", name), "dir");
     const program = join(directory, "example.ts");
     await writeFile(program, (fence.completeSource ?? fence.source) + trailingSource);
     const command = fence.runtime === runtime ? process.execPath : fence.runtime;

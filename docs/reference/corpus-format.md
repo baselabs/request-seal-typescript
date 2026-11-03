@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** the shared RequestSeal corpus contract · **Review when:** manifest schema or canonical serialization changes
+**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** the shared RequestSeal corpus contract · **Review when:** manifest schema or canonical serialization changes
 
 # Conformance corpus format
 
@@ -7,7 +7,7 @@ The Elixir and TypeScript implementations consume the same corpus. Source bytes 
 ## Layout and integrity
 
 ```text
-corpus/
+conformance/
   index.json
   sources/<origin>/...
   cases/<surface>/<case-id>.json
@@ -22,7 +22,7 @@ Every source and case file is listed once, sorted by path, with a lowercase hexa
 ```json
 {
   "format": "request-seal-conformance-corpus-index/1",
-  "elixir_release": "v0.4.0",
+  "elixir_release": "v0.5.2",
   "files": [{"path": "cases/signature_base/rfc9421-b2-1.json", "sha256": "<64 lowercase hex digits>"}],
   "cases": [{"id": "signature_base/rfc9421-b2-1", "manifest": "cases/signature_base/rfc9421-b2-1.json", "surface": "signature_base.build", "class": "byte_exact"}],
   "known_positive": "signature_base/rfc9421-b2-1"
@@ -197,7 +197,7 @@ empty content. Transport declarations default to unknown, with declared evidence
 
 ## Released batch inventory
 
-The `v0.4.0` corpus uses `request-seal-conformance-batch/1` with
+The pinned `v0.5.2` corpus uses `request-seal-conformance-batch/1` with
 `class: "mixed"`, source identity, evidence class, and `batch` containing
 `file`, `item_format`, `count: {int}`, and `not_applicable: {int}`. The index
 repeats both counts. The loader enumerates the source independently, verifies
@@ -225,7 +225,7 @@ The inventory understands Wycheproof group/test layouts for AES-GCM, RSA-OAEP,
 Ed25519, and ECDSA. An unfamiliar item format or source layout is reported as pending; its declared
 counts remain visible and pending permission still requires an allowlisted entry.
 Ed25519 and ECDSA execute on `crypto.verify`; AES-GCM and RSA-OAEP execute custodian-side primitive stages through the `jwe.decrypt` batch adapters. All four JOSE single-case surfaces are registered. Counts and override references are validated even when pending.
-See the [published format contract](https://github.com/baselabs/request_seal/blob/v0.4.0/docs/reference/corpus-format.md)
+See the [published format contract](https://github.com/baselabs/request_seal/blob/v0.5.2/docs/reference/corpus-format.md)
 for the complete surface and batch semantics.
 
 Message validation constructs the message and appended fields first, then applies

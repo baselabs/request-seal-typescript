@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
 
 # HTTP and custody adapters
 
@@ -373,7 +373,8 @@ that it does not pass through. The live test discovers the agent's acceptance
 boundary with bounded real signing calls, checks both refusal surfaces, and
 verifies that the next sign succeeds. No specific boundary count is required.
 See [the v0.4.1 custodian](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/custody/ssh_agent.ex).
-The shared corpus remains v0.4.0, unchanged between these releases.
+The current corpus and reciprocal peer pin v0.5.2; the v0.4.1 links above
+are historical source references, not the current interoperability pin.
 
 A public key the agent does not hold at construction, an agent failure reply, or a
 returned signature that fails local verification returns custodian_rejected; removed

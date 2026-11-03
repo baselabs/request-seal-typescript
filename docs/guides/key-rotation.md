@@ -1,8 +1,8 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 7517, RFC 7638, and the executed examples in this guide · **Review when:** key resolution, discovery snapshots, or custody contracts change
+**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** RFC 9421, RFC 7517, RFC 7638, and the executed examples in this guide · **Review when:** key resolution, discovery snapshots, or custody contracts change
 
 # Rotating keys
 
-You will replace a sender's signing key without a moment where valid requests fail. The pattern is the same whether you configure keys yourself or learn them from a published key set: accept both keys for an overlap period, move the sender to the new key, then stop accepting the old one.
+An overlap period lets you replace a sender's signing key while receivers continue accepting requests signed with either key. The pattern is the same whether you configure keys yourself or learn them from a published key set: accept both keys for an overlap period, move the sender to the new key, then stop accepting the old one.
 
 ## Rotate configured keys
 
@@ -59,7 +59,7 @@ Practical notes:
 
 ## Rotate published keys
 
-When a sender publishes its keys as a JWKS or a key directory, the publisher adds the new key, waits, then removes the old one. Each snapshot you build reflects what the publisher listed when you fetched it, so a refreshed snapshot that no longer lists a key stops resolving it. Keys in a published set are selected by RFC 7638 thumbprint.
+When a sender publishes its keys as a JWKS or a key directory, publish both keys before switching the sender. Wait for receivers to refresh, allowing for their configured maximum cache lifetime. After switching, retain the old public key for the maximum signature acceptance window plus clock skew, then remove it. For a compromised key, revoke it immediately instead of following the overlap procedure. Each snapshot you build reflects what the publisher listed when you fetched it, so a refreshed snapshot that no longer lists a key stops resolving it. Keys in a published set are selected by RFC 7638 thumbprint.
 
 ```ts
 import assert from "node:assert/strict";
@@ -90,7 +90,7 @@ assert.ok(!retired.ok && retired.error.kind === "discovery" && retired.error.rea
 assert.ok((await after.lookup(nextThumbprint, ["ed25519"], now + 1)).ok);
 ```
 
-A snapshot is served only until its cache lifetime ends, so an old key disappears no later than the publisher's `max-age` after removal. To stop trusting a key at once, even while the publisher still lists it, use the cache's `remove(source, thumbprint)` or the source's `revoked` option; both are described in [revoking and removing keys](key-discovery.md#revoking-and-removing-keys). A caller-owned cache also refuses an older snapshot than one it already holds, so a stale copy cannot bring a retired key back.
+A snapshot is served only until its effective lifetime ends. Removing a key from the publisher does not revoke snapshots receivers already hold: they may continue accepting that key until the earlier of snapshot expiry, key expiry, or an explicit local removal. Freshness is capped by source policy; when the response supplies no freshness, the source's fallback TTL applies. To stop trusting a key at once, even while the publisher still lists it, use the cache's `remove(source, thumbprint)` or the source's `revoked` option; both are described in [revoking and removing keys](key-discovery.md#revoking-and-removing-keys). A caller-owned cache also refuses an older snapshot than one it already holds, so a stale copy cannot bring a retired key back.
 
 ## Where to go next
 

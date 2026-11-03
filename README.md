@@ -1,8 +1,8 @@
-**Status:** maintained · **Kind:** overview · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9530, the Web Bot Auth protocol draft, and the executed examples in this file · **Review when:** package scope, installation, or the public API changes
+**Status:** maintained · **Kind:** overview · **Updated:** November 3, 2026 · **Governed by:** RFC 9421, RFC 9530, the Web Bot Auth protocol draft, and the executed examples in this file · **Review when:** package scope, installation, or the public API changes
 
-# RequestSeal
+# RequestSeal for TypeScript
 
-RequestSeal signs and verifies HTTP messages ([RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html)) and compact JOSE tokens in TypeScript, for services and clients that need to know who sent a request and that its bytes arrived unchanged. It uses WebCrypto, has no runtime dependencies, and runs on Node, Deno, and Bun.
+RequestSeal signs and verifies HTTP messages ([RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html)) and compact JOSE tokens in TypeScript. You choose trusted keys, required coverage, freshness, body integrity, and replay rules. Verification reports what those checks establish; your application decides access. The package uses WebCrypto, has no runtime dependencies, and runs on Node, Deno, and Bun.
 
 ## Install
 
@@ -10,13 +10,26 @@ RequestSeal signs and verifies HTTP messages ([RFC 9421](https://www.rfc-editor.
 npm install @request-seal/core
 ```
 
-See [CHANGELOG.md](CHANGELOG.md) for published versions and unreleased changes. The package is ESM. It needs Node 22.12.0 or newer, and the core API also runs on Deno and Bun (see Compatibility below). In TypeScript, use `nodenext` or `bundler` module resolution so subpath imports such as `@request-seal/core/fetch` resolve. Complete programs generate keys, close their loopback servers, and assert results; the labeled verification excerpts need the setup in their expanded programs.
+The package is ESM and requires Node 22.12.0 or newer. The core also runs on Deno and Bun; see [compatibility](#compatibility) for tested versions and adapter limits. In TypeScript, use `nodenext` or `bundler` module resolution so subpath imports resolve. See the [changelog](CHANGELOG.md) before upgrading.
 
 Save a complete program as `example.ts` in a project whose `package.json` has `"type": "module"`. On Node 22, run `node --experimental-strip-types example.ts`; on Node 24 and later, run `node example.ts`. For programs marked Deno, run `deno run --allow-read --allow-net=127.0.0.1,jsr.io example.ts`; for Bun, run `bun run example.ts`.
 
+The complete programs generate their own keys, assert accepted and rejected outcomes, and close their test servers. Assertions passing without an error means the program succeeded. The short verification excerpts need the setup in their expanded programs.
+
+| Your task | Start here |
+| --- | --- |
+| Learn the core API without a server | [Getting started](docs/guides/getting-started.md) |
+| Sign an outgoing request | [Fetch](docs/guides/fetch.md) |
+| Verify on Node, Express, or Fastify | [Node HTTP](docs/guides/node-http.md) |
+| Verify an agent or crawler | [Web Bot Auth](docs/guides/web-bot-auth.md) |
+| Reject repeated requests across instances | [Replay protection](docs/guides/replay-protection.md) |
+| Sign or encrypt compact tokens | [JOSE](docs/guides/jose.md) |
+
 ## Sign a request
 
-`signedFetch` is `fetch` plus a signature. It signs every attempt afresh, so a retry is never a replay.
+`signedFetch` signs the request before sending it. Redirects and retries are off by default; enabling retries requires an idempotent operation or application deduplication. Retries can repeat application effects even when the receiver enforces nonce replay protection.
+
+This program sends a bodyless GET to a local server that echoes the signature header. It demonstrates signing and delivery; the next example verifies a signature.
 
 ```ts
 import assert from "node:assert/strict";
@@ -26,9 +39,10 @@ import { signedFetch } from "@request-seal/core/fetch";
 const key = await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) });
 const server = createServer((req, res) => res.end(String(req.headers["signature-input"]))).listen(0, "127.0.0.1");
 await new Promise((ready) => server.once("listening", ready));
-const spec = { label: "sig", components: '("@method" "@authority" "@path")', algorithm: "hmac-sha256", expiresIn: 60 };
+const spec = { label: "sig", components: '("@method" "@scheme" "@authority" "@path")', algorithm: "hmac-sha256", expiresIn: 60 };
 const sent = await signedFetch(`http://127.0.0.1:${(server.address() as { port: number }).port}/reports`, { method: "GET" }, { spec, signer: key.ok ? key.value : assert.fail() });
-assert.ok(sent.ok && (await sent.value.response.text()).startsWith('sig=("@method" "@authority" "@path")')); server.close();
+assert.ok(sent.ok && (await sent.value.response.text()).startsWith('sig=("@method" "@scheme" "@authority" "@path")')); server.close();
+if (key.ok) await key.value.release();
 ```
 
 Next: [getting started](docs/guides/getting-started.md) for a core sign/verify round trip, or [Node HTTP](docs/guides/node-http.md) for server verification. The Fetch adapter cannot verify `@path`; see the [Fetch guide](docs/guides/fetch.md#verify-incoming-requests).
@@ -57,13 +71,13 @@ assert.ok(!rejected.ok && rejected.error.kind === "core" && rejected.error.reaso
 
 `content: "not_required"` skips body digest checks; `replay: "not_required"` allows repeated signatures within their freshness window. These local test programs use unsigned snapshots with `requireSignedDirectory: false`; production directories should keep the signed-directory default. See the [signed directory program](docs/guides/web-bot-auth.md).
 
-Each verification excerpt below is at most fifteen lines and matches the code between the `----` markers in its complete runnable program. The documentation check compares the two byte-for-byte, so edits cannot silently drift. Expand the program to see key generation, the caller-owned offline directory snapshot, and signed and unsigned requests with asserted outcomes.
+Expand either verification excerpt for a complete program with key generation, a caller-owned directory snapshot, and assertions for signed and unsigned requests.
 
 ### Express
 
 This GET route accepts bodyless requests. `captureRequest` runs first so the exact request line, headers, and body are kept before any parser touches them. See [Node HTTP](docs/guides/node-http.md) for Fastify, proxies, and body parsers.
 
-In your project, run `npm install express` and use `import express from "express";`. Replace the complete program's `createRequire` setup with that import; it loads the repository's pinned dependency only for these executable examples.
+Install Express with `npm install express`. It is your application's dependency.
 
 Verification excerpt (14 lines):
 
@@ -93,13 +107,11 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { generateKeyPairSync } from "node:crypto";
 import { createServer } from "node:http";
-import { createRequire } from "node:module";
+import express from "express";
 import { Custody, Discovery, DiscoverySource, Message, PublicKey, WebBotAuth, ok, type AgentRequest, type Result } from "@request-seal/core";
 import { captureRequest, verifyWebBotAuth } from "@request-seal/core/node-http";
 
 const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
-// In your project: import express from "express". This repository loads the version its tests pin.
-const express = createRequire(new URL("../../interop/adapters/package.json", import.meta.url))("express");
 const now = () => Math.floor(Date.now() / 1000);
 
 // Test-only unsigned local snapshot. In production, keep the signed-directory default.
@@ -360,12 +372,14 @@ For core `agent_unresolved`, `timeout` and `source_unavailable` map to 503; `unt
 | Hono on Deno | `WebBotAuth.verify` | The Hono program above. |
 | PostgreSQL replay store, with `pg` 8.23.1 | `@request-seal/core/replay-postgres` | A real PostgreSQL 18 server in CI. |
 | OpenSSH agent custody | `@request-seal/core/custody-ssh-agent` | A real `ssh-agent`, with signatures checked by OpenSSL. |
-| RequestSeal for Elixir 0.4.1 | HTTP and JWS algorithms, JWE, Web Bot Auth directories, replay claims | A two-way exchange in CI. |
+| RequestSeal for Elixir 0.5.2 | HTTP and JWS algorithms, JWE, Web Bot Auth directories, replay claims | A [two-way exchange](docs/reference/reciprocity.md) in CI. |
 | `http-message-signatures` 1.0.6 | RFC 9421 wire format | The [migration guide](docs/guides/migrating-from-http-message-signatures.md) tests. |
 
 ## Security
 
-RequestSeal reports what was cryptographically established and nothing more: the verified bytes, the key that signed them, and the trusted source of that key. It does not authorize anything. Private keys stay behind custody handles, and no error, log view, or serialization carries key material, stack traces, or caller bytes. Inputs are bounded in size, depth, and time, every operation takes a deadline, and discovery and replay run only where you configure them. Report a vulnerability privately through [GitHub security advisories](https://github.com/baselabs/request-seal-typescript/security/advisories/new); see [SECURITY.md](SECURITY.md) and the [threat model](docs/design/threat-model.md).
+RequestSeal reports the checks your policy required. Generic verification returns an unattributed principal; Web Bot Auth can attribute a configured agent or held key. A signed header does not authenticate a body unless your policy requires and checks its digest. Freshness alone does not prevent replay. No verification authorizes an application action.
+
+Private keys stay behind custody handles. Errors carry bounded reasons without raw inputs or callback diagnostics. Default result views redact key material and signature parameters; explicit payload, plaintext, and verification serializers expose their documented data. Inputs and asynchronous work have bounds, and discovery and replay run only where you configure them. Report vulnerabilities through [GitHub private vulnerability reporting](https://github.com/baselabs/request-seal-typescript/security/advisories/new); see [SECURITY.md](SECURITY.md) and the [threat model](docs/design/threat-model.md).
 
 ## Guides
 
@@ -386,8 +400,20 @@ API: [generated reference](https://baselabs.github.io/request-seal-typescript/).
 
 Reference: [glossary](docs/reference/glossary.md), [error reasons](docs/reference/errors.md), [signing and verification](docs/reference/sign-and-verify.md), [adapters](docs/reference/adapters.md), [Web Bot Auth](docs/reference/web-bot-auth.md), [replay](docs/reference/replay.md), [discovery](docs/reference/discovery.md), [JOSE](docs/reference/jose.md), [wire APIs](docs/reference/wire.md), [multiple signatures](docs/reference/quorum.md), [extension profiles](docs/reference/profiles.md), [error parity](docs/reference/error-parity.md), [telemetry](docs/reference/telemetry.md), and [corpus format](docs/reference/corpus-format.md). Design record: the [threat model](docs/design/threat-model.md). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+### Package entry points
+
+| Import | Purpose |
+| --- | --- |
+| `@request-seal/core` | Portable messages, policies, signatures, JOSE, discovery snapshots, replay, and telemetry |
+| `@request-seal/core/fetch` | Fetch signing; verification only on the measured Deno version |
+| `@request-seal/core/node-http` | Node HTTP/1 and HTTP/2 clients, capture, and verification |
+| `@request-seal/core/node-hasher` | Incremental SHA-2 hashing using Node's crypto module |
+| `@request-seal/core/discovery-node` | Bounded HTTPS key retrieval on Node |
+| `@request-seal/core/replay-postgres` | Replay claims over your PostgreSQL query function |
+| `@request-seal/core/custody-ssh-agent` | Signing through an agent you start and configure |
+
 ## Compatibility
 
 The core runs on Node 22.12.0, 22.23.1, 24.21.0, and 26.11.1, Deno 2.5.6, and Bun 1.3.14. Fetch signs on those runtimes, but Fetch verification supports only Deno 2.5.6. HTTPS discovery requires Node; use caller-owned snapshots elsewhere. In browsers (Chromium 156.0.8078.4, Firefox 157.0, WebKit 27.2), the Fetch adapter signs only. Core `verify` checks a caller-built `Message` under an explicit policy without using the Fetch adapter. See the [runtime matrix](docs/reference/runtime-matrix.md) for exact tested versions, permissions, and limitations.
 
-Crypto, custody, and error vocabulary follow RequestSeal for Elixir 0.4.1; conformance uses its byte-preserved 0.4.0 corpus. See [the corpus pin](CONTRIBUTING.md) and [replay protection](docs/reference/replay.md).
+The error vocabulary, reciprocal peer, and released corpus are pinned to RequestSeal for Elixir 0.5.2. Its corpus source and case files retain the v0.4.0 bytes; the index records the newer release. See [the corpus pin](CONTRIBUTING.md) and [reciprocal interoperability](docs/reference/reciprocity.md).

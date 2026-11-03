@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RequestSeal for Elixir 0.4.1 crypto and custody behavior, RFC 9421, RFC 9530, and the shared conformance corpus · **Review when:** signing, policy, digest, or verification contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** the public crypto and custody API, RFC 9421, RFC 9530, and the shared conformance corpus · **Review when:** signing, policy, digest, or verification contracts change
 
 # Signing and verification
 
@@ -175,5 +175,6 @@ fields, JWS, adapters, and SignatureBase keep their fixed limits.
 
 Source: [RequestSeal for Elixir 0.4.1 crypto](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/crypto.ex)
 and [custody](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/custody.ex).
-The error vocabulary pin is v0.4.1; the shared corpus remains v0.4.0 because its
-index is byte-identical across the tags and v0.4.1 supplied no corpus assets.
+These links describe when the byte-bound API was introduced. The current
+error vocabulary and corpus both pin v0.5.2; see
+[error parity](error-parity.md) and [the corpus pin](../../CONTRIBUTING.md).

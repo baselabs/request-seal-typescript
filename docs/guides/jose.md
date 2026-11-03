@@ -1,10 +1,10 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, RFC 8725, and the executed examples in this guide · **Review when:** JOSE policies or custody boundaries change
+**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, RFC 8725, and the executed examples in this guide · **Review when:** JOSE policies or custody boundaries change
 
 # Signed and encrypted tokens (JOSE)
 
 The JOSE API signs and encrypts compact tokens: `JWS` for signatures, `JWE` for encryption, and `Nested` for a signed token inside an encrypted one. It follows [RFC 7515](https://www.rfc-editor.org/rfc/rfc7515.html) and [RFC 7516](https://www.rfc-editor.org/rfc/rfc7516.html), and it takes the same position as the HTTP side: you state what you accept, and nothing in the token chooses an algorithm or a key. The [JOSE reference](../reference/jose.md) lists every option and bound.
 
-RequestSeal checks that a token is authentic and unmodified. It does not read JWT claims, so it does not check `iss`, `aud`, or `exp` for you. Do that after a successful verify, following [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html).
+JWS verification checks a signature over the payload. JWE decryption checks ciphertext integrity for the selected recipient; anyone with that recipient's public encryption key can create a JWE, so decryption alone does not identify a sender. Neither operation reads JWT claims, so it does not check `iss`, `aud`, or `exp` for you. Do that after a successful verify, following [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html).
 
 ## Policies are explicit
 

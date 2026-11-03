@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
+**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
 
 # Contributing
 
@@ -7,26 +7,28 @@ local tests print a skip reason when it is absent, and CI requires it. The OpenS
 
 ```sh
 npm ci --ignore-scripts
+npm ci --prefix interop --ignore-scripts
+npm ci --prefix interop/adapters --ignore-scripts
 npm run check
 ```
 
 `npm run check` runs, in order: `typecheck`, `typecheck:web`, `build`, `test`, `self-checks`, `conformance`, and `pack:check`. CI also runs `npm run docs` and the migration claims test after `npm ci --prefix interop/migration --ignore-scripts`: `node --experimental-strip-types --no-warnings --test interop/migration/claims.test.ts`. Build the [API reference](https://baselabs.github.io/request-seal-typescript/) locally with `npm run docs` and open `site-dist/index.html`; warnings fail the build.
 
-Write behavior tests before implementation and retain the failing and passing output. Use `node:test` and fast-check properties. Test actual cryptography and published vectors; no substitutes for an external peer. `npm run test:red` deliberately fails and verifies the runner's exit status.
+Write behavior tests before implementation and verify that they fail before the fix and pass afterward. Use `node:test` and fast-check properties. Test actual cryptography and published vectors; no substitutes for an external peer. `npm run test:red` deliberately fails and verifies the runner's exit status.
 
-Keep the core independent of Node modules and runtime dependencies. Regenerate `docs/reference/error-parity.md` in place with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 0a6568aa246326617f760e94e21b359285c6ddfc <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-0a6568a.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
+Keep the core independent of Node modules and runtime dependencies. Regenerate `docs/reference/error-parity.md` in place with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 53b6690ccd5036d58b280d08cf0cacc6427262fe <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-53b6690.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
 
-The shared corpus in `conformance/` is pinned to RequestSeal `v0.4.0`, commit `b2392871933d99641a7cb2ca2726aefd20081dee`, index SHA-256 `f37435eca377666ab45c2b8f580287263145268e03d9224c76e324e4afaded6f`. Shared corpus updates preserve upstream bytes and expectations. With network access, reproduce that byte copy with:
+The shared corpus in `conformance/` is pinned to RequestSeal `v0.5.2`, commit `53b6690ccd5036d58b280d08cf0cacc6427262fe`, index SHA-256 `ceb30bf713a6e34e6a15847b658a618d8f7568ee6a6c07bfbbf58fa5d143995e`. Shared corpus updates preserve upstream bytes and expectations. With network access, reproduce that byte copy with:
 
 ```sh
-node --experimental-strip-types --no-warnings scripts/vendor-corpus.ts v0.4.0
+node --experimental-strip-types --no-warnings scripts/vendor-corpus.ts v0.5.2
 ```
 
 For a pin move, run the same command with the new tag and `--update-pin`. It verifies the release asset checksum, archive paths, inventory digests, release commit, and index digest, then replaces the corpus and updates `src/constants.ts` together. Review both in one change; never regenerate expectations.
 
 `npm run conformance` runs the independently pinned smoke corpus and the released corpus with `--pending-ok`. Pending entries name the surface, optional item format, case IDs, case count, and asserted item count. Listed items tie out as executed plus not applicable plus runtime limited plus pending. A pending known-positive case stays explicitly unexecuted. The release workflow runs the released corpus without that flag, requiring every surface, every asserted item, and the known-positive case to execute successfully. Integrity failures and disagreements always fail, including with `--pending-ok`. Keep the corpus outside the npm tarball. Releases run the complete CI matrix before staging a provenance-bearing package; approval on npmjs.com completes publication.
 
-The package uses ESM with declaration exports. Use a modern TypeScript module resolver (`nodenext` or `bundler`); `node10` resolution cannot resolve future subpath declaration exports.
+The package uses ESM with declaration exports. Use a modern TypeScript module resolver (`nodenext` or `bundler`); `node10` resolution cannot resolve the package's subpath declaration exports.
 
 ## Runtime test compatibility
 

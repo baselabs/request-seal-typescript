@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** AGENTS.md, the shared conformance corpus, and the executed examples in this guide · **Review when:** an advertised capability, test runner, or evidence source changes
+**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** AGENTS.md, the shared conformance corpus, and the executed examples in this guide · **Review when:** an advertised capability, test runner, or evidence source changes
 
 # Testing
 
@@ -99,6 +99,8 @@ Use Node 22.12.0 or newer on macOS or Linux. Windows developers use WSL2. CI run
 
 ```sh
 npm ci --ignore-scripts
+npm ci --prefix interop --ignore-scripts
+npm ci --prefix interop/adapters --ignore-scripts
 npm run check
 ```
 

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** the error vocabulary in `src/errors/parity.ts` and the code that returns each reason · **Review when:** a reason is added, removed, or starts to be returned on a new path
+**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** the error vocabulary in `src/errors/parity.ts` and the code that returns each reason · **Review when:** a reason is added, removed, or starts to be returned on a new path
 
 # Error reasons
 
@@ -17,10 +17,10 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/binding.invalid_verification` | A value passed as a Verification is not one this library produced. | Pass the Verification from `verify` unchanged. |
 | `core/binding.tenant_unbound` | Not returned here. | None. |
 | `core/binding.unattributed` | Not returned here. | None. |
-| `core/content.body_unavailable` | A required digest check, or digest generation while signing, needs body bytes the message does not hold. | Retain the body, pass a `digestState` or `representation`, or stop requiring content on that path. |
+| `core/content.body_unavailable` | A required digest check, or digest generation while signing, needs body bytes the message does not hold. | Supply the required retained bytes, completed digest state, or full representation. Keep required content checks enabled. |
 | `core/content.digest_mismatch` | The recomputed digest differs from the signed one: the body changed. | Reject the request. |
 | `core/content.digest_not_covered` | The policy requires a digest field that the signature does not cover. | The sender must cover `content-digest` (or `repr-digest`). |
-| `core/content.digest_unsupported` | The digest field is missing or malformed, carries an algorithm your policy does not accept, or the hasher failed. | Accept the sender's algorithm, or have the sender use one you accept. |
+| `core/content.digest_unsupported` | The digest field is missing or malformed, carries an algorithm your policy does not accept, or the hasher failed. | Check the field and hasher; have the sender use the digest algorithms your policy requires. |
 | `core/crypto.invalid_signature` | The signature does not verify with the resolved key. | Reject the request. |
 | `core/crypto.signature_base_failed` | An exact-input spec could not build its signature base; `detail` names the base reason. | Fix the `signatureInput` or the message. |
 | `core/crypto.signer_failed` | A signer function threw, returned an error, or returned something other than 1 to 1,024 signature bytes. | Fix the signer function. |
@@ -36,11 +36,11 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/fields.missing_signature` | The message has no `Signature` field. | Ask the sender to sign. |
 | `core/fields.missing_signature_input` | The message has no `Signature-Input` field. | Ask the sender to sign. |
 | `core/fields.no_web_bot_auth_signature` | No signature carries the `web-bot-auth` tag. | Treat the request as unsigned. |
-| `core/fields.unknown_label` | The label you asked for is not on the message. | Ask for the label the sender used. |
+| `core/fields.unknown_label` | The label you asked for is not on the message. | Require the configured label; correct a sender or receiver configuration mismatch out of band. |
 | `core/freshness.created_in_future` | `created` is later than your clock plus `skew`. | Reject; check the sender's clock. |
 | `core/freshness.expired` | `expires` has passed. | The sender signs again. |
 | `core/freshness.invalid_clock` | Your clock callback returned something other than integer Unix seconds in range. | Fix the clock. |
-| `core/freshness.lifetime_exceeded` | `expires` minus `created` exceeds the Web Bot Auth `maxLifetime`. | Reject, or raise `maxLifetime`. |
+| `core/freshness.lifetime_exceeded` | `expires` minus `created` exceeds the Web Bot Auth `maxLifetime`. | Reject; have the sender use the agreed lifetime bound. |
 | `core/freshness.missing_created` | The signature has no `created`, which a policy with `maxAge` needs. | The sender adds `created`. |
 | `core/freshness.missing_expires` | The signature has no `expires`, and your policy requires it. | The sender adds `expires`. |
 | `core/freshness.too_old` | `created` is older than `maxAge` plus `skew`. | The sender signs again. |
@@ -63,19 +63,19 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/negotiation.negotiation_unfulfillable` | Fulfillment could not produce a requested signature: the chooser refused or the signer failed. | Check the chooser and signer. |
 | `core/negotiation.negotiation_unfulfilled` | In `verifyQuorum` with `acceptSignature`, the qualifying signatures do not carry what a request asked for. | The sender signs as requested. |
 | `core/policy.algorithm_mismatch` | The sender's `alg` parameter differs from the resolved key's algorithm. | Reject the request. |
-| `core/policy.algorithm_not_permitted` | The algorithm is not in your policy's `algorithms`. | Reject, or accept the algorithm. |
+| `core/policy.algorithm_not_permitted` | The algorithm is not in your policy's `algorithms`. | Reject; have the sender use an agreed algorithm from your allowlist. |
 | `core/policy.invalid_keyid` | A Web Bot Auth `keyid` is not an RFC 7638 thumbprint. | Reject the request. |
 | `core/policy.missing_required_component` | The signature does not cover a component your policy requires. | The sender covers it. |
 | `core/policy.nested_coverage_incomplete` | An outer Web Bot Auth signature does not cover the inner signature it vouches for. | Reject the request. |
 | `core/policy.test_key_rejected` | The key is a published example key. | Reject; allow only with `testKeys: "allow"` in tests. |
-| `core/policy.unexpected_component` | The signature covers a component that `extraComponents: "reject"` refuses. | Reject, or allow the component. |
-| `core/policy.unexpected_signature` | With `untagged: "reject"`, a signature lacks the `web-bot-auth` tag. | Reject, or use `untagged: "ignore"`. |
+| `core/policy.unexpected_component` | The signature covers a component that `extraComponents: "reject"` refuses. | Reject unexpected coverage; change the policy only when the integration contract changes. |
+| `core/policy.unexpected_signature` | With `untagged: "reject"`, a signature lacks the `web-bot-auth` tag. | Reject unrelated labels under this policy. Ignore them only if your integration explicitly permits them. |
 | `core/quorum.ambiguous_key_identity` | When counting keys, a required slot matched only signatures with no known key identity. | Supply key identities through the resolver. |
 | `core/quorum.deadline` | The caller's wall-clock deadline exhausted the assignment search before a satisfying assignment completed. Retryable. | Retry with a later deadline or under less load. |
 | `core/quorum.binding_unsatisfied` | A nested or same-parameter binding failed. | Reject the request. |
 | `core/quorum.nonqualifying_signature` | With `invalid: "reject"`, a signature failed its slot; `detail` is that slot's reason. | Reject the request. |
 | `core/quorum.quorum_not_met` | Too few qualifying signatures for the mode. | Reject the request. |
-| `core/quorum.unexpected_signature` | With `unexpected: "reject"`, a signature matched no slot. | Reject, or use `unexpected: "ignore"`. |
+| `core/quorum.unexpected_signature` | With `unexpected: "reject"`, a signature matched no slot. | Reject labels outside the quorum contract. |
 | `core/replay.commitment_failed` | Your commitment threw or returned anything but 1 to 256 bytes. | Fix the commitment. |
 | `core/replay.missing_replay_identifier` | Replay protection is required and the signature has no nonce. | The sender adds a nonce. |
 | `core/replay.replayed` | The signature was already used. | Reject the request. |
@@ -121,7 +121,7 @@ Returned by `SignatureBase.build`, and as `detail` of core errors from signing a
 
 | Reason | Meaning | What to do |
 | --- | --- | --- |
-| `signature_base/ambiguous_query_parameter` | `@query-param` names a parameter that appears more than once. | Do not cover that parameter. |
+| `signature_base/ambiguous_query_parameter` | `@query-param` names a parameter that appears more than once. | Reject the ambiguous parameter; agree on unique parameters or cover the complete raw query through a suitable adapter. |
 | `signature_base/duplicate_component` | The component list repeats a component. | Remove the duplicate. |
 | `signature_base/incompatible_parameters` | A component combines `bs` with `sf` or `key`. | Use one form. |
 | `signature_base/invalid_component` | A component identifier is malformed. | Fix the component list. |
@@ -214,14 +214,14 @@ Returned by discovery sources, snapshots, key sets, caches, and the Node transpo
 
 | Reason | Meaning | What to do |
 | --- | --- | --- |
-| `discovery/address_denied` | The host resolves to a private, loopback, or reserved address not in `permittedAddresses`. | Do not fetch it, or permit the exact address. |
+| `discovery/address_denied` | The host resolves to a private, loopback, or reserved address not in `permittedAddresses`. | Reject the destination. Permit an exact address only for a publisher you intentionally configured. |
 | `discovery/ambiguous_key_source` | A client metadata document carries both `jwks` and `jwks_uri`. | Reject the document. |
 | `discovery/cache_overloaded` | The cache is at its source or waiter bound. Retryable. | Retry later or raise the bounds. |
 | `discovery/client_id_mismatch` | A client metadata document's `client_id` differs from its location. | Reject the document. |
 | `discovery/connect_failed` | No connection could be made. Retryable. | Retry later. |
 | `discovery/deadline_exceeded` | The fetch ran out of time. Retryable. | Retry later. |
 | `discovery/directory_signature_invalid` | A key directory's possession proof does not verify. | Reject the directory. |
-| `discovery/directory_unsigned` | A directory has no proof and the source requires one. | Reject, or opt out only for trusted test data. |
+| `discovery/directory_unsigned` | A directory has no proof and the source requires one. | Require the signed proof, or explicitly trust an offline snapshot through a separate trusted channel. |
 | `discovery/invalid_key_set` | The key set is malformed or contains a key the source refuses, such as a private or duplicate key. | Reject the response. |
 | `discovery/invalid_options` | Options are malformed. | Fix the options. |
 | `discovery/invalid_response` | The response is malformed: bad JSON, encoding, cache headers, or framing. | Reject the response. |
@@ -236,7 +236,7 @@ Returned by discovery sources, snapshots, key sets, caches, and the Node transpo
 | `discovery/tls_failed` | The TLS handshake or certificate check failed. | Check the certificate and `cacerts`. |
 | `discovery/transport_unavailable` | `cacerts: "os"` has no usable OS trust store: the runtime lacks the API (Node before 22.15.0), the store is empty, or access is denied. | Supply DER roots in `cacerts`, or run where the system store is available. |
 | `discovery/unexpected_media_type` | The response content type does not match the source type. | Reject, or pass the correct `content-type`. |
-| `discovery/unexpected_status` | The response status was not 200. Retryable for 5xx. | Retry 5xx later; reject 4xx. |
+| `discovery/unexpected_status` | The final status is unsupported, a protocol switch was attempted, or more than four interim responses preceded it. Conditional 304 handling is separate. Retryable for 5xx. | Retry 5xx later; check status and protocol rules for other rejections. |
 | `discovery/unknown_key` | The key set has no fresh, compatible key with that ID. | Reject, or refresh the set. |
 
 ## jose
@@ -250,7 +250,7 @@ Returned by `JWS`, `JWE`, `Nested`, and `KeyManagement`.
 | `jose/crypto.entropy_failure` | The runtime's random generator, or a recipient wrapper, reported an entropy failure. Not marked retryable. | Treat it as a runtime fault and check the runtime. |
 | `jose/crypto.invalid_signature` | The signature does not verify, or is empty. | Reject. |
 | `jose/crypto.signer_failed` | A signer or recipient function failed. | Fix the function. |
-| `jose/input.algorithm_not_permitted` | The token's algorithm is not in your policy. | Reject, or allow it. |
+| `jose/input.algorithm_not_permitted` | The token's algorithm is not in your policy. | Reject; require an algorithm from the configured allowlist. |
 | `jose/input.compression_unsupported` | The header carries `zip`. | Reject. |
 | `jose/input.detached_payload` | The payload is empty or detached. | Reject. |
 | `jose/input.duplicate_member` | The protected header repeats a member. | Reject. |
@@ -269,7 +269,7 @@ Returned by `JWS`, `JWE`, `Nested`, and `KeyManagement`.
 | `jose/key.key_resolver_failed` | Your resolver threw or returned a malformed entry. | Fix the resolver. |
 | `jose/key.unknown_key` | Your resolver returned an error. | Reject. |
 | `jose/nesting.content_type_mismatch` | The outer `cty` is not one of your `content_types`. | Reject. |
-| `jose/nesting.nesting_depth` | The inner token is not a single compact JWS, or the inner JWS carries `cty`. | Reject. |
+| `jose/nesting.nesting_depth` | The inner token is not a single compact JWS, or its `cty` declares another JOSE envelope. Ordinary payload types such as `application/json` are allowed. | Reject. |
 
 ## replay
 
@@ -292,8 +292,8 @@ Returned by the Node HTTP and Fetch adapters. `stage` names the step and `attemp
 | Reason | Meaning | What to do |
 | --- | --- | --- |
 | `adapter/already_verified` | The request was already verified, or verification is in progress. | Read `verification(req)`. |
-| `adapter/body_unavailable` | The body could not be read whole, its length disagrees with `Content-Length`, or a Fetch response policy requires content. | Check framing; on Fetch, use `content: "not_required"` for responses. |
-| `adapter/cross_origin_redirect` | A redirect leaves the origin and is not in `allowedOrigins`. | Add the origin, or do not follow. |
+| `adapter/body_unavailable` | The body could not be read whole, its length disagrees with `Content-Length`, or a Fetch response policy requires content. | Check framing. If response integrity is required, use Node HTTP rather than disabling the digest check on Fetch. |
+| `adapter/cross_origin_redirect` | A redirect leaves the origin and is not in `allowedOrigins`. | Follow only origins your application explicitly trusts; otherwise reject. |
 | `adapter/digest_conflict` | Signing found an existing `Content-Digest` that disagrees. | Remove or fix the existing digest. |
 | `adapter/invalid_options` | Options are malformed, or used in the wrong order. | Fix the call. |
 | `adapter/invalid_request` | The request or URL is not acceptable here: on Fetch, a GET or HEAD with a body, an empty-query URL on Node below 24, or verification on a runtime outside `FETCH_VERIFICATION_RUNTIMES`; on Node, a URL with userinfo or a fragment, a method that is not a token, a value that is not a Node request, or `captureBody` on a request that is already captured. (A GET or HEAD body on the Node client is `invalid_options`.) | Fix the request, or verify on a supported runtime. |
@@ -306,4 +306,4 @@ Returned by the Node HTTP and Fetch adapters. `stage` names the step and `attemp
 | `adapter/signing_failed` | Signing failed. `source` holds the core or custody error when signing returned one, and is null when an unexpected exception was caught. | Map `source` when present; otherwise check the spec and signer. |
 | `adapter/unsupported_component` | Fetch signing covers a field the runtime controls (`host`, `content-length`, `accept-encoding`, `connection`, `transfer-encoding`, `trailer`, `keep-alive`, `proxy-connection`, `te`, `upgrade`, and `sec-fetch-mode` on Node) or a `;tr` component. Node response signing covers `transfer-encoding`, `connection`, `trailer`, `keep-alive`, `proxy-connection`, `te`, or `upgrade`. Fetch verification refuses a policy or signature covering `@request-target`, `@target-uri`, `@path`, `@query`, `cookie`, or a `bs` or `tr` parameter, because Fetch cannot show those bytes as sent. | For signing, cover `@authority` instead of `host` and `content-digest` instead of `content-length`. For verification of those components, use the Node HTTP adapter or core `verify` with a Message built from the wire. |
 | `adapter/unsupported_delivery` | The response cannot be signed as delivered: headers already sent, an informational status, or pending cookies covered. | Sign before writing the response. |
-| `adapter/untrusted_proxy` | The socket peer is not in `trustedProxies`. | Add the proxy, or reject. |
+| `adapter/untrusted_proxy` | The socket peer is not in `trustedProxies`. | Reject. Configure only infrastructure proxies whose addresses and forwarding behavior you control. |
