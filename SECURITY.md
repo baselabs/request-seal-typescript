@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** policy · **Updated:** November 3, 2026 · **Governed by:** the public error contract · **Review when:** reporting channels or security boundaries change
+**Status:** maintained · **Kind:** policy · **Updated:** November 11, 2026 · **Governed by:** the public error contract · **Review when:** reporting channels or security boundaries change
 
 # Security
 
@@ -10,12 +10,18 @@ Include the affected versions and a reproduction. Avoid private keys or live cre
 
 | Version | Security fixes |
 | --- | --- |
-| 0.4.x | Yes; use the latest patch |
-| 0.3.x and earlier | No; upgrade to 0.4.x |
+| 0.5.x | Yes; use the latest patch |
+| 0.4.x and earlier | No; upgrade to 0.5.x. Releases affected by a published advisory are deprecated on npm |
 
-Security fixes ship in the current 0.4.x line. Check the [changelog](CHANGELOG.md)
+Security fixes ship in the current 0.5.x line. Check the [changelog](CHANGELOG.md)
 for changes before upgrading. Version 0.1.0 was published manually without
 provenance; trusted publishing began with 0.2.0.
+
+## Published advisories
+
+| Advisory | Affected | Fixed | Summary |
+| --- | --- | --- | --- |
+| [GHSA-wqp2-3rvg-936p](https://github.com/baselabs/request-seal-typescript/security/advisories/GHSA-wqp2-3rvg-936p) | 0.4.0 and earlier | 0.5.0 | Web Bot Auth required replay could accept a captured request again after relabeling, removing or recombining its signatures. Generic `verify` is not affected. Earlier releases are deprecated on npm. |
 
 ## Verifying a release
 
