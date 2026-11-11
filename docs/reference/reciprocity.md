@@ -1,6 +1,6 @@
 **Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 ·
 **Governed by:** RFC 9421, RFC 7515, RFC 7516, protocol-00, and RequestSeal
-v0.5.2 · **Review when:** peer pins, exchange protocol, or CI changes
+v1.0.0 · **Review when:** peer pins, exchange protocol, or CI changes
 
 # Reciprocal interoperability
 
@@ -125,17 +125,13 @@ rounds, cases, rejections, and disagreements per family and direction.
 
 ## Pins and CI
 
-The peer is Hex `request_seal == 0.5.2`, checksum
-`b8632c4cd4ec8ab989cf5d919765c34dbb3a2774939a0e3e7f104f329558229b`, locked in
-both interop projects. The vendored corpus retains the v0.5.2 release pin,
-commit `53b6690ccd5036d58b280d08cf0cacc6427262fe`. The public error vocabulary
-independently tracks Elixir 1.0.0, commit `ffea562f139e80a6f9783fcfc0877718c2476bf5`. The source and case files retain their
-v0.4.0 bytes; `index.json` changes its release metadata, so the complete corpus
-and its index digest are not byte-identical across those releases. One test checks
-both projects’ Elixir and OTP pins, both Hex versions and checksums, and every
-CI setup-beam input against the declared toolchain. The exchange asserts its selector
-sets equal to both implementations’ runtime registries. No local checkout
-supplies the peer dependency.
+The peer is Hex `request_seal == 1.0.0`, checksum
+`b2c9746349be720d7052d209b697a62829e1c2dd89467562633a2f60d9c56285`, in
+both interop projects. The corpus and public error vocabulary pin release commit
+`511fed142044ccea28bdcbb317c091cb2c8a515d`. The published corpus archive SHA-256 is
+`7be50afc500fad4148cbb8368181796858396cd40bb44dd5ad3575bf95c26ea0`;
+its index SHA-256 is `34dcdcae8af03d45d7bf222d46cd368a683b365ae2f470756dd1d461c9ecd798`.
+Vendoring preserves every retained source and case byte and removes the two retired cases.
 
 The Linux CI job is named exactly `reciprocal`. It uses
 `erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124`, locked Hex

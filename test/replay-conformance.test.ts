@@ -11,18 +11,16 @@ test('every vendored replay claim executes with its exact pinned outcome', {time
     outcomes.push({id: m.id, expected: m.expected, observed: r, matches: !('loaderReason' in r) && matches(m, r)});
     return r;
   }, {errorKinds: surface.errorKinds ?? []}));
-  const report = await runCorpus('conformance', {pendingOk: true, registry});
+  const report = await runCorpus('conformance', {registry});
   assert.equal(report.ok, true, JSON.stringify(report));
   assert.equal(outcomes.length, 11);
   for (const result of outcomes) assert.equal(result.matches, true, JSON.stringify(result));
   console.log('CORPUS replay.claim: cases=11 executed=11 disagreements=0');
 });
-test('replay registration leaves pending and adds exactly eleven executed items', {timeout: 30000}, async () => {
-  const report = await runCorpus('conformance', {pendingOk: true});
-  assert.equal(report.pending.some(p => p.surface === 'replay.claim'), false);
+test('replay registration executes its eleven items in the complete corpus', {timeout: 30000}, async () => {
+  const report = await runCorpus('conformance');
   assert.equal(report.ok, true, JSON.stringify(report));
   assert.equal(report.executed + report.runtime_limited, 3000);
-  assert.equal(report.pending.reduce((n,p) => n+p.items,0), 2);
 });
 
 test('receipt retention drift rejects every successful corpus claim while preserving sweep and bound rejections', {timeout: 60000}, async () => {
@@ -48,7 +46,7 @@ test('receipt retention drift rejects every successful corpus claim while preser
         outcomes.push({id: m.id, expected: m.expected, matches: !('loaderReason' in result) && matches(m, result)});
         return result;
       }, {errorKinds: surface.errorKinds ?? []}));
-      runCorpus(process.argv[2], {pendingOk: true, registry}).then(report => {
+      runCorpus(process.argv[2], {registry}).then(report => {
         console.log(JSON.stringify({outcomes, failures: report.failures}));
         process.exitCode = report.ok ? 0 : 1;
       });

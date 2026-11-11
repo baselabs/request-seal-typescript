@@ -3,7 +3,7 @@ alias RequestSeal.Replay.{Claim, Postgres}
 Code.require_file("connection.exs", __DIR__)
 {:ok, conn} = RequestSealReplayConnection.open()
 [table, namespace_hex, _identifier, retain_until] = System.argv()
-"0.5.2" = Application.spec(:request_seal, :vsn) |> to_string()
+"1.0.0" = Application.spec(:request_seal, :vsn) |> to_string()
 IO.binwrite(:stdio, "READY\n")
 IO.binstream(:stdio, :line) |> Enum.each(fn line ->
   %{"identifier" => identifier, "barrier" => barrier} = :json.decode(line)

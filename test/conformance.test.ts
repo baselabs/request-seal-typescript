@@ -26,7 +26,7 @@ const mutations: [string, string, (root: string) => Promise<void>][] = [
   ['unlisted file', 'unlisted_or_missing_file', root => writeFile(resolve(root, 'cases/smoke/unlisted.json'), '{}')],
   ['known_positive', 'invalid_index', root => rewrite(root, 'index.json', i => {delete i.known_positive;})],
   ['unknown surface', 'invalid_manifest', root => rewrite(root, 'index.json', i => {i.cases[0].surface = 'not.registered';})],
-  ['unregistered surface with matching index', 'pending_surface', async root => {
+  ['unregistered surface with matching index', 'unsupported_surface', async root => {
     await rewrite(root, 'cases/smoke/bytes.json', c => {c.surface = 'not.registered';});
     await rewrite(root, 'index.json', i => {i.cases[0].surface = 'not.registered';});
   }],

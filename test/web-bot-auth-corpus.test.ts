@@ -58,13 +58,9 @@ test(
         );
       }
     }
-    const report = await runCorpus("conformance", { pendingOk: true });
+    const report = await runCorpus("conformance");
     assert.equal(report.ok, true, canonicalJson(report));
     assert.equal(report.executed + report.runtime_limited, 3000);
-    assert.equal(
-      report.pending.reduce((n, p) => n + p.items, 0),
-      2,
-    );
   },
 );
 test("canonical envelope facts omit provenance while runtime results retain it", async () => {

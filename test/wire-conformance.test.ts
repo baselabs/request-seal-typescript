@@ -1,3 +1,4 @@
+import {CORPUS_PIN} from '../src/constants.ts';
 import {PINNED} from './fixtures/upstream/httpwg-structured-fields/PINNED.ts';
 import test from 'node:test';
 import { tmpdir } from 'node:os';
@@ -164,7 +165,7 @@ test('complete vector batches execute through the real corpus loader', async () 
       new URL('index.json', root),
       canonicalJson({
         format: 'request-seal-conformance-corpus-index/1',
-        elixir_release: 'v0.2.0',
+        elixir_release: CORPUS_PIN.tag,
         files: inventory,
         cases,
         known_positive: cases.find((c) => c.id.includes('examples'))!.id,

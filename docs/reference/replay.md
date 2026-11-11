@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the atomic replay port and the shared v0.5.2 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the atomic replay port and the shared v1.0.0 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
 
 # Replay protection
 
@@ -155,9 +155,9 @@ For real database checks, install the isolated driver with
 `npm test`. Without the URL, local PostgreSQL tests print their skip reason; when `CI` is set,
 they fail instead. Cross-language
 checks additionally require `REQUESTSEAL_REPLAY_ELIXIR=1` and dependencies installed
-with `mix deps.get` in `interop/replay`; the peer pins published RequestSeal 0.5.2. Its Hex lock checksum is
-`b8632c4cd4ec8ab989cf5d919765c34dbb3a2774939a0e3e7f104f329558229b`.
-The released corpus retains v0.5.2; the public error vocabulary tracks v1.0.0. See
+with `mix deps.get` in `interop/replay`; the peer pins published RequestSeal 1.0.0. Its Hex lock checksum is
+`b2c9746349be720d7052d209b697a62829e1c2dd89467562633a2f60d9c56285`.
+The released corpus and public error vocabulary both pin v1.0.0. See
 [reciprocal interoperability](reciprocity.md#pins-and-ci).
 
 `ddl()` preserves the reference table definition byte for byte.

@@ -14,7 +14,7 @@ export function count(x: unknown): number | undefined {
   if (!record(x) || Object.keys(x).join(',') !== 'int' || typeof x.int !== 'string' || !/^(0|[1-9][0-9]*)$/.test(x.int)) return;
   const n = Number(x.int); return Number.isSafeInteger(n) ? n : undefined;
 }
-export function prepareBatch(m: Record<string, any>, r: CorpusResources): {items: BatchItem[]; notApplicable: number; pending?: false} | {items: BatchItem[]; notApplicable: number; pending: true; listed: number} | {reason: string} {
+export function prepareBatch(m: Record<string, any>, r: CorpusResources): {items: BatchItem[]; notApplicable: number} | {reason: string} {
   const b = m.batch;
   if (!record(b) || Object.keys(b).sort().join(',') !== 'count,file,item_format,not_applicable' || typeof b.file !== 'string' || !b.file.startsWith('sources/') || typeof b.item_format !== 'string' || count(b.count) === undefined || count(b.not_applicable) === undefined) return {reason: 'invalid_batch'};
   const surfaces: Record<string, readonly string[]> = {
@@ -28,11 +28,7 @@ export function prepareBatch(m: Record<string, any>, r: CorpusResources): {items
   const source = r.reference({ref: {file: b.file, pointer: ''}});
   if (!source.ok) return {reason: 'invalid_source_reference'};
   const raw = sourcePlain(source.value), items: BatchItem[] = [];
-  if (!Object.hasOwn(surfaces, b.item_format)) {
-    const listed = count(b.count)!, notApplicable = count(b.not_applicable)!;
-    if (notApplicable > listed) return {reason: 'not_applicable_count'};
-    return {items, notApplicable, listed, pending: true};
-  }
+  if (!Object.hasOwn(surfaces, b.item_format)) return {reason: 'unsupported_item_format'};
   const add = (value: Record<string, any>, id: string, parent?: Record<string, any>) => items.push({id, value, ...(parent ? {parent} : {}), position: items.length, notApplicable: false});
   if (b.item_format === 'rfc9421-signature-bases/1') {
     if (!Array.isArray(raw)) return {reason: 'unexpected_item_shape'};

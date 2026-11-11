@@ -1,8 +1,8 @@
 /** The public package version. */
-export const VERSION = '0.4.0';
+export const VERSION = '0.5.0';
 /** The immutable public conformance corpus release and index digest. */
-export const CORPUS_PIN = Object.freeze({tag: 'v0.5.2', commit: '53b6690ccd5036d58b280d08cf0cacc6427262fe', indexSha256: 'ceb30bf713a6e34e6a15847b658a618d8f7568ee6a6c07bfbbf58fa5d143995e'});
-// RequestSeal.StructuredFields ceilings at v0.4.0 (b239287).
+export const CORPUS_PIN = Object.freeze({tag: 'v1.0.0', commit: '511fed142044ccea28bdcbb317c091cb2c8a515d', indexSha256: '34dcdcae8af03d45d7bf222d46cd368a683b365ae2f470756dd1d461c9ecd798'});
+// RequestSeal.StructuredFields ceilings at v1.0.0 (511fed1).
 /** Default bounded Structured Fields parser limits. */
 export const STRUCTURED_FIELDS_LIMITS = Object.freeze({maxBytes: 65_536, maxMembers: 1024, maxInnerItems: 256, maxParameters: 256, maxKeyBytes: 256, maxValueBytes: 16_384, maxNodes: 4096});
 // RequestSeal.JOSE.Support: 16,384 bytes, four containers deep, 64 entries per container.
@@ -20,7 +20,7 @@ export const BODY_MAX_CHUNKS = 16_384; // RequestSeal.Signing at 1.0.0.
 /** Default maximum digest input bytes. */
 export const DIGEST_MAX_BYTES = 16_777_216; // RequestSeal.Digest default work ceiling.
 /** Fixed maximum cryptographic input byte limit. */
-export const CRYPTO_MAX_BYTES_CEILING = 16_777_216; // RequestSeal.Crypto.max_bytes_ceiling at v0.4.1.
+export const CRYPTO_MAX_BYTES_CEILING = 16_777_216; // RequestSeal.Crypto.max_bytes_ceiling at v1.0.0.
 /** Default cryptographic input byte limit. */
 export const CRYPTO_DEFAULT_MAX_BYTES = 1_048_576; // Independent of the fixed SignatureBase ceiling.
 /** Maximum signature-base bytes. */
@@ -67,7 +67,7 @@ export const DISCOVERY_MAX_TTL_SECONDS = 604_800; // RequestSeal.Discovery.Sourc
 export const DISCOVERY_MAX_NEGATIVE_TTL_SECONDS = 300; // RequestSeal.Discovery.Source.
 /** Maximum client metadata document bytes. */
 export const DISCOVERY_CIMD_MAX_BYTES = 5120; // RequestSeal.Discovery.Source.
-// RequestSeal.PublicKey and Custody.Local container/component ceilings at v0.4.0 (b239287).
+// RequestSeal.PublicKey and Custody.Local container/component ceilings at v1.0.0 (511fed1).
 /** Maximum encoded key container bytes. */
 export const KEY_MAX_BYTES = 16_384;
 /** Maximum key container members. */

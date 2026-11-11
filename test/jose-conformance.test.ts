@@ -19,16 +19,8 @@ test(
       assert.ok(surfaceRegistry().has(name), "registered " + name);
     for (const name of ["wycheproof-aes-gcm/1", "wycheproof-rsa-oaep/1"])
       assert.ok(itemRegistry().has(name), "registered " + name);
-    const r = await runCorpus("conformance", { pendingOk: true });
+    const r = await runCorpus("conformance");
     assert.equal(r.ok, true, canonicalJson(r));
-    assert.ok(
-      r.pending.every(
-        (p) =>
-          !p.surface.startsWith("jws.") &&
-          !p.surface.startsWith("jwe.") &&
-          !p.surface.startsWith("nested."),
-      ),
-    );
   },
 );
 test("RFC 7520 compact, detached and JSON serialization classes follow the explicit policy", async (t) => {
@@ -121,7 +113,7 @@ test(
       index.files.find((f: { path: string }) => f.path === path).sha256 =
         createHash("sha256").update(raw).digest("hex");
       await writeFile(root + "/index.json", canonicalJson(index));
-      const report = await runCorpus(root, { unpinned: true, pendingOk: true });
+      const report = await runCorpus(root, { unpinned: true });
       assert.equal(report.ok, false);
       const f = report.failures.find((f) => f.id === "jwe/aes_gcm_test/0:1");
       assert.ok(f);

@@ -16,17 +16,17 @@ npm run check
 
 Write behavior tests before implementation and verify that they fail before the fix and pass afterward. Use `node:test` and fast-check properties. Test actual cryptography and published vectors; no substitutes for an external peer. `npm run test:red` deliberately fails and verifies the runner's exit status.
 
-Keep the core independent of Node modules and runtime dependencies. Regenerate `docs/reference/error-parity.md` in place with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts ffea562f139e80a6f9783fcfc0877718c2476bf5 <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-ffea562.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
+Keep the core independent of Node modules and runtime dependencies. Regenerate `docs/reference/error-parity.md` in place with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 511fed142044ccea28bdcbb317c091cb2c8a515d <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-511fed1.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
 
-The shared corpus in `conformance/` is pinned to RequestSeal `v0.5.2`, commit `53b6690ccd5036d58b280d08cf0cacc6427262fe`, index SHA-256 `ceb30bf713a6e34e6a15847b658a618d8f7568ee6a6c07bfbbf58fa5d143995e`. Shared corpus updates preserve upstream bytes and expectations. With network access, reproduce that byte copy with:
+The shared corpus in `conformance/` is pinned to RequestSeal `v1.0.0`, commit `511fed142044ccea28bdcbb317c091cb2c8a515d`, index SHA-256 `34dcdcae8af03d45d7bf222d46cd368a683b365ae2f470756dd1d461c9ecd798`. Shared corpus updates preserve upstream bytes and expectations. With network access, reproduce that byte copy with:
 
 ```sh
-node --experimental-strip-types --no-warnings scripts/vendor-corpus.ts v0.5.2
+node --experimental-strip-types --no-warnings scripts/vendor-corpus.ts v1.0.0
 ```
 
 For a pin move, run the same command with the new tag and `--update-pin`. It verifies the release asset checksum, archive paths, inventory digests, release commit, and index digest, then replaces the corpus and updates `src/constants.ts` together. Review both in one change; never regenerate expectations.
 
-`npm run conformance` runs the independently pinned smoke corpus and the released corpus with `--pending-ok`. Pending entries name the surface, optional item format, case IDs, case count, and asserted item count. Listed items tie out as executed plus not applicable plus runtime limited plus pending. A pending known-positive case stays explicitly unexecuted. The release workflow runs the released corpus without that flag, requiring every surface, every asserted item, and the known-positive case to execute successfully. Integrity failures and disagreements always fail, including with `--pending-ok`. Keep the corpus outside the npm tarball. Releases run the complete CI matrix before staging a provenance-bearing package; approval on npmjs.com completes publication.
+`npm run conformance` runs the independently pinned smoke corpus and the released corpus under the same strict execution rules as the release workflow. Every surface and item format must have an execution adapter. Executed plus not applicable plus runtime limited must equal listed, and the named known-positive case must match successfully. Unsupported surfaces, unsupported formats, integrity failures and disagreements fail the run. Keep the corpus outside the npm tarball. Releases run the complete CI matrix before staging a provenance-bearing package; approval on npmjs.com completes publication.
 
 The package uses ESM with declaration exports. Use a modern TypeScript module resolver (`nodenext` or `bundler`); `node10` resolution cannot resolve the package's subpath declaration exports.
 
@@ -49,7 +49,7 @@ module-level registrations as nested tests, so one slow test can fail many files
 Give tests that run the whole corpus through the CLI an explicit 90-second timeout
 around 30-second subprocess bounds, and the live vendoring tests an explicit
 180-second timeout matching their bounded subprocess commands.
-The message-override, stale-pending, and override-container corpus checks use
+The message-override and override-container corpus checks use
 30-second budgets for complete inventory reads and repeated corpus validation.
 The private-byte tracker test has a 15-second timeout around its 10-second child
 process bound. The parent-deadline test also has a 15-second timeout because it

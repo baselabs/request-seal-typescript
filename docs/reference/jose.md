@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, and the pinned v0.5.2 corpus · **Review when:** JOSE policies or custody boundaries change
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, and the pinned v1.0.0 corpus · **Review when:** JOSE policies or custody boundaries change
 
 # Compact JOSE
 

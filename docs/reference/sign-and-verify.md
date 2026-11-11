@@ -148,7 +148,7 @@ retryable `custody/deadline_exceeded` deadline instead.
 
 ## Per-call primitive and custody byte bounds
 
-RequestSeal for Elixir 0.4.1 adds `max_bytes` on crypto and custody signing and verification.
+RequestSeal for Elixir 1.0.0 exposes `max_bytes` on crypto and custody signing and verification.
 The TypeScript counterpart is an optional trailing `{maxBytes}` object:
 `Crypto.sign(algorithm, handle, data, options?)`,
 `Crypto.verify(algorithm, key, signature, data, options?)`,
@@ -173,8 +173,7 @@ must explicitly pass the ceiling after the managed boundary has checked the
 caller's bound. A Body defaults to 1 MiB and its `maxBytes` can raise that; message
 fields, JWS, adapters, and SignatureBase keep their fixed limits.
 
-Source: [RequestSeal for Elixir 0.4.1 crypto](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/crypto.ex)
-and [custody](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/custody.ex).
-These links describe when the byte-bound API was introduced. The current
-error vocabulary tracks v1.0.0 and the corpus retains v0.5.2; see
+Source: [RequestSeal for Elixir 1.0.0 crypto](https://github.com/baselabs/request_seal/blob/v1.0.0/lib/request_seal/crypto.ex)
+and [custody](https://github.com/baselabs/request_seal/blob/v1.0.0/lib/request_seal/custody.ex).
+The error vocabulary and corpus pin the same release; see
 [error parity](error-parity.md) and [the corpus pin](../../CONTRIBUTING.md).

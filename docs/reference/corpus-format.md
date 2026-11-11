@@ -15,14 +15,14 @@ conformance/
 
 `index.json` and case manifests use canonical JSON (RFC 8785), without a trailing newline. Source files retain upstream bytes. Each origin includes SHA256SUMS, PROVENANCE.md, and its upstream license when applicable. Origins include rfc9421, rfc6979, rfc8032, rfc7515, rfc7516, rfc7520, wycheproof, httpwg-structured-fields, web-bot-auth, rfc7517, rfc8037, and local-keys. Locally generated test keys carry a provenance note and are never reused as operational secrets.
 
-Every source and case file is listed once, sorted by path, with a lowercase hexadecimal SHA-256. Consumers reject invalid digests, unlisted files, missing files, symlinks, duplicate cases, and path escapes. The root contains only index.json, sources/, and cases/. A regular file named exactly .DS_Store is skipped at the root or below sources/ or cases/ only when empty or carrying the Finder metadata signature; other entries by that name reject, even if listed. Each single case and asserted batch item executes exactly once. Executed plus not applicable plus consumer runtime limitations must equal listed for a complete run, and the named known-positive case must match successfully. Development runs with --pending-ok additionally count pending items in that tie-out; the release gate forbids pending items. The release tag, commit, and index SHA-256 are pinned together by the consuming repository.
+Every source and case file is listed once, sorted by path, with a lowercase hexadecimal SHA-256. Consumers reject invalid digests, unlisted files, missing files, symlinks, duplicate cases, and path escapes. The root contains only index.json, sources/, and cases/. A regular file named exactly .DS_Store is skipped at the root or below sources/ or cases/ only when empty or carrying the Finder metadata signature; other entries by that name reject, even if listed. Each single case and asserted batch item executes exactly once. Executed plus not applicable plus consumer runtime limitations must equal listed for a complete run, and the named known-positive case must match successfully. The release tag, commit, and index SHA-256 are pinned together by the consuming repository.
 
 ## Index
 
 ```json
 {
   "format": "request-seal-conformance-corpus-index/1",
-  "elixir_release": "v0.5.2",
+  "elixir_release": "v1.0.0",
   "files": [{"path": "cases/signature_base/rfc9421-b2-1.json", "sha256": "<64 lowercase hex digits>"}],
   "cases": [{"id": "signature_base/rfc9421-b2-1", "manifest": "cases/signature_base/rfc9421-b2-1.json", "surface": "signature_base.build", "class": "byte_exact"}],
   "known_positive": "signature_base/rfc9421-b2-1"
@@ -98,7 +98,7 @@ Never use a bare JSON number for a wire value. Explicit pairs preserve member or
 | `replay.claim` | Namespace/key bytes; created, expires, max_age, and skew tagged integers, with nullable expires/max_age. Retention integer and hexadecimal row form, or rejection. |
 | `profile.name` | Built-in profile name or package/kind pair. Valid or `core/input.invalid_profile`. |
 
-An unregistered surface or batch item format is reported as pending with case IDs and case/item counts. It fails by default. `--pending-ok` reads the committed `tools/conformance/pending.json` allowlist. Pending surfaces, item formats, case IDs, and case/item counts must match their declared entries. A registered surface or item format appearing in pending, an unlisted entry, or changed counts fails the run; integrity errors and disagreements also fail. Update the allowlist and exact executed count deliberately as execution adapters land. A pending known-positive case is explicitly reported as unexecuted and blocks releases. The separate tooling smoke corpus registers `smoke` for the actual base64url and JSON decoders, plus one case each for the four wire surfaces, `crypto.verify`, `key.import`, `sign`, `verify`, `digest.content`, `jws.sign`, `jws.verify`, `jwe.decrypt`, `nested.decrypt`, `discovery.body`, `replay.claim`, and `web_bot_auth.verify`. It exercises byte-exact, verify-only, and rejection classes and has its own pinned index. It is not a released protocol corpus. `--unpinned` allows a deliberate development run; ordinary release-corpus runs require `CORPUS_PIN`.
+An unregistered surface rejects with `unsupported_surface`; an unregistered batch item format rejects with `unsupported_item_format`. Unsupported formats and missing adapters fail before execution. The known-positive case must execute and match its expected outcome. The separate tooling smoke corpus registers `smoke` for the actual base64url and JSON decoders, plus one case each for the four wire surfaces, `crypto.verify`, `key.import`, `sign`, `verify`, `digest.content`, `jws.sign`, `jws.verify`, `jwe.decrypt`, `nested.decrypt`, `discovery.body`, `replay.claim`, and `web_bot_auth.verify`. It exercises byte-exact, verify-only, and rejection classes and has its own pinned index. It is not a released protocol corpus. `--unpinned` allows a deliberate development run; ordinary release-corpus runs require `CORPUS_PIN`.
 
 ## Canonical Verification
 
@@ -135,14 +135,6 @@ thumbprint}`; held-key principals contain `{thumbprint}`. This intentionally
 projects the full runtime provenance into the pinned comparison shape. Envelope
 evidence and ignored labels remain runtime facts outside this canonical map.
 
-The pinned 0.5.2 corpus still contains two retired composite-verification cases.
-They have no execution surface in this package and are listed exactly in
-`tools/conformance/pending.json`. Their manifest error vocabulary remains tied to
-that corpus release in `tools/conformance/elixir-reasons-53b6690.json`, independently
-of the current public error vocabulary. Integrity and unknown-rule checks still
-apply to every manifest. A strict run rejects pending surfaces; the existing
-`--pending-ok` run permits only the exact inventory. The corpus bytes and pin stay
-unchanged until the next corpus release.
 
 ## Crypto and key import execution
 
@@ -190,7 +182,7 @@ empty content. Transport declarations default to unknown, with declared evidence
 
 ## Released batch inventory
 
-The pinned `v0.5.2` corpus uses `request-seal-conformance-batch/1` with
+The pinned `v1.0.0` corpus uses `request-seal-conformance-batch/1` with
 `class: "mixed"`, source identity, evidence class, and `batch` containing
 `file`, `item_format`, `count: {int}`, and `not_applicable: {int}`. The index
 repeats both counts. The loader enumerates the source independently, verifies
@@ -215,10 +207,10 @@ overrides contain outcome and reason; their independently counted total must
 match the declared count. Every other item retains its upstream verdict.
 
 The inventory understands Wycheproof group/test layouts for AES-GCM, RSA-OAEP,
-Ed25519, and ECDSA. An unfamiliar item format or source layout is reported as pending; its declared
-counts remain visible and pending permission still requires an allowlisted entry.
-Ed25519 and ECDSA execute on `crypto.verify`; AES-GCM and RSA-OAEP execute custodian-side primitive stages through the `jwe.decrypt` batch adapters. All four JOSE single-case surfaces are registered. Counts and override references are validated even when pending.
-See the [published format contract](https://github.com/baselabs/request_seal/blob/v0.5.2/docs/reference/corpus-format.md)
+Ed25519, and ECDSA. An unfamiliar item format rejects with `unsupported_item_format`; a malformed
+source for a registered format rejects with `unexpected_item_shape`.
+Ed25519 and ECDSA execute on `crypto.verify`; AES-GCM and RSA-OAEP execute custodian-side primitive stages through the `jwe.decrypt` batch adapters. All four JOSE single-case surfaces are registered. Counts and override references are validated before execution.
+See the [published format contract](https://github.com/baselabs/request_seal/blob/v1.0.0/docs/reference/corpus-format.md)
 for the complete surface and batch semantics.
 
 Message validation constructs the message and appended fields first, then applies
@@ -260,13 +252,11 @@ that agrees with the corpus fails as `stale_runtime_limitation`; a different
 observed outcome or an unlisted divergence fails as `outcome_mismatch`. A listed
 item removed or made not applicable also fails as stale. The CLI and crypto tests
 use this same policy. The complete tie-out is
-`executed + not_applicable + runtime_limited == listed`; development additionally
-includes pending items. A runtime-limited item cannot establish the known positive.
+`executed + not_applicable + runtime_limited == listed`. A runtime-limited item cannot establish the known positive.
 
-With `--pending-ok`, the designated `known_positive` may remain pending only when
-its case is in the exact pending allowlist. An executed or runtime-limited case
-cannot use this exemption. The release workflow runs the complete runtime and
-corpus battery as its closing gate; pending inventory must match in both directions.
+The designated `known_positive` must execute successfully. An unsupported or
+runtime-limited case cannot establish it. Development and release verification
+run the same complete inventory and reject every execution disagreement.
 
 `vendor-corpus <tag>` verifies the release assets and pin without writing the
 working tree. `--update-pin` replaces the corpus only when the declared pin moves;

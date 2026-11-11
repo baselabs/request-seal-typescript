@@ -1,6 +1,6 @@
 // Derived from pinned Elixir constructors and call sites; regenerate with scripts/generate-parity.ts or scripts/render-parity.ts --update-table.
 /** The immutable reference release used for the error vocabulary. */
-export const ELIXIR_ERROR_PIN = 'ffea562f139e80a6f9783fcfc0877718c2476bf5';
+export const ELIXIR_ERROR_PIN = '511fed142044ccea28bdcbb317c091cb2c8a515d';
 const entries = [
   {
     "kind": "core",

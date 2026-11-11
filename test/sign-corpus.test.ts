@@ -9,16 +9,10 @@ test("sign verify and content digest surfaces execute the shared corpus", {timeo
   const registry = surfaceRegistry();
   for (const name of ["sign", "verify", "digest.content"])
     assert.equal(registry.has(name), true, name);
-  const r = await runCorpus("conformance", { pendingOk: true });
+  const r = await runCorpus("conformance");
   assert.equal(r.ok, true, canonicalJson(r));
   // JOSE adds 309 items to the signing registry; discovery four, replay eleven, signature negotiation one more; Web Bot Auth fourteen.
   assert.equal(r.executed + r.runtime_limited, 3000);
-  assert.equal(
-    r.pending.some((p) =>
-      ["sign", "verify", "digest.content"].includes(p.surface),
-    ),
-    false,
-  );
 });
 import { readFileSync } from "node:fs";
 import { decodeJson, decodeBase64Url, ok } from "../src/index.ts";

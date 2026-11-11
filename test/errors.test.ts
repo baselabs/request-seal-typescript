@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ERROR_PARITY, ERROR_RETRYABLE, ELIXIR_ERROR_PIN } from '../src/errors/parity.ts';
-const fixture = JSON.parse(readFileSync(new URL('./fixtures/elixir-reasons-ffea562.json', import.meta.url), 'utf8'));
+const fixture = JSON.parse(readFileSync(new URL('./fixtures/elixir-reasons-511fed1.json', import.meta.url), 'utf8'));
 test('every pinned Elixir reason has a unique parity rule, including the known positive', () => {
-  assert.equal(ELIXIR_ERROR_PIN, 'ffea562f139e80a6f9783fcfc0877718c2476bf5');
+  assert.equal(ELIXIR_ERROR_PIN, '511fed142044ccea28bdcbb317c091cb2c8a515d');
   assert.equal(fixture.commit, ELIXIR_ERROR_PIN);
   assert.ok(fixture.entries.some((e: {rule_id: string}) => e.rule_id === 'core/crypto.invalid_signature'));
   assert.equal(fixture.entries.length, 217);

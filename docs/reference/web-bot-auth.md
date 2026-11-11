@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00 and the shared v0.5.2 conformance corpus · **Review when:** profile acceptance, discovery, or replay contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00 and the shared v1.0.0 conformance corpus · **Review when:** profile acceptance, discovery, or replay contracts change
 
 # Web Bot Auth
 

@@ -20,59 +20,48 @@ async function rewrite(root: string, path: string, change: (v: any) => void) {
   const bytes = canonicalJson(v); await writeFile(join(root, path), bytes);
   if (path !== 'index.json') await rewrite(root, 'index.json', i => {i.files.find((f: any) => f.path === path).sha256 = createHash('sha256').update(bytes).digest('hex');});
 }
-test('vendored release inventory ties out implemented and pending items', {timeout: 90_000}, async () => {
-  const report = await runCorpus('conformance', {pendingOk: true});
+test('vendored release inventory executes every supported item', {timeout: 90_000}, async () => {
+  const report = await runCorpus('conformance');
   assert.equal(report.ok, true, canonicalJson(report));
-  assert.equal(report.listed, report.executed + report.not_applicable + report.runtime_limited + report.pending.reduce((n, p) => n + p.items, 0));
-  assert.equal(report.cases, 173);
-  assert.equal(report.listed, 3064);
-  // Foundation/wire/crypto/sign: 2,652; JOSE: 309; discovery.body: 4; replay.claim: 11; accept_signature.parse: 1; web_bot_auth.verify: 14; profile.name: 9.
-  // 3,064 listed = 3,000 executed/runtime-limited + 62 not applicable + 2 retired pending.
+  assert.equal(report.listed, report.executed + report.not_applicable + report.runtime_limited);
+  assert.equal(report.cases, 171);
+  assert.equal(report.listed, 3062);
   assert.equal(report.executed + report.runtime_limited, 3000);
   assert.equal(report.not_applicable, 62);
-  const expected = JSON.parse(await readFile('tools/conformance/pending.json', 'utf8'));
-  assert.deepEqual(report.pending, expected);
+  assert.deepEqual(Object.keys(report).sort(),
+    ['cases', 'executed', 'failures', 'known_positive_executed', 'listed', 'not_applicable', 'ok', 'runtime_limited']);
 });
-/** Exercise the real CLI in an owned copy when mutating its committed allowlist.
- * The live loader and corpus remain untouched while other tests run.
- */
-async function pendingCli(corpus: string, pendingOk: boolean, unregister: boolean): Promise<{status: number | null; report: CorpusReport}> {
-  const root = await mkdtemp(resolve('test/.tmp-profile-pending-'));
+// Remove a real execution adapter only in the owned copy; the live registry stays intact.
+async function cliWithoutProfile(): Promise<{status: number | null; report: CorpusReport}> {
+  const root = await mkdtemp(resolve('test/.tmp-profile-missing-'));
   try {
     await cp(resolve('src'), join(root, 'src'), {recursive: true});
     await cp(resolve('tools'), join(root, 'tools'), {recursive: true});
     await writeFile(join(root, 'package.json'), '{"type":"module"}');
-    const index = JSON.parse(await readFile('conformance/index.json', 'utf8'));
-    const ids = index.cases.filter((c: any) => c.surface === 'profile.name').map((c: any) => c.id);
-    await writeFile(join(root, 'tools/conformance/pending.json'), canonicalJson([...JSON.parse(await readFile('tools/conformance/pending.json', 'utf8')), {surface:'profile.name',cases:ids.length,items:ids.length,ids}]));
-    if (unregister) {
-      const path = join(root, 'tools/conformance/loader.ts');
-      const source = await readFile(path, 'utf8');
-      const entry = '    ["profile.name", profileSurface, ["core","custody"]],\n';
-      assert.ok(source.includes(entry));
-      await writeFile(path, source.replace(entry, ''));
-    }
-    const child = spawnSync(process.execPath, [...prefix, join(root, 'tools/conformance/cli.ts'), '--corpus', resolve(corpus), '--unpinned', ...(pendingOk ? ['--pending-ok'] : [])], {encoding:'utf8',timeout:30_000});
+    const path = join(root, 'tools/conformance/loader.ts');
+    const source = await readFile(path, 'utf8');
+    const entry = '    ["profile.name", profileSurface, ["core","custody"]],\n';
+    assert.ok(source.includes(entry));
+    await writeFile(path, source.replace(entry, ''));
+    const child = spawnSync(process.execPath, [...prefix, join(root, 'tools/conformance/cli.ts'), '--corpus', resolve('conformance')], {encoding:'utf8',timeout:30_000});
     assert.ok(child.stdout, child.stderr);
     return {status:child.status, report:JSON.parse(child.stdout)};
   } finally {await rm(root, {recursive:true,force:true});}
 }
-test('pending release surfaces fail closed; CLI flag only permits exact pending', {timeout:90_000}, async () => {
-  for (const pendingOk of [false,true]) {
-    const {status,report} = await pendingCli('conformance', pendingOk, true);
-    assert.equal(status, pendingOk ? 0 : 1, canonicalJson(report));
-    assert.equal(report.ok, pendingOk); assert.equal(report.pending.find(p => p.surface === "profile.name")!.items, 9);
-    assert.equal(report.known_positive_executed, true);
-    if (!pendingOk) assert.ok(report.failures.some((f: any) => f.reason === 'pending_surface'));
-    const complete = spawnSync(process.execPath, [...prefix, 'tools/conformance/cli.ts', '--corpus', 'conformance', ...(pendingOk ? ['--pending-ok'] : [])], {encoding:'utf8',timeout:30_000});
-    assert.equal(complete.status,pendingOk ? 0 : 1,complete.stdout+complete.stderr);
-    assert.deepEqual(JSON.parse(complete.stdout).pending, JSON.parse(await readFile('tools/conformance/pending.json','utf8')));
-  }
+test('the CLI rejects a missing execution surface and accepts complete execution', {timeout:90_000}, async () => {
+  const {status,report} = await cliWithoutProfile();
+  assert.equal(status, 1, canonicalJson(report));
+  assert.equal(report.ok, false);
+  assert.equal(report.executed, 0);
+  assert.ok(report.failures.some(f => f.id.startsWith('profile/') && f.reason === 'unsupported_surface'));
+  const complete = spawnSync(process.execPath, [...prefix, 'tools/conformance/cli.ts', '--corpus', 'conformance'], {encoding:'utf8',timeout:30_000});
+  assert.equal(complete.status, 0, complete.stdout + complete.stderr);
+  assert.equal(JSON.parse(complete.stdout).ok, true);
 });
 for (const path of ['index.json', 'sources/httpwg-structured-fields/binary.json']) test(`vendored byte tamper: ${path}`, {timeout: 90_000}, async () => {
   await copy(async root => {
     const bytes = await readFile(join(root, path)); bytes[0] = bytes[0]! ^ 1; await writeFile(join(root, path), bytes);
-    const report = await runCorpus(root, {pendingOk: true});
+    const report = await runCorpus(root, {});
     assert.equal(report.ok, false);
     assert.equal(report.failures[0]?.reason, path === 'index.json' ? 'index_pin_mismatch' : 'file_digest_mismatch');
   });
@@ -90,7 +79,7 @@ for (const [name, path, change, reason] of [
     if (name === 'batch count' || name === 'not applicable') await rewrite(root, 'index.json', i => {
       const entry = i.cases.find((c: any) => c.manifest === path); entry[name === 'batch count' ? 'count' : 'not_applicable'] = {int: name === 'batch count' ? '1' : '0'};
     });
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false); assert.ok(report.failures.some(f => f.reason === reason), canonicalJson(report));
   });
 });
@@ -100,7 +89,7 @@ for (const [name, bytes, allowed] of [
 ] as const) test(`inventory identifies ${name}`, {timeout: 90_000}, async () => {
   await copy(async root => {
     await writeFile(join(root, 'sources/.DS_Store'), bytes);
-    const report = await runCorpus(root, {pendingOk: true});
+    const report = await runCorpus(root, {});
     assert.equal(report.ok, allowed, canonicalJson(report));
     if (!allowed) assert.equal(report.failures[0]?.reason, 'unlisted_or_missing_file');
   });
@@ -108,24 +97,22 @@ for (const [name, bytes, allowed] of [
 test('Finder-named symlink cannot bypass inventory', {timeout: 90_000}, async () => {
   await copy(async root => {
     await symlink('httpwg-structured-fields/binary.json', join(root, 'sources/.DS_Store'));
-    assert.equal((await runCorpus(root, {pendingOk: true})).ok, false);
+    assert.equal((await runCorpus(root, {})).ok, false);
   });
 });
-test('an unregistered item format reports pending without invoking a wire adapter', {timeout: 90_000}, async () => {
+test('an unregistered item format rejects before executing a wire adapter', {timeout: 90_000}, async () => {
   await copy(async root => {
     await rewrite(root, 'cases/structured_fields/httpwg-binary.json', m => {m.batch.item_format = 'future-httpwg/1';});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false, canonicalJson(report));
-    assert.ok(report.failures.some(f => f.reason === 'pending_not_allowlisted'));
-    const pending = report.pending.find(p => p.item_format === 'future-httpwg/1');
-    assert.equal(pending?.cases, 1); assert.equal(pending?.items, 17);
-    assert.ok(!(await runCorpus(root, {unpinned: true})).ok);
+    assert.equal(report.executed, 0);
+    assert.ok(report.failures.some(f => f.id === 'structured_fields/httpwg-binary' && f.reason === 'unsupported_item_format'));
   });
 });
 test('changed upstream expectation reports the individual item and both values', {timeout: 90_000}, async () => {
   await copy(async root => {
     await rewrite(root, 'sources/httpwg-structured-fields/examples.json', cases => {cases[0].canonical = ['wrong'];});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false);
     const disagreement = report.failures.find(f => f.reason === 'outcome_mismatch');
     assert.ok(disagreement); assert.ok(disagreement.id.startsWith('structured_fields/httpwg-examples/0:'));
@@ -137,7 +124,7 @@ test('a declared known positive must match, not merely return a success', {timeo
   try {
     await cp(resolve('test/fixtures/corpus-smoke'), root, {recursive: true});
     await rewrite(root, 'cases/smoke/bytes.json', m => {m.expected.bytes.b64 = 'YWJk';});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false); assert.equal(report.known_positive_executed, false);
     assert.ok(report.failures.some(f => f.reason === 'known_positive_not_executed'));
   } finally {await rm(root, {recursive: true, force: true});}
@@ -146,22 +133,22 @@ test('Finder-named directories and extra root directories are unlisted', {timeou
   const {mkdir} = await import('node:fs/promises');
   for (const path of ['sources/.DS_Store', 'extra']) await copy(async root => {
     await mkdir(join(root, path));
-    const report = await runCorpus(root, {pendingOk: true});
+    const report = await runCorpus(root, {});
     assert.equal(report.ok, false); assert.equal(report.failures[0]?.reason, 'unlisted_or_missing_file');
   });
 });
 test('HTTPWG batches reject overrides instead of changing manifest pins', {timeout: 90_000}, async () => {
   await copy(async root => {
     await rewrite(root, 'cases/structured_fields/httpwg-binary.json', m => {m.overrides = {'extra padding': {outcome: 'reject', rule_id: 'core/input.invalid_options', clause: 'Deliberately mismatched rule for the rejection check'}};});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false);
     assert.ok(report.failures.some(f => f.reason === 'unsupported_overrides'));
   });
 });
-test('pending permission cannot turn a rejection into the known positive', {timeout: 90_000}, async () => {
+test('a rejection cannot become the known positive', {timeout: 90_000}, async () => {
   await copy(async root => {
     await rewrite(root, 'index.json', i => {i.known_positive = 'verify/replay-retention-exceeded';});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false);
     assert.ok(report.failures.some(f => f.reason === 'invalid_known_positive'));
   });
@@ -170,32 +157,22 @@ test('registered batch formats cannot execute under a different surface', {timeo
   await copy(async root => {
     await rewrite(root, 'cases/signature_base/rfc9421-bases.json', m => {m.surface = 'message.validate';});
     await rewrite(root, 'index.json', i => {i.cases.find((c: any) => c.id === 'signature_base/rfc9421-bases').surface = 'message.validate';});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false); assert.ok(report.failures.some(f => f.reason === 'invalid_batch_surface'));
   });
 });
 
-test('pending permission rejects a dropped registered surface', {timeout: 90_000}, async () => {
+test('a dropped registered surface rejects before execution', {timeout: 90_000}, async () => {
   const registry = new Map(surfaceRegistry()); registry.delete('signature_base.build');
-  const report = await runCorpus('conformance', {pendingOk: true, registry});
+  const report = await runCorpus('conformance', {registry});
   assert.equal(report.ok, false);
-  assert.ok(report.failures.some(f => f.reason === 'registered_surface_pending'));
-});
-test('pending permission rejects changed pending counts', {timeout: 90_000}, async () => {
-  await copy(async root => {
-    await rewrite(root, 'cases/verify/invalid-policy.json', m => {m.surface = 'profile.name';});
-    await rewrite(root, 'index.json', i => {i.cases.find((c: any) => c.id === 'verify/invalid-policy').surface = 'profile.name';});
-    const {report,status} = await pendingCli(root, true, true);
-    assert.equal(status, 1);
-    assert.equal(report.ok, false);
-    assert.ok(report.failures.some(f => f.reason === 'pending_count_mismatch'));
-  });
+  assert.ok(report.failures.some(f => f.reason === 'unsupported_surface'));
 });
 for (const id of ['signature_base/rfc9421-bases', 'verify/replay-retention-exceeded']) {
   test(`known positive requires a single positive case: ${id}`, {timeout: 90_000}, async () => {
     await copy(async root => {
       await rewrite(root, 'index.json', i => {i.known_positive = id;});
-      const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+      const report = await runCorpus(root, {unpinned: true});
       assert.equal(report.ok, false);
       assert.ok(report.failures.some(f => f.reason === 'invalid_known_positive'));
     });
@@ -204,7 +181,7 @@ for (const id of ['signature_base/rfc9421-bases', 'verify/replay-retention-excee
 test('RFC 9421 batches refuse even empty overrides', {timeout: 90_000}, async () => {
   await copy(async root => {
     await rewrite(root, 'cases/signature_base/rfc9421-bases.json', m => {m.overrides = {};});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false);
     assert.ok(report.failures.some(f => f.reason === 'unsupported_overrides'));
   });
@@ -216,7 +193,7 @@ for (const [name, bytes, allowed] of [
 ] as const) test(`root inventory identifies ${name}`, {timeout: 90_000}, async () => {
   await copy(async root => {
     await writeFile(join(root, '.DS_Store'), bytes);
-    const report = await runCorpus(root, {pendingOk: true});
+    const report = await runCorpus(root, {});
     assert.equal(report.ok, allowed, canonicalJson(report));
     if (!allowed) assert.equal(report.failures[0]?.reason, 'unlisted_or_missing_file');
   });
@@ -228,7 +205,7 @@ test('listing ordinary Finder-named bytes does not make them corpus data', {time
       i.files.push({path: 'sources/.DS_Store', sha256: createHash('sha256').update(bytes).digest('hex')});
       i.files.sort((a: any, b: any) => a.path < b.path ? -1 : 1);
     });
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false);
     assert.equal(report.failures[0]?.reason, 'unlisted_or_missing_file');
   });
@@ -236,13 +213,13 @@ test('listing ordinary Finder-named bytes does not make them corpus data', {time
 test('missing corpus files keep a specific loader reason', {timeout: 90_000}, async () => {
   await copy(async root => {
     await rm(join(root, 'sources/httpwg-structured-fields/binary.json'));
-    assert.equal((await runCorpus(root, {pendingOk: true})).failures[0]?.reason, 'missing_file');
+    assert.equal((await runCorpus(root, {})).failures[0]?.reason, 'missing_file');
   });
 });
 test('symbolic corpus directories keep a specific loader reason', {timeout: 90_000}, async () => {
   await copy(async root => {
     await symlink('httpwg-structured-fields', join(root, 'sources/link'));
-    assert.equal((await runCorpus(root, {pendingOk: true})).failures[0]?.reason, 'symbolic_link');
+    assert.equal((await runCorpus(root, {})).failures[0]?.reason, 'symbolic_link');
   });
 });
 for (const value of [NaN, Infinity, -Infinity, new Map(), new Set(), new (class Example {})(), () => {}]) {
@@ -250,17 +227,16 @@ for (const value of [NaN, Infinity, -Infinity, new Map(), new Set(), new (class 
     assert.throws(() => canonicalJson(value), /invalid_canonical_value/);
   });
 }
-test('an unfamiliar source layout is pending rather than an integrity failure', {timeout: 90_000}, async () => {
+test('an unfamiliar source layout requires a registered item format', {timeout: 90_000}, async () => {
   await copy(async root => {
     await rewrite(root, 'sources/httpwg-structured-fields/binary.json', v => {
-      // Preserve real source items inside a future layout.
       const cases = [...v]; v.length = 0; v.push({vectors: cases});
     });
     await rewrite(root, 'cases/structured_fields/httpwg-binary.json', m => {m.batch.item_format = 'future-httpwg/2';});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
-    assert.ok(report.pending.some(p => p.item_format === 'future-httpwg/2' && p.items === 17));
-    assert.ok(report.failures.every(f => f.reason !== 'unexpected_item_shape'), canonicalJson(report));
-    assert.ok(report.failures.some(f => f.reason === 'pending_not_allowlisted'));
+    const report = await runCorpus(root, {unpinned: true});
+    assert.equal(report.ok, false);
+    assert.equal(report.executed, 0);
+    assert.ok(report.failures.some(f => f.reason === 'unsupported_item_format'));
   });
 });
 for (const path of ['cases/jwe/aes_gcm_test.json', 'cases/jwe/rsa_oaep_2048_sha256_mgf1sha256_test.json', 'cases/crypto/ed25519_test.json', 'cases/crypto/ecdsa_secp256r1_sha256_p1363_test.json']) {
@@ -279,7 +255,7 @@ for (const path of ['cases/jwe/aes_gcm_test.json', 'cases/jwe/rsa_oaep_2048_sha2
         const c = i.cases.find((c: any) => c.manifest === path);
         c.not_applicable.int = String(Number(c.not_applicable.int) + 1);
       });
-      const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+      const report = await runCorpus(root, {unpinned: true});
       assert.equal(report.not_applicable, 63, canonicalJson(report));
       assert.equal(report.ok, true, canonicalJson(report));
       // One newly excluded item leaves each registered Wycheproof batch format.
@@ -296,7 +272,7 @@ test('signature transformations use their own parameters over the parent', {time
       parent.transformations[0].parameters = parent.parameters + ';nonce="changed"';
       parent.transformations[0].same_base = false;
     });
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, true, canonicalJson(report));
   });
 });
@@ -309,7 +285,7 @@ test('message overrides reject undocumented body members before execution', {tim
       m.inputs.message_override = {body: 'unavailable'};
     });
     await rewrite(root, 'index.json', i => {i.cases.find((c: any) => c.id === 'message/ipv6-literal').class = 'rejection';});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.ok(report.failures.some(f => f.reason === 'invalid_manifest'));
   });
 });
@@ -318,7 +294,7 @@ test('Structured Fields rejection cannot pass on an options error', {timeout: 90
     await rewrite(root, 'cases/structured_fields/nonzero-pad-bits-one-byte.json', m => {
       m.inputs.schema = 'not-a-schema'; m.expected = {rule_id: 'core/input.invalid_options'};
     });
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.equal(report.ok, false);
     assert.ok(report.failures.some(f => f.id === 'structured_fields/nonzero-pad-bits-one-byte' && f.reason === 'outcome_mismatch'));
   });
@@ -357,7 +333,15 @@ test('format documentation states the release and override contract', {timeout: 
   assert.match(doc, /valid, invalid, or acceptable/);
   assert.match(doc, /unsupported_overrides/);
   const changelog = await readFile('CHANGELOG.md', 'utf8');
-  assert.doesNotMatch(changelog.split('## Unreleased')[1] ?? '', /\n- [^\n]+\n\n- /);
+  const {VERSION} = await import('../src/constants.ts');
+  const latest = changelog.split(/^## /m)[1];
+  assert.ok(latest, 'the changelog has a release entry');
+  const headingEnd = latest.indexOf('\n');
+  assert.ok(headingEnd > 0, 'the release entry has a heading and body');
+  assert.ok(latest.slice(0, headingEnd).startsWith(`${VERSION} - `), 'the first release entry matches the package version');
+  const body = latest.slice(headingEnd + 1).trim();
+  assert.match(body, /^- /);
+  assert.doesNotMatch(body, /\n\n-/);
   assert.match(changelog, /valid, invalid, or acceptable/);
 });
 
@@ -393,7 +377,7 @@ test('vendoring skips only an explicit offline request', {timeout:30_000}, () =>
 test('rejection manifests reject unknown rule vocabulary before execution', async () => {
   await copy(async root => {
     await rewrite(root, 'cases/structured_fields/nonzero-pad-bits-one-byte.json', m => {m.expected.rule_id = 'structured_fields/absent_reason';});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.ok(report.failures.some(f => f.reason === 'invalid_manifest'));
     assert.equal(report.executed, 0);
   });
@@ -401,12 +385,12 @@ test('rejection manifests reject unknown rule vocabulary before execution', asyn
 test('message overrides reject undocumented keys and decode tagged field bytes', {timeout: 30_000}, async () => {
   await copy(async root => {
     await rewrite(root, 'cases/message/ipv6-literal.json', m => {m.inputs.message_override = {body: 'unavailable'};});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.ok(report.failures.some(f => f.reason === 'invalid_manifest'));
   });
   await copy(async root => {
     await rewrite(root, 'cases/message/ipv6-literal.json', m => {m.inputs.message_override = {fields: [['X-Test', {b64: 'YQ'}]], authority: '[2001:db8::1]', scheme: 'https'};});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.ok(report.ok, canonicalJson(report));
   });
 });
@@ -417,19 +401,6 @@ test('smoke rejection matching declares its JOSE error family', async () => {
   assert.ok(matches({...manifest, expected: {rule_id: 'jose/input.invalid_base64'}}, err(joseError('invalid_base64', 'input'))));
   for (const [name, surface] of surfaceRegistry()) assert.ok(surface.errorKinds?.length, name);
 });
-test('pending permission rejects stale entries alongside retired surfaces', {timeout:30_000}, async () => {
-  const {status,report} = await pendingCli('conformance', true, false);
-  assert.equal(status,1);
-  assert.deepEqual(report.pending, JSON.parse(await readFile('tools/conformance/pending.json','utf8')));
-  assert.ok(report.failures.some((f: any) => f.reason === 'stale_pending_allowlist'), canonicalJson(report));
-});
-
-test('malformed pending JSON reports the bounded allowlist diagnostic', async () => {
-  const {parsePendingAllowlist} = await import('../tools/conformance/loader.ts');
-  for (const raw of ['{', '{}', '[{}]', '[null]']) assert.throws(() => parsePendingAllowlist(raw), /invalid_pending_allowlist/);
-  assert.deepEqual(parsePendingAllowlist('[]'), []);
-});
-
 test('verifying the pinned corpus leaves directory identity and source bytes unchanged', {timeout: 180_000, skip: liveVendorSkip !== undefined}, async () => {
   const root = await mkdtemp(join(tmpdir(), 'request-seal-vendor-readonly-'));
   try {
@@ -450,7 +421,7 @@ test('verifying the pinned corpus leaves directory identity and source bytes unc
 test('message override containers must be documented objects', {timeout: 30_000}, async () => {
   for (const override of [null, [], '', 1]) await copy(async root => {
     await rewrite(root, 'cases/message/ipv6-literal.json', m => {m.inputs.message_override = override;});
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.ok(report.failures.some(f => f.reason === 'invalid_manifest'), canonicalJson(report));
   });
 });

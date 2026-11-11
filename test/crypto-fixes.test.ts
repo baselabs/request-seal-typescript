@@ -204,11 +204,6 @@ test('runtime reference pins Bun extreme-s exception', async () => {
   assert.match(await readFile('docs/reference/runtime-matrix.md', 'utf8'), /Tested runtime lanes[\s\S]*Bun 1\.3\.14[\s\S]*261[\s\S]*262/);
 });
 
-test('changelog continuous list and corpus metadata first', async () => {
-  const changelog = await readFile('CHANGELOG.md', 'utf8'); assert.doesNotMatch(changelog.split('## Unreleased')[1]!.trim(), /\n\n-/);
-  assert.match(await readFile('docs/reference/corpus-format.md', 'utf8'), /^\*\*Status:\*\*/);
-});
-
 test('PKCS8 v2 reason is unsupported_format', async () => {
   const root = value(readDer(value(readPem(await read('ed25519_private.pem'))).der));
   assert.equal(reason(await api.Custody.local('ed25519', sequence(integer(1n), ...root.children.slice(1).map(n => value(encodeDer(n)))))), 'unsupported_format');

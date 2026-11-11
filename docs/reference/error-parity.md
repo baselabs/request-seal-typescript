@@ -1,10 +1,10 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** Elixir release 1.0.0 at ffea562f139e80a6f9783fcfc0877718c2476bf5 · **Review when:** the shared error vocabulary changes
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** Elixir release 1.0.0 at 511fed142044ccea28bdcbb317c091cb2c8a515d · **Review when:** the shared error vocabulary changes
 
 # Error parity
 
-OBSERVED: extraction with `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts ffea562f139e80a6f9783fcfc0877718c2476bf5 <output.json>` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
+OBSERVED: extraction with `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 511fed142044ccea28bdcbb317c091cb2c8a515d <output.json>` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
 
-The error vocabulary is pinned to v1.0.0 (release commit ffea562f139e80a6f9783fcfc0877718c2476bf5); the shared corpus is vendored at v0.5.2 from that release's verified assets. These pins track different artifacts.
+The error vocabulary is pinned to v1.0.0 (release commit 511fed142044ccea28bdcbb317c091cb2c8a515d); the shared corpus is vendored from the same release's verified assets.
 
 Extension-profile reasons are defined by extension packages and arrive with the profile row. The core layer union does not include `profile`.
 

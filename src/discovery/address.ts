@@ -1,6 +1,6 @@
 import { ok, type Result } from "../result.ts";
 import { ensure, failure } from "./support.ts";
-// Pinned RequestSeal v0.4.0 Discovery.Address conservative IANA policy.
+// Pinned RequestSeal v1.0.0 Discovery.Address conservative IANA policy.
 // https://www.iana.org/assignments/iana-ipv4-special-registry/
 // https://www.iana.org/assignments/iana-ipv6-special-registry/
 const v4 = [

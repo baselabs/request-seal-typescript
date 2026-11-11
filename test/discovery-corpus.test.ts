@@ -12,12 +12,8 @@ test(
       true,
       "discovery.body must be registered",
     );
-    const report = await runCorpus("conformance", { pendingOk: true });
+    const report = await runCorpus("conformance");
     assert.equal(report.ok, true, JSON.stringify(report));
-    assert.equal(
-      report.pending.some((p) => p.surface === "discovery.body"),
-      false,
-    );
     assert.equal(report.executed + report.runtime_limited, 3000);
   },
 );
@@ -35,7 +31,7 @@ test('tampered discovery expected keys report outcome mismatch through the body 
     const bytes = canonicalJson(manifest); await writeFile(join(root, entry.manifest), bytes);
     index.files.find((f: any) => f.path === entry.manifest).sha256 = createHash('sha256').update(bytes).digest('hex');
     await writeFile(join(root, 'index.json'), canonicalJson(index));
-    const report = await runCorpus(root, {unpinned: true, pendingOk: true});
+    const report = await runCorpus(root, {unpinned: true});
     assert.ok(report.failures.some(f => f.id === entry.id && f.reason === 'outcome_mismatch'), JSON.stringify(report));
   } finally {await rm(root, {recursive: true, force: true});}
 });

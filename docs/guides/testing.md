@@ -146,7 +146,7 @@ The Node adapters run in real Node subprocesses even when the suite is started b
 
 ## Conformance corpus
 
-The corpus under `conformance/` holds public vectors, vendor bytes, and canonical expectations. It is shared with the Elixir implementation. Neither implementation may regenerate an expected value: the corpus is the oracle. The runner verifies a pinned index digest and refuses to run a corpus that does not match it. It also reports what ran, what was not applicable, what was limited by the runtime, and what is still pending, and the counts must add up. Release builds run the corpus with no pending surfaces allowed.
+The corpus under `conformance/` holds public vectors, vendor bytes, and canonical expectations. It is shared with the Elixir implementation. Neither implementation may regenerate an expected value: the corpus is the oracle. The runner verifies a pinned index digest and refuses to run a corpus that does not match it. It reports executed, not applicable, and runtime-limited items; those counts must equal the complete listed inventory. Every surface and item format must have an execution adapter, and the named known-positive case must execute successfully. Development and release builds use these same strict rules.
 
 ## Where to go next
 

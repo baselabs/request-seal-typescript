@@ -1,3 +1,4 @@
+import {CORPUS_PIN} from '../src/constants.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {surfaceRegistry} from '../tools/conformance/loader.ts';
@@ -60,7 +61,7 @@ async function corpus(
     await writeFile(join(root, 'cases/crypto/wycheproof.json'), manifest);
     const index = {
       format: 'request-seal-conformance-corpus-index/1',
-      elixir_release: 'v0.4.0',
+      elixir_release: CORPUS_PIN.tag,
       known_positive: 'crypto/rfc8032-1',
       files: [
         {path: 'cases/crypto/positive.json', sha256: sha(positive)},
@@ -153,7 +154,7 @@ test('public-only corpus import projects private JWK examples without changing t
     assert.ok(JSON.parse(new TextDecoder().decode(source)).keys?.some((k: {d?: string}) => k.d) || JSON.parse(new TextDecoder().decode(source)).d);
     before.set(path, source);
   }
-  const report = await runCorpus('conformance', {pendingOk: true});
+  const report = await runCorpus('conformance');
   assert.deepEqual(report.failures.filter(f => ids.some(id => f.id === 'key/' + id)), []);
   for (const [path, source] of before) assert.deepEqual(new Uint8Array(await readFile(path)), source);
 });
@@ -188,7 +189,7 @@ test('platform-scoped limitations execute elsewhere and fail stale on this platf
     const prefix = runtime === 'deno' ? ['run', '--allow-read'] : runtime === 'bun' ? ['run'] : ['--experimental-strip-types', '--no-warnings'];
     const execute = async () => {
       await writeFile(join(root, 'tools/conformance/runtime-limits.json'), JSON.stringify(table));
-      return spawnSync(process.execPath, [...prefix, join(root, 'tools/conformance/cli.ts'), '--corpus', resolve('conformance'), '--pending-ok'], {encoding: 'utf8', timeout: 25_000});
+      return spawnSync(process.execPath, [...prefix, join(root, 'tools/conformance/cli.ts'), '--corpus', resolve('conformance')], {encoding: 'utf8', timeout: 25_000});
     };
     const elsewhere = await execute();
     assert.equal(elsewhere.status, 0, elsewhere.stderr || elsewhere.stdout);

@@ -304,9 +304,9 @@ certifies a decoded body as the wire content.
 ## Reference divergences
 
 The following adapter choices differ from, or are not decided by, the Elixir
-v0.4.1 framework boundaries:
+v1.0.0 framework boundaries:
 
-The references below are source observations at tag `v0.4.1`; line numbers
+The references below are source observations at tag `v1.0.0`; line numbers
 refer to files under `lib/request_seal/`.
 
 - GET or HEAD body signing is refused here. The Finch and Req translations pass
@@ -322,23 +322,23 @@ refer to files under `lib/request_seal/`.
   exempt request-related components from response-side lists, subject to core
   signing restrictions.
 - Node capture refuses CONNECT with `invalid_request`, matching
-  `plug/capture.ex:114–117`; no CONNECT handling difference remains.
+  `plug/capture.ex:197–200`; no CONNECT handling difference remains.
 - Node `signResponse` can sign without a captured request when no request-related
   components are selected. Plug requires capture even for status-only signing
-  and returns `not_captured` (`plug/sign_response.ex:124–128`).
+  and returns `not_captured` (`plug/sign_response.ex:232–235`).
 - Node response signing always sets Date from the sampled clock, replacing an
   existing Date even when it is not covered. Plug adds Date only when covered
-  and absent (`plug/sign_response.ex:137–147`).
+  and absent (`plug/sign_response.ex:244–254`).
 - On response-signing failure before headers are sent, Node restores the
   caller's header snapshot, including Date and Content-Length, and leaves
   delivery to the caller. Plug replaces delivery with its `on_failure` status
   and an empty unsigned body, removing delivery and signature fields
-  (`plug/sign_response.ex:181–209`).
+  (`plug/sign_response.ex:288–317`).
 - Node and Fetch clients retry only 5xx responses, subject to `maxRetries`;
   transport errors, 408, and 429 do not retry. A 3xx without Location returns
   `invalid_request` while redirects remain. The reference defers whether another
-  attempt runs to Req's retry and redirect steps (`req.ex:37–45`), with adapter
-  verification ahead of those steps when selected (`req.ex:165–178`).
+  attempt runs to Req's retry and redirect steps (`req.ex:25–43`), with adapter
+  verification ahead of those steps when selected (`req.ex:301–312`).
 
 ## SSH-agent custody
 
@@ -369,9 +369,8 @@ returns `custodian_protocol` through `KeyHandle.sign`. The same refusal through
 that it does not pass through. The live test discovers the agent's acceptance
 boundary with bounded real signing calls, checks both refusal surfaces, and
 verifies that the next sign succeeds. No specific boundary count is required.
-See [the v0.4.1 custodian](https://github.com/baselabs/request_seal/blob/v0.4.1/lib/request_seal/custody/ssh_agent.ex).
-The current corpus and reciprocal peer pin v0.5.2; the v0.4.1 links above
-are historical source references, not the current interoperability pin.
+See [the v1.0.0 custodian](https://github.com/baselabs/request_seal/blob/v1.0.0/lib/request_seal/custody/ssh_agent.ex).
+The corpus and reciprocal peer pin the same release.
 
 A public key the agent does not hold at construction, an agent failure reply, or a
 returned signature that fails local verification returns custodian_rejected; removed

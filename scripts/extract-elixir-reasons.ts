@@ -186,7 +186,7 @@ export function extract(repo: string, commit: string, output: string, sourceRef 
     // The constructor's retryable expression names its always-retryable
     // reasons in one of three spellings: "reason in [...]" (the list can
     // wrap across lines), "reason == :x", or a default argument ORed with
-    // one ("retryable or reason == :x", new at 0.5.2). Struct defaults and
+    // one ("retryable or reason == :x"). Struct defaults and
     // moduledoc prose never match these, so always-false kinds stay empty.
     const retryList = source.match(/retryable:\s*reason in \[([^\]]+)\]/)?.[1] ?? '';
     const retryEquality = source.match(/retryable:\s*(?:[a-z_]+ or )?reason == :([a-z_]+)/)?.[1] ?? '';

@@ -17,13 +17,7 @@ import { snapshotOptions } from '../../src/brand.ts';
 import { decodeJson, type JsonNode } from '../../src/json.ts';
 import { decodeBase64Url, encodeBase64Url } from '../../src/bytes.ts';
 import { CORPUS_PIN, DIGEST_MAX_BYTES, DISCOVERY_MAX_BYTES } from '../../src/constants.ts';
-import type {ErrorKind} from '../../src/errors/parity.ts';
-import {readFileSync} from 'node:fs';
-// Manifest validity belongs to the pinned corpus release, independently of the
-// current public error vocabulary. Unsupported surfaces remain exactly pending.
-const corpusVocabulary = JSON.parse(readFileSync(new URL('./elixir-reasons-53b6690.json', import.meta.url), 'utf8')) as {commit: string; entries: {rule_id: string}[]};
-if (corpusVocabulary.commit !== CORPUS_PIN.commit) throw new Error('Corpus vocabulary pin mismatch');
-const RULE_IDS = new Set(corpusVocabulary.entries.map(e => e.rule_id));
+import {RULE_IDS, type ErrorKind} from '../../src/errors/parity.ts';
 import { ruleId, joseError } from '../../src/errors/types.ts';
 import { ok, err, type Result } from '../../src/result.ts';
 import { SMOKE_INDEX_SHA256 } from './smoke-pin.ts';
@@ -34,7 +28,7 @@ export type Outcome = {fields: readonly (readonly [string,Uint8Array])[]} | {byt
 export type CorpusResources = {read: (path: string) => Result<Uint8Array>; reference: (value: unknown) => Result<JsonNode>};
 export type SurfaceResult = Result<Outcome> | {ok: false; loaderReason: 'invalid_manifest'};
 export type Surface = ((manifest: CorpusCase, resources: CorpusResources) => SurfaceResult | Promise<SurfaceResult>) & {readonly errorKinds?: readonly ErrorKind[]};
-export type CorpusReport = {ok: boolean; cases: number; listed: number; executed: number; not_applicable: number; runtime_limited: number; pending: {surface: string; item_format?: string; cases: number; items: number; ids: string[]}[]; known_positive_executed: boolean; failures: {id: string; reason: string; expected?: unknown; actual?: unknown}[]};
+export type CorpusReport = {ok: boolean; cases: number; listed: number; executed: number; not_applicable: number; runtime_limited: number; known_positive_executed: boolean; failures: {id: string; reason: string; expected?: unknown; actual?: unknown}[]};
 class LoaderFailure extends Error {}
 const loaderFailure = (reason: string): never => {throw new LoaderFailure(reason);};
 /** RFC 8785 ordering for the manifest's string/boolean/null and tagged-number model. */
@@ -215,21 +209,14 @@ export function matches(manifest: CorpusCase, result: Result<Outcome>, kindsBySu
 function batchManifestValid(m: Record<string, unknown>): boolean {
   return m.format === 'request-seal-conformance-batch/1' && m.class === 'mixed' && typeof m.id === 'string' && typeof m.surface === 'string' && record(m.source) && ['document','section','url'].every(k => typeof (m.source as Record<string, unknown>)[k] === 'string' && (m.source as Record<string, unknown>)[k] !== '') && (m.evidence_class === 'published_vector' || m.evidence_class === 'reviewed_derivation' && typeof m.derivation === 'string' && m.derivation.trim() !== '') && Object.keys(m).every(k => ['format','id','surface','class','evidence_class','source','batch','pins','overrides','derivation','positive'].includes(k));
 }
-export function parsePendingAllowlist(raw: string): CorpusReport["pending"] {
-  let allowlist: unknown;
-  try {allowlist = JSON.parse(raw);} catch {loaderFailure('invalid_pending_allowlist');}
-  if (!Array.isArray(allowlist)) throw new LoaderFailure('invalid_pending_allowlist');
-  if (!allowlist.every(p => record(p) && typeof p.surface === 'string' && (p.item_format === undefined || typeof p.item_format === 'string') && Number.isSafeInteger(p.cases) && Number(p.cases) > 0 && Number.isSafeInteger(p.items) && Number(p.items) >= 0 && Array.isArray(p.ids) && p.ids.every(id => typeof id === 'string') && p.ids.length === p.cases)) loaderFailure('invalid_pending_allowlist');
-  return allowlist as CorpusReport["pending"];
-}
-export async function runCorpus(folder: string, options: {unpinned?: boolean; smoke?: boolean; pendingOk?: boolean; registry?: ReadonlyMap<string, Surface>} = {}): Promise<CorpusReport> {
-  const report: CorpusReport = {ok: false, cases: 0, listed: 0, executed: 0, not_applicable: 0, runtime_limited: 0, pending: [], known_positive_executed: false, failures: []};
+export async function runCorpus(folder: string, options: {unpinned?: boolean; smoke?: boolean; registry?: ReadonlyMap<string, Surface>} = {}): Promise<CorpusReport> {
+  const report: CorpusReport = {ok: false, cases: 0, listed: 0, executed: 0, not_applicable: 0, runtime_limited: 0, known_positive_executed: false, failures: []};
   const failure = (id: string, reason: string) => report.failures.push({id, reason});
   try {
-    const snapshot = snapshotOptions(options, ['unpinned', 'smoke', 'pendingOk', 'registry']);
+    const snapshot = snapshotOptions(options, ['unpinned', 'smoke', 'registry']);
     if (!snapshot.ok) { failure('index', 'invalid_options'); return report; }
     const attrs = snapshot.value;
-    for (const key of ['unpinned', 'smoke', 'pendingOk'] as const) if (Object.hasOwn(attrs, key) && typeof attrs[key] !== 'boolean') { failure('index', 'invalid_options'); return report; }
+    for (const key of ['unpinned', 'smoke'] as const) if (Object.hasOwn(attrs, key) && typeof attrs[key] !== 'boolean') { failure('index', 'invalid_options'); return report; }
     if (Object.hasOwn(attrs, 'registry') && (!attrs.registry || typeof (attrs.registry as ReadonlyMap<string, Surface>).get !== 'function')) { failure('index', 'invalid_options'); return report; }
     const root = resolve(folder), rawIndex = await boundedRead(join(root, 'index.json'), DIGEST_MAX_BYTES);
     const pin = attrs.smoke ? SMOKE_INDEX_SHA256 : CORPUS_PIN.indexSha256;
@@ -254,7 +241,7 @@ export async function runCorpus(folder: string, options: {unpinned?: boolean; sm
     const used = new Set<string>(), manifests = new Set<string>(), foldedManifests = new Set<string>();
     const registry = (attrs.registry as ReadonlyMap<string, Surface> | undefined) ?? surfaceRegistry(), resources = resourcesFor(files), formats = itemRegistry();
     const kindsBySurface = rejectionKinds(registry);
-    const ready: {entry: Record<string, any>; manifest: Record<string, any>; items?: BatchItem[]; pendingLayout?: boolean; pendingItems?: number}[] = [];
+    const ready: {entry: Record<string, any>; manifest: Record<string, any>; items?: BatchItem[]}[] = [];
     for (const entry of index.cases) {
       if (!record(entry) || Object.keys(entry).sort().join(',') !== (entry.class === 'mixed' ? 'class,count,id,manifest,not_applicable,surface' : 'class,id,manifest,surface') || typeof entry.id !== 'string' || !/^[a-z_]+\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(entry.id) || !safePath(entry.manifest) || !entry.manifest.startsWith('cases/') || typeof entry.surface !== 'string' || !(classValid(entry.class) || entry.class === 'mixed') || used.has(entry.id) || foldedManifests.has(entry.manifest.toLowerCase())) {failure('index', 'invalid_or_duplicate_case'); return report;}
       used.add(entry.id); manifests.add(entry.manifest); foldedManifests.add(entry.manifest.toLowerCase());
@@ -265,12 +252,13 @@ export async function runCorpus(folder: string, options: {unpinned?: boolean; sm
       if (!(entry.class === 'mixed' ? batchManifestValid(m) : manifestValid(m)) || m.id !== entry.id || m.surface !== entry.surface || m.class !== entry.class) {failure(entry.id, 'invalid_manifest'); continue;}
       if (m.keys?.some((k: Record<string, any>) => !files.has(k.file) || k.public !== undefined && !files.has(k.public))) {failure(entry.id, 'unlisted_key'); continue;}
       if (!referencesValid(m, resources)) {failure(entry.id, 'invalid_source_reference'); continue;}
+      if (!registry.has(entry.surface)) {failure(entry.id, 'unsupported_surface'); continue;}
       if (entry.class === 'mixed') {
         const batch = prepareBatch(m, resources);
         if ('reason' in batch) {failure(entry.id, batch.reason); continue;}
         if (count(entry.count) !== count(m.batch.count) || count(entry.not_applicable) !== count(m.batch.not_applicable)) {failure(entry.id, 'batch_index_mismatch'); continue;}
-        report.listed += batch.pending ? batch.listed : batch.items.length; report.not_applicable += batch.notApplicable;
-        ready.push({entry, manifest: m, items: batch.items, ...(batch.pending ? {pendingLayout: true, pendingItems: batch.listed - batch.notApplicable} : {})});
+        report.listed += batch.items.length; report.not_applicable += batch.notApplicable;
+        ready.push({entry, manifest: m, items: batch.items});
       } else {report.listed++; ready.push({entry, manifest: m});}
     }
     if ([...files.keys()].some(path => path.startsWith('cases/') && !manifests.has(path))) failure('index', 'unconsumed_manifest');
@@ -278,18 +266,12 @@ export async function runCorpus(folder: string, options: {unpinned?: boolean; sm
     for (const {entry, manifest: m} of ready) if (Object.hasOwn(m, 'positive') && (typeof m.positive !== 'string' || m.positive === entry.id || !byId.has(m.positive) || m.evidence_class !== 'reviewed_derivation')) failure(entry.id, 'invalid_positive_reference');
     if (!['byte_exact', 'verify_only'].includes(byId.get(index.known_positive)?.manifest.class)) failure('index', 'invalid_known_positive');
     if (report.failures.length) return report;
-    const pendingIds = new Set<string>();
     const limits = selectRuntimeLimits(JSON.parse(new TextDecoder().decode(await boundedRead(fileURLToPath(new URL('./runtime-limits.json', import.meta.url)), DIGEST_MAX_BYTES))), process.versions);
-    for (const {entry, manifest: m, items, pendingLayout, pendingItems} of ready) {
+    for (const {entry, manifest: m, items} of ready) {
       const surface = registry.get(entry.surface), format = items ? m.batch.item_format as string : undefined;
       const runner = format ? formats.get(format) : undefined;
-      if (!surface || items && (!runner || pendingLayout)) {
-        pendingIds.add(entry.id);
-        let pending = report.pending.find(p => p.surface === entry.surface && p.item_format === format);
-        if (!pending) {pending = {surface: entry.surface, ...(format ? {item_format: format} : {}), cases: 0, items: 0, ids: []}; report.pending.push(pending);}
-        pending.cases++; pending.items += pendingItems ?? (items ? items.filter(i => !i.notApplicable).length : 1); pending.ids.push(entry.id);
-        continue;
-      }
+      if (!surface) {failure(entry.id, 'unsupported_surface'); continue;}
+      if (items && !runner) {failure(entry.id, 'unsupported_item_format'); continue;}
       if (items) {
         let successful = true;
         const itemLimits = limits.filter(limit => limit.id === entry.id);
@@ -314,21 +296,8 @@ export async function runCorpus(folder: string, options: {unpinned?: boolean; sm
         if (!match) report.failures.push({id: entry.id, reason: 'outcome_mismatch', expected: m.expected, actual: result.ok ? ('bytes' in result.value ? {bytes: {b64: encodeBase64Url(result.value.bytes)}} : result.value) : {rule_id: ruleId(result.error)}});
       }
     }
-    if (report.executed + report.not_applicable + report.runtime_limited + report.pending.reduce((n,p) => n + p.items, 0) !== report.listed) failure('index', 'execution_count_mismatch');
-    if (!attrs.pendingOk && report.pending.length) failure('index', 'pending_surface');
-    if (attrs.pendingOk) {
-      const allowlist = parsePendingAllowlist(new TextDecoder().decode(await boundedRead(fileURLToPath(new URL('./pending.json', import.meta.url)), DIGEST_MAX_BYTES)));
-      for (const entry of allowlist) if (!report.pending.some(p => p.surface === entry.surface && p.item_format === entry.item_format)) failure(entry.surface, 'stale_pending_allowlist');
-      const registered = surfaceRegistry();
-      for (const p of report.pending) {
-        if (registered.has(p.surface) || registry.has(p.surface)) failure(p.surface, 'registered_surface_pending');
-        if (p.item_format && formats.has(p.item_format)) failure(p.item_format, 'registered_item_format_pending');
-        const expected = allowlist.find(e => e.surface === p.surface && e.item_format === p.item_format);
-        if (!expected) failure(p.surface, 'pending_not_allowlisted');
-        else if (canonicalJson(expected) !== canonicalJson(p)) failure(p.surface, 'pending_count_mismatch');
-      }
-    }
-    if (!report.known_positive_executed && !(attrs.pendingOk && pendingIds.has(index.known_positive))) failure('index', 'known_positive_not_executed');
+    if (report.executed + report.not_applicable + report.runtime_limited !== report.listed) failure('index', 'execution_count_mismatch');
+    if (!report.known_positive_executed) failure('index', 'known_positive_not_executed');
     report.ok = report.failures.length === 0;
   } catch (e) {failure('index', e instanceof LoaderFailure ? e.message : 'invalid_or_unavailable_corpus');}
   return report;

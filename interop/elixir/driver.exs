@@ -222,8 +222,8 @@ defmodule Reciprocal do
     after GenServer.stop(conn) end
   end
   def run do
-    "0.5.2" = Application.spec(:request_seal, :vsn) |> to_string()
-    IO.binwrite(:stdio, [:json.encode(%{"ready" => true, "language" => "elixir", "version" => "0.5.2"}), "\n"])
+    "1.0.0" = Application.spec(:request_seal, :vsn) |> to_string()
+    IO.binwrite(:stdio, [:json.encode(%{"ready" => true, "language" => "elixir", "version" => "1.0.0"}), "\n"])
     IO.binstream(:stdio, :line) |> Enum.each(fn line ->
       r = :json.decode(line)
       response = try do dispatch(r) catch

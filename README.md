@@ -372,7 +372,7 @@ For core `agent_unresolved`, `timeout` and `source_unavailable` map to 503; `unt
 | Hono on Deno | `WebBotAuth.verify` | The Hono program above. |
 | PostgreSQL replay store, with `pg` 8.23.1 | `@request-seal/core/replay-postgres` | A real PostgreSQL 18 server in CI. |
 | OpenSSH agent custody | `@request-seal/core/custody-ssh-agent` | A real `ssh-agent`, with signatures checked by OpenSSL. |
-| RequestSeal for Elixir 0.5.2 | HTTP and JWS algorithms, JWE, Web Bot Auth directories, replay claims | A [two-way exchange](docs/reference/reciprocity.md) in CI. |
+| RequestSeal for Elixir 1.0.0 | HTTP and JWS algorithms, JWE, Web Bot Auth directories, replay claims | A [two-way exchange](docs/reference/reciprocity.md) in CI. |
 | `http-message-signatures` 1.0.6 | RFC 9421 wire format | The [migration guide](docs/guides/migrating-from-http-message-signatures.md) tests. |
 
 ## Security
@@ -416,4 +416,4 @@ Reference: [glossary](docs/reference/glossary.md), [error reasons](docs/referenc
 
 The core runs on Node 22.12.0, 22.23.1, 24.21.0, and 26.11.1, Deno 2.5.6, and Bun 1.3.14. Fetch signs on those runtimes, but Fetch verification supports only Deno 2.5.6. HTTPS discovery requires Node; use caller-owned snapshots elsewhere. In browsers (Chromium 156.0.8078.4, Firefox 157.0, WebKit 27.2), the Fetch adapter signs only. Core `verify` checks a caller-built `Message` under an explicit policy without using the Fetch adapter. See the [runtime matrix](docs/reference/runtime-matrix.md) for exact tested versions, permissions, and limitations.
 
-The public error vocabulary is pinned to RequestSeal for Elixir 1.0.0. The reciprocal peer and released corpus retain their 0.5.2 pins. Its corpus source and case files retain the v0.4.0 bytes; the index records the newer release. See [the corpus pin](CONTRIBUTING.md) and [reciprocal interoperability](docs/reference/reciprocity.md).
+The public error vocabulary, reciprocal peer, and released corpus are pinned to RequestSeal for Elixir 1.0.0. Every corpus surface and asserted item must execute under the same rules in development and release verification. See [the corpus pin](CONTRIBUTING.md) and [reciprocal interoperability](docs/reference/reciprocity.md).
