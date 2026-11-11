@@ -37,8 +37,10 @@ async function rejects(fn: () => Promise<unknown>, expected?: Predicate): Promis
 }
 function doesNotThrow(fn: () => unknown): void { fn(); }
 function match(value: string, pattern: RegExp): void { ok(pattern.test(value), 'Expected pattern ' + pattern); }
+function doesNotMatch(value: string, pattern: RegExp, message?: string): void { ok(!pattern.test(value), message ?? 'Expected no match for pattern ' + pattern); }
 const assert: {
   ok: typeof ok; equal: typeof equal; deepEqual: typeof deepEqual; fail: typeof fail;
   throws: typeof throws; rejects: typeof rejects; doesNotThrow: typeof doesNotThrow; match: typeof match;
-} = {ok, equal, deepEqual, fail, throws, rejects, doesNotThrow, match};
+  doesNotMatch: typeof doesNotMatch;
+} = {ok, equal, deepEqual, fail, throws, rejects, doesNotThrow, match, doesNotMatch};
 export default assert;
