@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421 and the executed examples in this guide · **Review when:** replay contracts, retention bounds, or store interfaces change
+**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421 and the executed examples in this guide · **Review when:** replay contracts, retention bounds, or store interfaces change
 
 # Replay protection
 
@@ -134,7 +134,7 @@ Sweep with a trusted clock that agrees with your verifiers. With more than one n
 
 ## Web Bot Auth
 
-A Web Bot Auth envelope can carry several signatures, and it takes a single claim after every selected signature and nested check has passed. Your commitment receives a different shape, `{ profile, signatures: [...] }`, with one entry per signature. The library does not add the profile to your namespace or your commitment, so put the profile into the commitment yourself: a nonce-only commitment in a namespace shared by generic and Web Bot Auth verification lets one profile's nonce consume the other's. The program signs with a held key, verifies once, and sees the second use refused.
+Required Web Bot Auth replay accepts exactly one selected signature and returns `unexpected_signature` at `policy` for more, after verification and before any claim. Nested envelopes require `replay: "not_required"`. Your commitment receives `{ profile, signatures: [...] }` with exactly one entry containing covered facts, without the uncovered label (RFC 9421 Section 7.2.5). The library does not add the profile to your namespace or your commitment, so put the profile into the commitment yourself: a nonce-only commitment in a namespace shared by generic and Web Bot Auth verification lets one profile's nonce consume the other's. The program signs with a held key, verifies once, and sees the second use refused.
 
 ```ts
 import assert from "node:assert/strict";
@@ -155,7 +155,7 @@ const policy = must(WebBotAuth.Policy.create({
   replay: {
     identifier: "nonce",
     namespace: new TextEncoder().encode("crawlers"),
-    // A Web Bot Auth envelope can hold several signatures, so the facts list them. Put the profile in the commitment
+    // Required replay supplies one signature without its uncovered label. Put the profile in the commitment
     // so an identical nonce under another profile in the same namespace never collides with this one.
     commitment: async (facts: WebBotAuthReplayFacts) => ok(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(
       JSON.stringify([facts.profile, facts.signatures.map((signature) => [signature.keyid, signature.identifier]).sort()]))))),

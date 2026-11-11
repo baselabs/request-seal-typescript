@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00, RFC 9421, and the executed examples in this guide · **Review when:** the Web Bot Auth draft, discovery behavior, or the policy contract changes
+**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00, RFC 9421, and the executed examples in this guide · **Review when:** the Web Bot Auth draft, discovery behavior, or the policy contract changes
 
 # Web Bot Auth
 
@@ -134,7 +134,7 @@ assert.ok(!refused.ok && refused.error.kind === "core" && refused.error.reason =
 | `agents` | Callback `({ identifier, location, type }) => Result` returning a `DiscoverySource`, a fresh `KeySet`, or `null` to refuse. |
 | `cache` | A caller-owned discovery cache, or `null` when `agents` returns key sets. |
 | `freshness` | `{ clock, maxAge, skew }`. Expiry is always required. |
-| `content`, `replay` | As for generic policies. Replay claims once, after every selected signature and nested check passes. See [replay protection](replay-protection.md). |
+| `content`, `replay` | As for generic policies. Required replay accepts exactly one selected signature and claims its covered facts, without the label. More selected signatures return `unexpected_signature` at `policy` after verification; nested envelopes require `replay: "not_required"`. See [replay protection](replay-protection.md). |
 | `components` | Extra coverage to require. Default `"()"`; authority or target URI coverage is always required. |
 | `maxLifetime` | 1 to 604,800 seconds, default 86,400. |
 | `testKeys` | `"reject"` (default) refuses published example keys; `"allow"` is for tests. |
@@ -163,7 +163,7 @@ Include a fresh `nonce` whenever the site may require replay protection; a `null
 | `invalid_signature_agent` | The `Signature-Agent` field breaks the draft's dictionary rules. The detail is `invalid_dictionary`, `invalid_member`, `duplicate_member`, or `legacy_string` (the old string form). |
 | `invalid_keyid` | The `keyid` is not an RFC 7638 thumbprint. |
 | `missing_required_component` | The signature covers neither `@authority` nor `@target-uri`, or omits its own `signature-agent` member. |
-| `unexpected_signature` | The policy sets `untagged: "reject"` and the message carries a signature without the `web-bot-auth` tag. |
+| `unexpected_signature` | The policy sets `untagged: "reject"` and a signature lacks the `web-bot-auth` tag, or required replay found more than one selected signature. |
 | `lifetime_exceeded` | `expires` minus `created` is longer than `maxLifetime`. |
 | `nested_coverage_incomplete` | An outer signature does not cover the inner signature and its components. |
 | `test_key_rejected` | The key is a published example key. |

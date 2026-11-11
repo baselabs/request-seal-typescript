@@ -71,7 +71,7 @@ test("documented profile commitment separates equal nonces while nonce-only comm
     rejection(await Seal.verify(m, generic, {label: "agent"}), "replayed");
   }
 });
-test("one whole-envelope claim follows every selected signature and no failed envelope reaches storage", async (t) => {
+test("required replay claims one selected signature over covered facts only", async (t) => {
   const counted = counting();
   const committed: Seal.WebBotAuthReplayFacts[] = [];
   const replay = {
@@ -110,10 +110,18 @@ test("one whole-envelope claim follows every selected signature and no failed en
   );
   assert.equal(counted.claims.length, 0);
   assert.equal(committed.length, 0);
-  const r = value(await Seal.WebBotAuth.verify(m, p));
+  value(await Seal.WebBotAuth.verify(m, policy()));
+  const multiple = await Seal.WebBotAuth.verify(m, p);
+  rejection(multiple, "unexpected_signature");
+  assert.equal(!multiple.ok && multiple.error.kind === "core" && multiple.error.layer, "policy");
+  assert.equal(counted.claims.length, 0);
+  assert.equal(committed.length, 0);
+  const single = await request();
+  const r = value(await Seal.WebBotAuth.verify(single, p));
   assert.equal(counted.claims.length, 1);
   assert.equal(committed.length, 1);
-  assert.equal(committed[0]!.signatures.length, 2);
+  assert.equal(committed[0]!.signatures.length, 1);
+  assert.equal(Object.hasOwn(committed[0]!.signatures[0]!, "label"), false);
   assert.equal(
     committed[0]!.profile.revision,
     "draft-ietf-webbotauth-httpsig-protocol-00",
@@ -122,11 +130,67 @@ test("one whole-envelope claim follows every selected signature and no failed en
     assert.equal("provenance" in f.agent, false);
   for (const v of Object.values(r.signatures)) assert.equal(v.replay, r.replay);
   assert.equal(r.replay !== "not_required" && r.replay.retainUntil, now + 3600);
-  rejection(await Seal.WebBotAuth.verify(m, p), "replayed");
+  rejection(await Seal.WebBotAuth.verify(single, p), "replayed");
   assert.equal(counted.claims.length, 2);
   t.diagnostic(
-    "failed envelopes: claims=0 commitments=0; valid two-signature envelope: claims=1 commitments=1; replay: already_claimed",
+    "failed and multiple-signature envelopes: no claim; one verified signature: one claim; replay: already_claimed",
   );
+});
+
+for (const attack of ["relabel", "removal", "combination"] as const)
+test(`required replay rejects captured signature ${attack}`, async () => {
+  const h = await custody();
+  try {
+    const key = value(await h.publicKey());
+    const keyid = value(await key.thumbprint());
+    const heldKeys = () => Seal.ok({ algorithm: "ed25519" as const, key });
+    const counted = counting();
+    let commitments = 0;
+    const replay = {
+      identifier: "nonce", namespace: new Uint8Array([7]), timeoutMs: 5000,
+      store: counted.store,
+      commitment: async (facts: Seal.WebBotAuthReplayFacts) => {
+        commitments++;
+        return Seal.ok(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(facts)))));
+      },
+    };
+    const p = policy({ unresolved: { heldKeys }, replay });
+    const withoutReplay = policy({ unresolved: { heldKeys } });
+    const original = await request("held-key");
+    const relabeled = rewrite(original, (n, w) =>
+      ["signature", "signature-input"].includes(n) ? w.replace(/^agent=/, "other=") : w);
+    value(await Seal.WebBotAuth.verify(relabeled, withoutReplay));
+    if (attack === "relabel") {
+      value(await Seal.WebBotAuth.verify(original, p));
+      rejection(await Seal.WebBotAuth.verify(relabeled, p), "replayed");
+      assert.equal(commitments, 2);
+      return;
+    }
+    const unsigned = value(Seal.Message.create({ ...original, fields: [] }));
+    const other = value(await Seal.sign(unsigned, {
+      label: "other", algorithm: "ed25519",
+      signatureInput: `("@authority");created=${now};expires=${now + 60};keyid="${keyid}";nonce="second-capture";tag="web-bot-auth"`,
+    }, h));
+    const combined = value(Seal.Message.create({
+      ...original, fields: [...original.fields, ...other.fields],
+    }));
+    value(await Seal.WebBotAuth.verify(combined, withoutReplay));
+    if (attack === "combination") {
+      value(await Seal.WebBotAuth.verify(original, p));
+      value(await Seal.WebBotAuth.verify(other, p));
+    }
+    const rejected = await Seal.WebBotAuth.verify(combined, p);
+    rejection(rejected, "unexpected_signature");
+    assert.equal(!rejected.ok && rejected.error.kind === "core" && rejected.error.layer, "policy");
+    assert.equal(commitments, attack === "combination" ? 2 : 0);
+    assert.equal(counted.claims.length, commitments);
+    if (attack === "removal") {
+      value(await Seal.WebBotAuth.verify(original, p));
+      rejection(await Seal.WebBotAuth.verify(original, p), "replayed");
+    }
+  } finally {
+    await h.release();
+  }
 });
 test("identical nonces have distinct generic and Web Bot Auth commitments in one namespace", async (t) => {
   const counted = counting(),
@@ -203,8 +267,8 @@ test("identical nonces have distinct generic and Web Bot Auth commitments in one
 });
 for (const exceeds of [false, true])
 test(exceeds
-  ? "envelope rejects retention beyond the clock maximum for every selected signature without claiming storage"
-  : "envelope retention uses the earliest acceptance end before applying the clock ceiling", async () => {
+  ? "signature rejects retention beyond the clock maximum without claiming storage"
+  : "signature retention accepts the clock ceiling", async () => {
   const h = await custody();
   try {
     const key = value(await h.publicKey()),
@@ -236,7 +300,6 @@ test(exceeds
       await Seal.Message.request("GET", "https://example.com/a", [], ""),
     );
     for (const [label, expires] of [
-      ["late", Seal.CLOCK_MAX_SECONDS + 10],
       ["early", Seal.CLOCK_MAX_SECONDS + (exceeds ? 1 : 0)],
     ] as const)
       m = value(

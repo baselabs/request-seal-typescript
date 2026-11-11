@@ -447,9 +447,12 @@ async function verifyWebBotAuthSpanned(
     const evidence = nested(selected, inputs);
     let replay: WebBotAuthVerification["replay"] = "not_required";
     if (p.replay !== "not_required") {
+      // RFC 9421 Section 7.2.5 leaves labels uncovered. A set of signatures
+      // also changes when captures are stripped or combined: claim one only.
+      ensure(selected.length === 1, "unexpected_signature", "policy");
       const facts: WebBotAuthReplayFacts["signatures"][number][] = [];
       const ends: number[] = [];
-      for (const [label, v] of Object.entries(results)) {
+      for (const v of Object.values(results)) {
         const params = Object.fromEntries(
           v.signature.parameters.map(([k, b]) => [k, b.value]),
         );
@@ -481,7 +484,6 @@ async function verifyWebBotAuthSpanned(
               });
         facts.push(
           Object.freeze({
-            label,
             identifier: params.nonce,
             algorithm: v.signature.algorithm,
             keyid: params.keyid as string,

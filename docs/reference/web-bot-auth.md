@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00 and the shared v0.5.2 conformance corpus · **Review when:** profile acceptance, discovery, or replay contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00 and the shared v0.5.2 conformance corpus · **Review when:** profile acceptance, discovery, or replay contracts change
 
 # Web Bot Auth
 
@@ -90,10 +90,12 @@ Nested evidence records coverage only. An inner label listed in evidence may be
 untagged or unverified. Callers intersect the evidence labels with the `signatures`
 map before relying on them as verified signatures.
 
-Required replay commits once after every selected signature, content check, and
-nested-coverage check succeeds. The commitment callback receives frozen
+Required replay accepts exactly one selected signature, otherwise returning
+`unexpected_signature` at `policy` after verification and before commitment or
+storage. Nested envelopes require `replay: "not_required"`. A claim runs after
+the signature, content, and nested-coverage checks succeed. The commitment callback receives frozen
 `{profile: {name: "web_bot_auth", revision}, signatures: [...]}`. Each entry
-contains `label`, `identifier` (nonce), `algorithm`, `keyid`, stable `agent`
+contains `identifier` (nonce), `algorithm`, `keyid`, stable `agent`
 facts, `created`, and `expires`. Agent facts are `{kind, identifier, type, origin, thumbprint}`
 without `provenance`, so they omit source proof, cache revision, and fetch time;
 held-key facts are `{kind: "key", thumbprint}`.
@@ -102,12 +104,11 @@ separate generic and Web Bot Auth claims. The library does not prefix the
 namespace or commitment output with the profile; a nonce-only commitment in a
 shared namespace collides across profiles, matching the reference. Use distinct
 caller namespaces or the [profile-aware commitment recipe](replay.md).
-Sort stable signature identities when
-wire-order-independent replay scope is required. Hash the encoded bytes and
-return a Result containing 1–256 commitment bytes. Labels and retention are
-metadata, not automatic uniqueness scope. Retention is the earliest acceptance
-end across the complete envelope; the clock ceiling applies to that end. One
-receipt is shared by all selected signature facts. See [replay](replay.md).
+The uncovered label is never included (RFC 9421 Section 7.2.5), so relabeling a
+capture cannot change its claim. Refusing multiple selected signatures prevents
+stripped or recombined captures from producing new set commitments. Hash the
+encoded facts and return a Result containing 1–256 commitment bytes. Retention
+is the signature's acceptance end, bounded by the clock ceiling. See [replay](replay.md).
 
 Matching the reference, verification reads the freshness clock separately for
 the profile check, associated-key lookup, and generic signature check. Each

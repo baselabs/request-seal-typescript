@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** design · **Updated:** November 3, 2026 · **Governed by:** the public security invariants, the pinned Elixir peer, WebCrypto, public standards, and executed boundary tests · **Review when:** a trust boundary, profile, adapter, data shape, custody mechanic, or runtime behavior changes
+**Status:** maintained · **Kind:** design · **Updated:** November 11, 2026 · **Governed by:** the public security invariants, the pinned Elixir peer, WebCrypto, public standards, and executed boundary tests · **Review when:** a trust boundary, profile, adapter, data shape, custody mechanic, or runtime behavior changes
 
 # RequestSeal threat model
 
@@ -20,7 +20,7 @@ The caller controls accepted profiles, trusted origins and proxies, trust anchor
 2. **A signature covers only what it names.** A signed digest field authenticates body content only after digest recomputation succeeds. Enforced in `test/sign-verify.test.ts` (`digest_mismatch`) and `test/digest-policy-negotiation.test.ts`; the migration tests in `interop/migration/claims.test.ts` show the contrast with a library that never reads a body.
 3. **Key possession is not identity.** Identity needs a trusted, profile-valid key association with provenance. A generic verification records `principal: "unattributed"`; Web Bot Auth records an agent principal only when a configured source vouched for the key, and a held-key principal otherwise. Enforced in `test/sign-verify-contract.test.ts` and `test/web-bot-auth-discovery.test.ts`.
 4. **Authentication is not authorization.** Every verification, JWS result, and JWE result carries `authorization: "not_evaluated"`. RequestSeal never permits an application action.
-5. **Replay success needs one atomic claim over the complete authenticated envelope.** The claim runs last, after cryptography and required content checks, and it covers every selected signature. Enforced in `test/replay-verify.test.ts`, `test/replay-fixes.test.ts`, `test/web-bot-auth-replay.test.ts`, and the real PostgreSQL store tests.
+5. **Replay success needs one atomic claim over covered facts.** The claim runs last, after cryptography and required content checks. Required Web Bot Auth replay accepts exactly one selected signature and omits its uncovered label; multiple selected signatures reject before commitment or storage. Enforced in `test/replay-verify.test.ts`, `test/replay-fixes.test.ts`, `test/web-bot-auth-replay.test.ts`, and the real PostgreSQL store tests.
 6. **Private keys stay behind custody handles.** No error, inspection, serialization, or telemetry path exports them. See [custody and cryptographic boundaries](#custody-and-cryptographic-boundaries).
 7. **Failed or incomplete verification never yields a partially trusted principal.** A verification is a frozen, branded value that exists only after every required layer succeeds; every other outcome is an error `Result`.
 8. **Profile labels do not weaken rules.** There is no generic or legacy fallback after a named-profile failure.
@@ -47,7 +47,7 @@ The caller controls accepted profiles, trusted origins and proxies, trust anchor
 
 ## Profile-specific hazards
 
-Web Bot Auth discovery can turn a signed field into a network capability. The selected draft permits more than one discovery type. Selection is configuration, not content negotiation by an attacker. Directory signatures and requests have their own profile rules; support for `req` in one does not imply support in the other. Nested signatures must independently satisfy required coverage before one whole-envelope replay claim.
+Web Bot Auth discovery can turn a signed field into a network capability. The selected draft permits more than one discovery type. Selection is configuration, not content negotiation by an attacker. Directory signatures and requests have their own profile rules; support for `req` in one does not imply support in the other. Nested signatures must independently satisfy required coverage. Required replay accepts exactly one selected signature and omits its uncovered label (RFC 9421 Section 7.2.5), preventing relabeled, stripped, or recombined captures from claiming afresh. Nested envelopes require `replay: "not_required"`.
 
 ## Generic JOSE threats
 

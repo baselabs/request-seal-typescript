@@ -32,11 +32,10 @@ export type WebBotAuthSignature = Omit<Verification, "profile" | "principal"> &
     profile: WebBotAuthProfile;
     principal: AgentPrincipal | HeldPrincipal;
   }>;
-/** Verified Web Bot Auth envelope facts supplied to a replay commitment callback. */
+/** One verified Web Bot Auth signature's covered facts, without its uncovered label. */
 export type WebBotAuthReplayFacts = Readonly<{
   profile: WebBotAuthProfile;
   signatures: readonly Readonly<{
-    label: string;
     identifier: string;
     algorithm: SigningAlgorithm;
     keyid: string;

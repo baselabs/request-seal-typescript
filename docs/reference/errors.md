@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** the error vocabulary in `src/errors/parity.ts` and the code that returns each reason · **Review when:** a reason is added, removed, or starts to be returned on a new path
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the error vocabulary in `src/errors/parity.ts` and the code that returns each reason · **Review when:** a reason is added, removed, or starts to be returned on a new path
 
 # Error reasons
 
@@ -69,7 +69,7 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/policy.nested_coverage_incomplete` | An outer Web Bot Auth signature does not cover the inner signature it vouches for. | Reject the request. |
 | `core/policy.test_key_rejected` | The key is a published example key. | Reject; allow only with `testKeys: "allow"` in tests. |
 | `core/policy.unexpected_component` | The signature covers a component that `extraComponents: "reject"` refuses. | Reject unexpected coverage; change the policy only when the integration contract changes. |
-| `core/policy.unexpected_signature` | With `untagged: "reject"`, a signature lacks the `web-bot-auth` tag. | Reject unrelated labels under this policy. Ignore them only if your integration explicitly permits them. |
+| `core/policy.unexpected_signature` | A signature lacks the `web-bot-auth` tag under `untagged: "reject"`, or required replay has more than one selected signature. | Required replay needs exactly one selected signature. Verify nested envelopes with `replay: "not_required"`. |
 | `core/quorum.ambiguous_key_identity` | When counting keys, a required slot matched only signatures with no known key identity. | Supply key identities through the resolver. |
 | `core/quorum.deadline` | The caller's wall-clock deadline exhausted the assignment search before a satisfying assignment completed. Retryable. | Retry with a later deadline or under less load. |
 | `core/quorum.binding_unsatisfied` | A nested or same-parameter binding failed. | Reject the request. |

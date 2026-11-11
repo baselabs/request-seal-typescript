@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** the atomic replay envelope and the shared v0.5.2 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the atomic replay envelope and the shared v0.5.2 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
 
 # Replay protection
 
@@ -60,7 +60,10 @@ values from the authenticated stamp, rather than the conversion in
 Include stable authenticated key and agent identities in that encoding when they
 define the caller's uniqueness scope. Use the same encoding and namespace for
 every verifier of that scope. A profile-aware claim still rejects repeats within
-its own profile. See [Web Bot Auth](web-bot-auth.md) for envelope facts.
+its own profile. Required Web Bot Auth replay accepts exactly one selected signature and omits its
+uncovered label; multiple selected signatures return `unexpected_signature` at
+`policy` after verification, before commitment or storage. Nested envelopes require
+`replay: "not_required"`. See [Web Bot Auth](web-bot-auth.md) for the facts.
 
 `Claim.create({namespace, key, retainUntil})` returns a frozen, privately branded
 claim with copied byte getters. Retention is integer Unix seconds from
