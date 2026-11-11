@@ -93,7 +93,7 @@ Never use a bare JSON number for a wire value. Explicit pairs preserve member or
 | `crypto.verify` | Algorithm, key reference, data, signature. Valid or rejection. |
 | `key.import` | Material bytes or file; pem/pkcs8/jwk format; algorithm. Valid with public JWK/thumbprint, or rejection. |
 | `jws.sign`, `jws.verify`, `jwe.decrypt`, `nested.decrypt` | Compact serialization and protected pairs; explicit policy. Deterministic signing bytes, valid with payload where applicable, or rejection. |
-| `web_bot_auth.verify` | Message, signed directory body bytes, trusted agent origins, explicit policy, time. Verification or rejection. |
+| `web_bot_auth.verify` | Message, signed directory body bytes, agent sources the caller trusts, explicit policy, time. Verification or rejection. |
 | `discovery.body` | Body bytes; jwks/directory/cimd kind; limits. Key thumbprints or rejection. |
 | `replay.claim` | Namespace/key bytes; created, expires, max_age, and skew tagged integers, with nullable expires/max_age. Retention integer and hexadecimal row form, or rejection. |
 | `profile.name` | Built-in profile name or package/kind pair. Valid or `core/input.invalid_profile`. |
@@ -126,7 +126,7 @@ HTTP algorithms use their token string. A JWS-algorithm selection uses the pair
 }
 ```
 
-`profile` is `{name: "rfc9421"}`, `{name: "web_bot_auth", revision: "draft-ietf-webbotauth-httpsig-protocol-00"}`, or `{name: [package, kind]}`. `content` may be `{kind: "content-digest", checked: ["sha-256"], bytes: {int: "18"}, unsupported: []}`. `freshness` may carry tagged `now`, `created`, `expires`, `max_age`, and `skew`, with nullable expires/max_age. `replay` may carry `{store: "store", retain_until: {int: "<seconds>"}}`; receipts carry neither namespace nor commitment key. Store identity naming is a per-language label. Cross-language comparison uses the receipt's `retain_until` and the normalized store label `"store"`; the runtime receipt retains its public adapter identity. `principal` may carry the trusted agent origin, source kind, and thumbprint. Authorization remains unevaluated.
+`profile` is `{name: "rfc9421"}`, `{name: "web_bot_auth", revision: "draft-ietf-webbotauth-httpsig-protocol-00"}`, or `{name: [package, kind]}`. `content` may be `{kind: "content-digest", checked: ["sha-256"], bytes: {int: "18"}, unsupported: []}`. `freshness` may carry tagged `now`, `created`, `expires`, `max_age`, and `skew`, with nullable expires/max_age. `replay` may carry `{store: "store", retain_until: {int: "<seconds>"}}`; receipts carry neither namespace nor commitment key. Store identity naming is a per-language label. Cross-language comparison uses the receipt's `retain_until` and the normalized store label `"store"`; the runtime receipt retains its public adapter identity. `principal` may carry the agent's caller-trusted origin, source kind, and thumbprint. Authorization remains unevaluated.
 
 Web Bot Auth canonical serialization is a map keyed by selected signature label in
 lexical order, each value using the single-label shape above with the protocol-00
