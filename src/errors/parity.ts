@@ -1,6 +1,6 @@
 // Derived from pinned Elixir constructors and call sites; regenerate with scripts/generate-parity.ts or scripts/render-parity.ts --update-table.
 /** The immutable reference release used for the error vocabulary. */
-export const ELIXIR_ERROR_PIN = '53b6690ccd5036d58b280d08cf0cacc6427262fe';
+export const ELIXIR_ERROR_PIN = 'ffea562f139e80a6f9783fcfc0877718c2476bf5';
 const entries = [
   {
     "kind": "core",
@@ -227,12 +227,6 @@ const entries = [
   {
     "kind": "core",
     "layer": "input",
-    "reason": "invalid_quorum",
-    "rule_id": "core/input.invalid_quorum"
-  },
-  {
-    "kind": "core",
-    "layer": "input",
     "reason": "invalid_request",
     "rule_id": "core/input.invalid_request"
   },
@@ -298,12 +292,6 @@ const entries = [
   },
   {
     "kind": "core",
-    "layer": "negotiation",
-    "reason": "negotiation_unfulfilled",
-    "rule_id": "core/negotiation.negotiation_unfulfilled"
-  },
-  {
-    "kind": "core",
     "layer": "policy",
     "reason": "algorithm_mismatch",
     "rule_id": "core/policy.algorithm_mismatch"
@@ -349,42 +337,6 @@ const entries = [
     "layer": "policy",
     "reason": "unexpected_signature",
     "rule_id": "core/policy.unexpected_signature"
-  },
-  {
-    "kind": "core",
-    "layer": "quorum",
-    "reason": "ambiguous_key_identity",
-    "rule_id": "core/quorum.ambiguous_key_identity"
-  },
-  {
-    "kind": "core",
-    "layer": "quorum",
-    "reason": "binding_unsatisfied",
-    "rule_id": "core/quorum.binding_unsatisfied"
-  },
-  {
-    "kind": "core",
-    "layer": "quorum",
-    "reason": "deadline",
-    "rule_id": "core/quorum.deadline"
-  },
-  {
-    "kind": "core",
-    "layer": "quorum",
-    "reason": "nonqualifying_signature",
-    "rule_id": "core/quorum.nonqualifying_signature"
-  },
-  {
-    "kind": "core",
-    "layer": "quorum",
-    "reason": "quorum_not_met",
-    "rule_id": "core/quorum.quorum_not_met"
-  },
-  {
-    "kind": "core",
-    "layer": "quorum",
-    "reason": "unexpected_signature",
-    "rule_id": "core/quorum.unexpected_signature"
   },
   {
     "kind": "core",
@@ -1243,14 +1195,6 @@ const retryableRules = {
       "kind": "constant",
       "value": false
     },
-    "ambiguous_key_identity": {
-      "kind": "constant",
-      "value": false
-    },
-    "binding_unsatisfied": {
-      "kind": "constant",
-      "value": false
-    },
     "body_unavailable": {
       "kind": "constant",
       "value": false
@@ -1262,10 +1206,6 @@ const retryableRules = {
     "created_in_future": {
       "kind": "constant",
       "value": false
-    },
-    "deadline": {
-      "kind": "constant",
-      "value": true
     },
     "digest_mismatch": {
       "kind": "constant",
@@ -1328,10 +1268,6 @@ const retryableRules = {
       "value": false
     },
     "invalid_profile": {
-      "kind": "constant",
-      "value": false
-    },
-    "invalid_quorum": {
       "kind": "constant",
       "value": false
     },
@@ -1407,23 +1343,11 @@ const retryableRules = {
       "kind": "constant",
       "value": false
     },
-    "negotiation_unfulfilled": {
-      "kind": "constant",
-      "value": false
-    },
     "nested_coverage_incomplete": {
       "kind": "constant",
       "value": false
     },
     "no_web_bot_auth_signature": {
-      "kind": "constant",
-      "value": false
-    },
-    "nonqualifying_signature": {
-      "kind": "constant",
-      "value": false
-    },
-    "quorum_not_met": {
       "kind": "constant",
       "value": false
     },
@@ -1938,7 +1862,7 @@ const retryableRules = {
       "minimum": 500,
       "maximum": 599,
       "path": "lib/request_seal/discovery.ex",
-      "line": 517
+      "line": 534
     },
     "unknown_key": {
       "kind": "constant",

@@ -23,6 +23,7 @@ export const portableFiles = [
   'discovery-core-fixes.test.ts',
   'discovery-transport-errors.test.ts',
   'error-branding.test.ts',
+  'fault-envelope.test.ts',
   'jose-header.test.ts',
   'policy.test.ts',
   'profile-types.test.ts',

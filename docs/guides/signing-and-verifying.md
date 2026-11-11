@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9530, and the executed examples in this guide · **Review when:** signing, policy, digest, or verification contracts change
+**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421, RFC 9530, and the executed examples in this guide · **Review when:** signing, policy, digest, or verification contracts change
 
 # Signing and verifying
 
@@ -131,7 +131,7 @@ A representation digest (`kind: "representation"`) needs the complete representa
 
 ### Several signatures
 
-A message can carry more than one signature, for example one from the sender and one from a gateway. Verify the label you expect with `verify`. When a request must carry several, build a `Quorum` and call `verifyQuorum`: each assigned signature must meet its own complete policy, and coverage is never pooled across signatures. See [multiple signatures](../reference/quorum.md).
+RequestSeal verifies each signature label independently with `verify(message, policy, { label })` and returns its result. Each signature must satisfy its complete policy; coverage is never pooled. Deciding how many signers or which signers an application requires, and mapping a verified signer to application identity or authority, is the application's job.
 
 ## Respond to a rejection
 
@@ -156,7 +156,7 @@ type Rejection = { kind: string; reason: string; layer?: string; detail?: string
 // The default status for every kind (and layer); the exceptions below name single reasons.
 const families: Record<string, number> = {
   "core/binding": 403, "core/content": 401, "core/crypto": 500, "core/fields": 400, "core/freshness": 401, "core/input": 500, "core/internal": 500, "core/key": 401,
-  "core/negotiation": 400, "core/policy": 401, "core/quorum": 401, "core/replay": 401,
+  "core/negotiation": 400, "core/policy": 401, "core/replay": 401,
   message: 400, structured_fields: 400, signature_base: 400, digest: 400, crypto: 500, custody: 500, discovery: 401,
   "jose/crypto": 401, "jose/input": 400, "jose/key": 401, "jose/nesting": 400, replay: 503, adapter: 500,
 };
@@ -167,8 +167,8 @@ const exceptions: Record<string, number> = {
   "core/fields.missing_signature": 401, "core/fields.missing_signature_input": 401, "core/fields.no_web_bot_auth_signature": 401, "core/fields.unknown_label": 401,
   "core/fields.label_in_use": 500, "core/freshness.invalid_clock": 500,
   "core/input.invalid_message": 400, "core/input.invalid_request": 400, "core/input.limit": 400, "core/input.unsupported_component": 400,
-  "core/key.key_resolver_failed": 500, "core/negotiation.negotiation_unfulfilled": 401, "core/policy.test_key_rejected": 403,
-  "core/quorum.ambiguous_key_identity": 500, "core/internal.internal": 500, "core/replay.commitment_failed": 500,
+  "core/key.key_resolver_failed": 500, "core/policy.test_key_rejected": 403,
+  "core/internal.internal": 500, "core/replay.commitment_failed": 500,
   "core/replay.store_failed": 503, "core/replay.store_timeout": 503, "core/replay.store_unavailable": 503,
   "crypto/invalid_signature": 401, "crypto/invalid_data": 400, "custody/invalid_signature": 401, "custody/decryption_failed": 401,
   "discovery/revoked_key": 403, "discovery/invalid_options": 500, "discovery/invalid_source": 500, "discovery/domain_not_found": 500, "discovery/ambiguous_key_source": 500, "discovery/transport_unavailable": 500,

@@ -46,7 +46,11 @@ export class PublicKey {
     branded.add(this);
     Object.freeze(this);
   }
-  /** Import public JWK, PEM, or SPKI material without discarding metadata restrictions. */
+  /**
+   * Import public JWK, PEM, or SPKI material without discarding metadata restrictions.
+   * Ed25519 encodings must decompress under RFC 8032 Section 5.1.3 as well as
+   * being canonical and outside the small-order blocklist, in every format.
+   */
   static async import(
     material: unknown,
     format: 'jwk' | 'pem' | 'spki' | 'der' = 'jwk',

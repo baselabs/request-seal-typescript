@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** the shared RequestSeal corpus contract · **Review when:** manifest schema or canonical serialization changes
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the shared RequestSeal corpus contract · **Review when:** manifest schema or canonical serialization changes
 
 # Conformance corpus format
 
@@ -88,7 +88,6 @@ Never use a bare JSON number for a wire value. Explicit pairs preserve member or
 | `signature_base.build` | Message, serialized Signature-Input inner-list `parameters`, optional `field_schemas`. Base bytes or rejection. |
 | `sign` | Message; explicit label/signature_input/algorithm spec or six-key signing spec; clock and nonce options. Exact appended field-value pair array for HMAC, Ed25519, and RSA PKCS #1; sign-then-verify for ECDSA and RSA-PSS; or rejection. |
 | `verify` | Message, selected label, options, explicit policy. Verification or rejection. |
-| `quorum.verify` | Message and quorum. Quorum verification or rejection. |
 | `accept_signature.parse` | Raw bytes. Canonical bytes or rejection. |
 | `digest.content` | Content bytes, algorithms, content-digest/repr-digest selector. Bytes or rejection. |
 | `crypto.verify` | Algorithm, key reference, data, signature. Valid or rejection. |
@@ -103,7 +102,7 @@ An unregistered surface or batch item format is reported as pending with case ID
 
 ## Canonical Verification
 
-Members appear in the following order. Covered identifiers retain base order; parameters retain wire order. Quorum serialization uses the corresponding quorum result shape.
+Members appear in the following order. Covered identifiers retain base order; parameters retain wire order.
 
 HTTP algorithms use their token string. A JWS-algorithm selection uses the pair
 `["jws", "<name>"]`, for example `["jws", "PS384"]`, in Verification facts.
@@ -136,20 +135,14 @@ thumbprint}`; held-key principals contain `{thumbprint}`. This intentionally
 projects the full runtime provenance into the pinned comparison shape. Envelope
 evidence and ignored labels remain runtime facts outside this canonical map.
 
-Quorum facts have this member order: `profile`, `mode`, `unit`, `required`,
-`satisfied`, `count`, `qualifying`, `signatures`, `nonqualifying`, `bindings`,
-`negotiation`, `replay`, `principal`, `authorization`. Threshold mode is
-`["threshold", {"int": "n"}]`; units are `"key"`, `"principal"`, or
-`["role", [["shared_principal", boolean]]]`. Count is a tagged integer.
-Required and satisfied slot IDs retain configured order. Qualifying entries
-contain label, slot, principal, and role. Signatures are keyed by assigned label
-in lexical order, with each value serialized as a single-label Verification.
-Nonqualifying entries contain label, slot (nullable), bounded reason, and layer.
-Bindings are `"not_required"` or ordered `[binding, "satisfied"]` pairs, with
-nested binding encoded as `["nested", [["outer", id], ["inner", id]]]` and
-same-parameter binding as `["same_parameter", name, [ids]]`. Negotiation is
-`"not_requested"` or `"fulfilled"`. Replay stays `"not_required"`, principal
-stays `"unattributed"`, and authorization stays `"not_evaluated"`.
+The pinned 0.5.2 corpus still contains two retired composite-verification cases.
+They have no execution surface in this package and are listed exactly in
+`tools/conformance/pending.json`. Their manifest error vocabulary remains tied to
+that corpus release in `tools/conformance/elixir-reasons-53b6690.json`, independently
+of the current public error vocabulary. Integrity and unknown-rule checks still
+apply to every manifest. A strict run rejects pending surfaces; the existing
+`--pending-ok` run permits only the exact inventory. The corpus bytes and pin stay
+unchanged until the next corpus release.
 
 ## Crypto and key import execution
 

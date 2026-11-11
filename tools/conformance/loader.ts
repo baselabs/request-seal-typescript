@@ -1,6 +1,6 @@
 import {profileSurface} from "./profile-surface.ts";
 import {webBotAuthSurface} from './web-bot-auth.ts';
-import {quorumSurface,acceptSignatureSurface} from './quorum-surfaces.ts';
+import {acceptSignatureSurface} from './accept-signature.ts';
 import {replaySurface} from './replay-surfaces.ts';
 import {joseSurface} from './jose-surfaces.ts';
 import {signSurface,verifySurface,digestSurface} from './sign-surfaces.ts';
@@ -17,7 +17,13 @@ import { snapshotOptions } from '../../src/brand.ts';
 import { decodeJson, type JsonNode } from '../../src/json.ts';
 import { decodeBase64Url, encodeBase64Url } from '../../src/bytes.ts';
 import { CORPUS_PIN, DIGEST_MAX_BYTES, DISCOVERY_MAX_BYTES } from '../../src/constants.ts';
-import {RULE_IDS, type ErrorKind} from '../../src/errors/parity.ts';
+import type {ErrorKind} from '../../src/errors/parity.ts';
+import {readFileSync} from 'node:fs';
+// Manifest validity belongs to the pinned corpus release, independently of the
+// current public error vocabulary. Unsupported surfaces remain exactly pending.
+const corpusVocabulary = JSON.parse(readFileSync(new URL('./elixir-reasons-53b6690.json', import.meta.url), 'utf8')) as {commit: string; entries: {rule_id: string}[]};
+if (corpusVocabulary.commit !== CORPUS_PIN.commit) throw new Error('Corpus vocabulary pin mismatch');
+const RULE_IDS = new Set(corpusVocabulary.entries.map(e => e.rule_id));
 import { ruleId, joseError } from '../../src/errors/types.ts';
 import { ok, err, type Result } from '../../src/result.ts';
 import { SMOKE_INDEX_SHA256 } from './smoke-pin.ts';
@@ -155,7 +161,7 @@ export function surfaceRegistry(): ReadonlyMap<string, Surface> {
   const entries: [string, Surface, readonly ErrorKind[]][] = [
     ["profile.name", profileSurface, ["core","custody"]],
     ['web_bot_auth.verify', webBotAuthSurface, ['core']],
-    ['replay.claim', replaySurface, ['core','replay']], ['quorum.verify', quorumSurface, ['core','custody']],
+    ['replay.claim', replaySurface, ['core','replay']],
     ['accept_signature.parse', acceptSignatureSurface, ['core']], ['smoke', smoke, ['jose']],
     ['sign', signSurface, ['core','custody']], ['verify', verifySurface, ['core','custody']],
     ['digest.content', digestSurface, ['digest']], ['crypto.verify', cryptoVerify, ['crypto','custody']],

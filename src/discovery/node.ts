@@ -1,4 +1,5 @@
 import { Agent, request } from "node:https";
+import { BODY_MAX_CHUNKS } from "../constants.ts";
 import type { IncomingMessage } from "node:http";
 import { promises as dns } from "node:dns";
 import { isIP } from "node:net";
@@ -413,13 +414,13 @@ async function get(
           }
           ensure(length === null || Number(length) <= source.maxBytes, "limit");
           const chunks: Uint8Array[] = [];
-          let size = 0;
+          let size = 0, count = 0;
           res.on("data", (chunk: Buffer) => {
             try {
               remaining(context);
               size += chunk.length;
-              ensure(size <= source.maxBytes, "limit");
-              chunks.push(new Uint8Array(chunk));
+              ensure(++count < BODY_MAX_CHUNKS && size <= source.maxBytes, "limit");
+              if (chunk.length) chunks.push(new Uint8Array(chunk));
             } catch (error) {
               cleanup();
               fail(error);
@@ -584,7 +585,7 @@ async function conditional(
       "invalid_options",
     );
     const clock = Object.hasOwn(a, "clock") ? a.clock : systemClock;
-    clockValue(clock);
+    const requestedAt = clockValue(clock);
     let servers: readonly string[] | undefined;
     if (Object.hasOwn(a, "dnsServers")) {
       servers = Object.freeze(
@@ -647,7 +648,7 @@ async function conditional(
             etag: validator!.etag,
             fetchedAt: now,
             expiresAt: hasFreshness(outer.fields)
-              ? expiry(outer.fields, source, now)
+              ? expiry(outer.fields, source, now, requestedAt)
               : now + validator!.lifetime,
           });
           return ok(fresh);
@@ -678,7 +679,9 @@ async function conditional(
               }),
               "invalid_source",
             );
+            const nestedRequestedAt = clockValue(clock);
             const nested = await resource(url, nestedSource, context, servers);
+            const nestedReceivedAt = clockValue(clock);
             // The nested subresource is always fetched unconditionally, so a
             // 304 cannot occur here; keep the rejection total anyway.
             if ("notModified" in nested)
@@ -690,9 +693,11 @@ async function conditional(
               now,
               nested.fields,
               nested.location,
-              expiry(outer.fields, source, now),
+              expiry(outer.fields, source, now, requestedAt),
               true,
               context,
+              nestedRequestedAt,
+              nestedReceivedAt,
             );
             remaining(context);
             return result;
@@ -708,6 +713,8 @@ async function conditional(
           undefined,
           false,
           context,
+          requestedAt,
+          now,
         );
         remaining(context);
         return result;

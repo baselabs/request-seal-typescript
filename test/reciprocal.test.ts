@@ -4,14 +4,14 @@ import {readFileSync, existsSync} from 'node:fs';
 import {ELIXIR_ERROR_PIN} from '../src/errors/parity.ts';
 import {CORPUS_PIN} from '../src/constants.ts';
 
-test('the reciprocal peer and both pins track the same Elixir release', () => {
+test('the reciprocal peer and corpus retain their pin while public errors track 1.0.0', () => {
   assert.ok(existsSync('interop/elixir/mix.exs'), 'published reciprocal peer workspace exists');
   const project = readFileSync('interop/elixir/mix.exs', 'utf8');
-  const fixture = JSON.parse(readFileSync('test/fixtures/elixir-reasons-53b6690.json', 'utf8')) as Record<string, unknown>;
-  assert.equal(ELIXIR_ERROR_PIN, '53b6690ccd5036d58b280d08cf0cacc6427262fe');
+  const fixture = JSON.parse(readFileSync('test/fixtures/elixir-reasons-ffea562.json', 'utf8')) as Record<string, unknown>;
+  assert.equal(ELIXIR_ERROR_PIN, 'ffea562f139e80a6f9783fcfc0877718c2476bf5');
   assert.ok(JSON.stringify(fixture).includes(ELIXIR_ERROR_PIN));
   assert.match(project, /\{:request_seal, "== 0\.5\.2"\}/);
-  assert.equal(CORPUS_PIN.tag, 'v0.5.2', 'the corpus, the error vocabulary, and the reciprocal peer all track the v0.5.2 release');
+  assert.equal(CORPUS_PIN.tag, 'v0.5.2', 'the corpus and reciprocal peer retain the v0.5.2 release');
   assert.match(readFileSync('docs/reference/reciprocity.md', 'utf8'), /request_seal == 0\.5\.2/);
 });
 

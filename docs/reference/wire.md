@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RFC 8941, RFC 9651, and RFC 9421 · **Review when:** wire API contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** RFC 8941, RFC 9651, and RFC 9421 · **Review when:** wire API contracts change
 
 # Wire APIs
 
@@ -82,8 +82,10 @@ be `declared`; unknown protocol and TLS declarations are preserved.
 The asynchronous convenience builders
 `Message.request(method, absoluteHttpUrl, orderedPairs, bytesOrNull, options)`
 and `Message.response(status, orderedPairs, bytesOrNull, options)` retain body
-bytes. The request builder lowercases scheme/host and omits HTTP(S) default
-ports while preserving path and query octets. An absent path becomes `/`. Fragments and non-HTTP(S) schemes reject with
+bytes. The request builder preserves scheme, authority, path, and query spelling,
+including host case and explicit default ports. RFC 9421 Section 2.2.2 uses
+these sent bytes for `@target-uri`; only `@authority` and `@scheme` normalize
+during component derivation (Sections 2.2.3–2.2.4). An absent path becomes `/`. Fragments and non-HTTP(S) schemes reject with
 `invalid_message`.
 Direct `Message.create` supports all four target forms without normalization.
 Authorities follow RFC 3986 Section 3.2.2: bracketed hosts are IPv6 or IPvFuture

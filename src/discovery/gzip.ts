@@ -1,4 +1,6 @@
 import { ensure } from "./support.ts";
+import { BODY_MAX_CHUNKS } from "../constants.ts";
+import { trimOws } from "./headers.ts";
 import type { Context } from "../context.ts";
 import { deflateSize } from "./deflate.ts";
 const crcTable = Array.from({ length: 256 }, (_, n) => {
@@ -26,7 +28,7 @@ export async function decodeBody(
   cap: number,
   context?: Context,
 ): Promise<Uint8Array> {
-  coding = coding?.trim().toLowerCase() ?? "identity";
+  coding = coding === null ? "identity" : trimOws(coding).toLowerCase();
   if (coding === "identity") {
     ensure(bytes.length <= cap, "limit");
     return new Uint8Array(bytes);
@@ -79,15 +81,15 @@ export async function decodeBody(
   })();
   writing.catch(() => {});
   const chunks: Uint8Array[] = [];
-  let size = 0;
+  let size = 0, count = 0;
   try {
     while (true) {
       ensure(!context?.signal.aborted, "deadline_exceeded");
       const next = await reader.read();
       if (next.done) break;
       size += next.value.length;
-      ensure(size <= cap, "limit");
-      chunks.push(next.value);
+      ensure(++count < BODY_MAX_CHUNKS && size <= cap, "limit");
+      if (next.value.length) chunks.push(next.value);
     }
     await writing;
     ensure(!context?.signal.aborted, "deadline_exceeded");

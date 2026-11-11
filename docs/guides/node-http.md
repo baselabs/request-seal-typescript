@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** RFC 9421, RFC 9113, and executed Node, Express, and Fastify transport tests · **Review when:** a supported Node version, framework version, or adapter contract changes
+**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421, RFC 9113, and executed Node, Express, and Fastify transport tests · **Review when:** a supported Node version, framework version, or adapter contract changes
 
 # Node HTTP, Express, and Fastify
 
@@ -232,16 +232,20 @@ await app.close();
 
 Fastify is your application's dependency. Close the capture registration and server when shutting down.
 
-## Responses, Web Bot Auth, and quorums
+## Responses and Web Bot Auth
 
 - `signResponse(res, spec, signer, { body, request })` (plus optional `context`, `clock`, `nonce`, and `pendingCookies`) signs a final response over exactly the bytes it will send, writes and ends the response, and returns the signed `Message`. `request` must be a `Capture`. Do not write to the response afterward.
 - `verifyWebBotAuth(req, policy, { timeoutMs })` (plus optional `context`, `representation`, and `digestState`) verifies a Web Bot Auth request over the same capture. See [Web Bot Auth](web-bot-auth.md).
-- `verifyQuorum(req, quorum, options)` verifies several signatures from one request. See [multiple signatures](../reference/quorum.md).
 
-`verifyRequest`, `verifyWebBotAuth`, and `verifyQuorum` share the one-verification-per-request rule.
+`verifyRequest` and `verifyWebBotAuth` share the one-verification-per-request rule.
 
 ## Where to go next
 
 - [Replay protection](replay-protection.md) rejects a verified request that is sent again.
 - [Signing and verifying](signing-and-verifying.md) lists the status codes to send when verification fails.
 - [Testing](testing.md) shows how the framework tests run against real Express and Fastify.
+
+Retained body readers accept fewer than 16,384 producer chunks, including empty
+chunks, as well as enforcing the byte bound and Context deadline. Empty chunks
+are discarded. Reaching the work ceiling returns `limit` before another pull;
+a stalled producer is canceled through the operation's Context.

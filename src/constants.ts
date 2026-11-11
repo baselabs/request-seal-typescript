@@ -15,6 +15,8 @@ export const JOSE_MAX_COMPACT_BYTES = 1_048_576; // RequestSeal.JOSE.Support.byt
 export const JOSE_MAX_PLAINTEXT_BYTES = 1_048_576; // RequestSeal.JOSE.Support.
 /** Default maximum retained body bytes. */
 export const BODY_MAX_BYTES = 1_048_576; // RequestSeal.Body default retention.
+/** Retained-body producer work ceiling, including empty chunks; EOF must arrive sooner. */
+export const BODY_MAX_CHUNKS = 16_384; // RequestSeal.Signing at 1.0.0.
 /** Default maximum digest input bytes. */
 export const DIGEST_MAX_BYTES = 16_777_216; // RequestSeal.Digest default work ceiling.
 /** Fixed maximum cryptographic input byte limit. */
@@ -33,10 +35,6 @@ export const MESSAGE_MAX_TARGET_BYTES = 16_384; // RequestSeal.Message.
 export const MESSAGE_MAX_FIELD_BYTES = 65_536; // RequestSeal.Message.Validation.
 /** Maximum total HTTP field bytes. */
 export const MESSAGE_MAX_FIELDS_BYTES = 1_048_576; // RequestSeal.Message.
-/** Maximum quorum evaluation nodes. */
-export const QUORUM_MAX_NODES = 131_072; // RequestSeal.Quorum.Evaluation.
-/** Maximum signatures evaluated by a quorum. */
-export const QUORUM_MAX_SIGNATURES = 64; // RequestSeal.Quorum.
 /** Default maximum discovery response bytes. */
 export const DISCOVERY_DEFAULT_MAX_BYTES = 65_536; // RequestSeal.Discovery.Source.
 /** Fixed maximum discovery response bytes. */

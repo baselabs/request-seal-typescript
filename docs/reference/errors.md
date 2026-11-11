@@ -8,7 +8,7 @@ Adapter errors can carry the underlying error in `error.source`; the [adapter se
 
 ## core
 
-Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, and policy construction. `layer` says which stage failed.
+Returned by `sign`, `verify`, Web Bot Auth, Accept-Signature, and policy construction. `layer` says which stage failed.
 
 | Reason | Meaning | What to do |
 | --- | --- | --- |
@@ -49,7 +49,6 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/input.invalid_options` | An options object has an unknown key or a bad value. | Fix the options. |
 | `core/input.invalid_policy` | A policy is missing a choice, has an unknown key, or has a bad value. | Fix the policy. |
 | `core/input.invalid_profile` | A profile stamp is malformed or reserved, or generic `verify` received `profile` or `principal`. | Fix the stamp or options. |
-| `core/input.invalid_quorum` | A quorum definition is malformed. | Fix the quorum. |
 | `core/input.invalid_request` | Signing covers `content-length`, and the message's `Content-Length` disagrees with its body. | Fix the message. |
 | `core/input.limit` | An input exceeds a size, count, or depth bound. | Reject, or send less. |
 | `core/input.signer_algorithm_mismatch` | An exact-input spec's KeyHandle is bound to another algorithm. | Use a handle for the spec's algorithm. |
@@ -61,7 +60,6 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/negotiation.inapplicable_component` | An Accept-Signature request names a component that cannot apply to its target. | Reject the Accept-Signature field. |
 | `core/negotiation.invalid_accept_signature` | An Accept-Signature value is malformed. | Reject the field or fix the option. |
 | `core/negotiation.negotiation_unfulfillable` | Fulfillment could not produce a requested signature: the chooser refused or the signer failed. | Check the chooser and signer. |
-| `core/negotiation.negotiation_unfulfilled` | In `verifyQuorum` with `acceptSignature`, the qualifying signatures do not carry what a request asked for. | The sender signs as requested. |
 | `core/policy.algorithm_mismatch` | The sender's `alg` parameter differs from the resolved key's algorithm. | Reject the request. |
 | `core/policy.algorithm_not_permitted` | The algorithm is not in your policy's `algorithms`. | Reject; have the sender use an agreed algorithm from your allowlist. |
 | `core/policy.invalid_keyid` | A Web Bot Auth `keyid` is not an RFC 7638 thumbprint. | Reject the request. |
@@ -70,12 +68,6 @@ Returned by `sign`, `verify`, `verifyQuorum`, Web Bot Auth, Accept-Signature, an
 | `core/policy.test_key_rejected` | The key is a published example key. | Reject; allow only with `testKeys: "allow"` in tests. |
 | `core/policy.unexpected_component` | The signature covers a component that `extraComponents: "reject"` refuses. | Reject unexpected coverage; change the policy only when the integration contract changes. |
 | `core/policy.unexpected_signature` | A signature lacks the `web-bot-auth` tag under `untagged: "reject"`, or required replay has more than one selected signature. | Required replay needs exactly one selected signature. Verify nested envelopes with `replay: "not_required"`. |
-| `core/quorum.ambiguous_key_identity` | When counting keys, a required slot matched only signatures with no known key identity. | Supply key identities through the resolver. |
-| `core/quorum.deadline` | The caller's wall-clock deadline exhausted the assignment search before a satisfying assignment completed. Retryable. | Retry with a later deadline or under less load. |
-| `core/quorum.binding_unsatisfied` | A nested or same-parameter binding failed. | Reject the request. |
-| `core/quorum.nonqualifying_signature` | With `invalid: "reject"`, a signature failed its slot; `detail` is that slot's reason. | Reject the request. |
-| `core/quorum.quorum_not_met` | Too few qualifying signatures for the mode. | Reject the request. |
-| `core/quorum.unexpected_signature` | With `unexpected: "reject"`, a signature matched no slot. | Reject labels outside the quorum contract. |
 | `core/replay.commitment_failed` | Your commitment threw or returned anything but 1 to 256 bytes. | Fix the commitment. |
 | `core/replay.missing_replay_identifier` | Replay protection is required and the signature has no nonce. | The sender adds a nonce. |
 | `core/replay.replayed` | The signature was already used. | Reject the request. |

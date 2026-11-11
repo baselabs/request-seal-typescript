@@ -1,7 +1,8 @@
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { workingTreeFiles } from "./repository-files.ts";
 
 import MarkdownIt from "markdown-it";
 
@@ -57,7 +58,7 @@ export function documentationFences(root = process.cwd()): Fence[] {
   const files: string[] = [];
   // Include tracked documents and visible additions; ignore generated output and local hidden directories.
   if (existsSync(join(root, ".git"))) {
-    files.push(...execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--exclude=.[!.]*/", "--", "*.md"], {cwd: root, encoding: "utf8"}).trim().split("\n").filter(Boolean));
+    files.push(...workingTreeFiles(root, ["*.md"]));
   } else {
     const walk = (directory: string) => {
       for (const entry of readdirSync(join(root, directory), {withFileTypes: true})) {

@@ -6,6 +6,10 @@ import { ensure, unwrap, list } from "./support.ts";
 import type { DiscoverySource } from "./source.ts";
 /** Ordered discovery response header names and string or byte values. */
 export type Headers = readonly (readonly [string, string | Uint8Array])[];
+/** RFC 9110 Section 5.6.3: HTTP optional whitespace is only SP / HTAB. */
+export function trimOws(value: string): string {
+  return value.replace(/^[ \t]+|[ \t]+$/g, "");
+}
 export function fields(headers: unknown): readonly Field[] {
   let total = 0;
   return Object.freeze(
@@ -31,7 +35,7 @@ export function fields(headers: unknown): readonly Field[] {
 export function values(fs: readonly Field[], name: string): string[] {
   return fs
     .filter((f) => f.name.toLowerCase() === name)
-    .map((f) => String.fromCharCode(...f.value).trim());
+    .map((f) => trimOws(String.fromCharCode(...f.value)));
 }
 export function header(fs: readonly Field[], name: string): string | null {
   const all = values(fs, name);
@@ -59,7 +63,7 @@ export function httpDate(input: string | null, now: number): number | null {
         /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) ([A-Z][a-z]{2}) ( [0-9]|[0-9]{2}) ([0-9]{2}):([0-9]{2}):([0-9]{2}) ([0-9]{4})$/.exec(
           input,
         );
-      if (p) parts = [p[2]!.trim(), p[1]!, p[6]!, p[3]!, p[4]!, p[5]!];
+      if (p) parts = [trimOws(p[2]!), p[1]!, p[6]!, p[3]!, p[4]!, p[5]!];
     }
   }
   if (!parts) return null;
@@ -97,13 +101,14 @@ export function expiry(
   fs: readonly Field[],
   source: DiscoverySource,
   now: number,
+  requestedAt = now,
 ): number {
   const controls = values(fs, "cache-control")
     .join(",")
     .toLowerCase()
     .split(",")
-    .map((v) => v.trim());
-  return expiryFromControls(fs, source, now, controls);
+    .map(trimOws);
+  return expiryFromControls(fs, source, now, controls, requestedAt);
 }
 /** RFC 9111 Section 4.3.4: whether a response carries freshness directives of its own. */
 export function hasFreshness(fs: readonly Field[]): boolean {
@@ -112,11 +117,11 @@ export function hasFreshness(fs: readonly Field[]): boolean {
     .join(",")
     .toLowerCase()
     .split(",")
-    .map((v) => v.trim());
+    .map(trimOws);
   // Only freshness-changing names count: max-age, no-cache, no-store. A
   // directive like `public` leaves the stored lifetime in force.
   return controls.some((v) => {
-    const name = v.split("=", 1)[0]!.trim();
+    const name = trimOws(v.split("=", 1)[0]!);
     return name === "no-store" || name === "no-cache" || name === "max-age";
   });
 }
@@ -125,6 +130,7 @@ function expiryFromControls(
   source: DiscoverySource,
   now: number,
   controls: readonly string[],
+  requestedAt: number,
 ): number {
   const ages = controls
     .filter((v) => v.startsWith("max-age="))
@@ -149,12 +155,13 @@ function expiryFromControls(
   return (
     now +
     (controls.some((v) => {
-      const name = v.split("=", 1)[0]!.trim();
+      const name = trimOws(v.split("=", 1)[0]!);
       return name === "no-store" || name === "no-cache";
     })
       ? 0
       : Math.max(
-          Math.min(ttl, source.maxTtl) - Math.max(Number(age), now - date, 0),
+          // RFC 9111 Section 4.2.3: corrected_age_value includes response_delay.
+          Math.min(ttl, source.maxTtl) - Math.max(Number(age) + Math.max(now - requestedAt, 0), now - date, 0),
           0,
         ))
   );
@@ -172,7 +179,7 @@ export function mediaType(
         ? ["application/json"]
         : ["application/json", "application/jwk-set+json"];
   ensure(
-    allowed.includes(media.split(";")[0]!.trim().toLowerCase()),
+    allowed.includes(trimOws(media.split(";")[0]!).toLowerCase()),
     "unexpected_media_type",
   );
 }

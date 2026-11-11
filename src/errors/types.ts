@@ -48,8 +48,8 @@ export function faultClass(e: unknown): CoreDetail {
 export function coreError(reason: Reason<'core'>, layer: Layer<'core'>, detail: CoreDetail | null = null, source: CustodyError | null = null): CoreError {
   if (!ERROR_PARITY.some(e => e.kind === 'core' && e.layer === layer && e.reason === reason)) throw new TypeError('Unknown core error pair');
   if (source !== null && (reason !== 'signing_failed' || !isRequestSealError(source) || source.kind !== 'custody')) throw new TypeError('Invalid core source');
-  const allowed = reason === 'signature_base_failed' ? signatureDetails : reason === 'agent_unresolved' ? agentDetails : reason === 'invalid_signature_agent' ? fieldDetails : reason === 'internal' ? internalDetails : reason === 'nonqualifying_signature' ? new Set(ERROR_PARITY.filter(e => e.kind === 'core').map(e => e.reason)) : new Set<string>();
-  return freeze({kind: 'core', reason, layer, correlation: correlation(), retryable: reason === 'deadline', source, message: reason === 'signer_algorithm_mismatch' ? 'signer algorithm does not match signature specification' : null, detail: typeof detail === 'string' && allowed.has(detail) ? detail : null});
+  const allowed = reason === 'signature_base_failed' ? signatureDetails : reason === 'agent_unresolved' ? agentDetails : reason === 'invalid_signature_agent' ? fieldDetails : reason === 'internal' ? internalDetails : new Set<string>();
+  return freeze({kind: 'core', reason, layer, correlation: correlation(), retryable: false, source, message: reason === 'signer_algorithm_mismatch' ? 'signer algorithm does not match signature specification' : null, detail: typeof detail === 'string' && allowed.has(detail) ? detail : null});
 }
 function simple<K extends SimpleKind>(kind: K, reason: Reason<K>): SimpleError<K> {
   return freeze({ kind, reason: reasonFor(kind, reason) } as SimpleError<K>);

@@ -1,5 +1,4 @@
 import {isWebBotAuthVerification, webBotAuthFacts} from './web-bot-auth/verification.ts';
-import {isQuorumVerification,quorumFacts} from './quorum/verification.ts';
 import { deepFreeze, inspection } from "./brand.ts";
 import { encodeUtf8 } from "./runtime.ts";
 import { decimalSource, copyDecimalSource, type Bare, type Parameters } from "./structured-fields/index.ts";
@@ -140,7 +139,6 @@ function wire(value: unknown): unknown {
 /** Ordered language-neutral facts; cryptographic material is never serialized. */
 export function verificationFacts(value: unknown): Result<unknown> {
   if (isWebBotAuthVerification(value)) return webBotAuthFacts(value);
-  if (isQuorumVerification(value)) return quorumFacts(value);
   if (!isVerification(value))
     return err(coreError("invalid_verification", "binding"));
   const number = (n: number | null) =>

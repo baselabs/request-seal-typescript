@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9530, the public API in `src/index.ts`, and the guides and references it links · **Review when:** a public type, result field, or documented term changes
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** RFC 9421, RFC 9530, the public API in `src/index.ts`, and the guides and references it links · **Review when:** a public type, result field, or documented term changes
 
 # Glossary
 
@@ -33,7 +33,6 @@ One term per concept, as the code and the other pages use it.
 | Key set | The validated keys from one discovery response, looked up by RFC 7638 thumbprint for the algorithms you allow. | [Key discovery](../guides/key-discovery.md#sources-and-key-sets) |
 | Snapshot | Response bytes you fetched yourself, turned into a key set with `Discovery.resolver.fromSnapshot`. | [Key discovery](../guides/key-discovery.md#snapshots-the-path-for-any-runtime) |
 | Agent | In Web Bot Auth, an automated client that signs its requests and names its key directory in `Signature-Agent`. | [Web Bot Auth](../guides/web-bot-auth.md) |
-| Quorum | A policy that requires several signatures on one message, each meeting its own complete single-label policy. | [Multiple signatures](quorum.md) |
 | Capture | The Node adapter's retained copy of an incoming request's line, headers, and body, taken before any parser runs. | [Node HTTP](../guides/node-http.md#why-capture-comes-first) |
 | Conformance corpus | The shared, checksummed set of published vectors and expected outcomes that both language implementations execute. | [Corpus format](corpus-format.md) |
 | Runtime limitation | A declared, exactly scoped case where a runtime's WebCrypto or transport disagrees with the corpus, reported instead of loosening a check. | [Runtime matrix](runtime-matrix.md) |

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
+**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
 
 # Contributing
 
@@ -16,7 +16,7 @@ npm run check
 
 Write behavior tests before implementation and verify that they fail before the fix and pass afterward. Use `node:test` and fast-check properties. Test actual cryptography and published vectors; no substitutes for an external peer. `npm run test:red` deliberately fails and verifies the runner's exit status.
 
-Keep the core independent of Node modules and runtime dependencies. Regenerate `docs/reference/error-parity.md` in place with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 53b6690ccd5036d58b280d08cf0cacc6427262fe <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-53b6690.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
+Keep the core independent of Node modules and runtime dependencies. Regenerate `docs/reference/error-parity.md` in place with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts ffea562f139e80a6f9783fcfc0877718c2476bf5 <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-ffea562.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
 
 The shared corpus in `conformance/` is pinned to RequestSeal `v0.5.2`, commit `53b6690ccd5036d58b280d08cf0cacc6427262fe`, index SHA-256 `ceb30bf713a6e34e6a15847b658a618d8f7568ee6a6c07bfbbf58fa5d143995e`. Shared corpus updates preserve upstream bytes and expectations. With network access, reproduce that byte copy with:
 

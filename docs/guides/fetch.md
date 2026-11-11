@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, the Fetch standard, and executed Node and Deno transport tests · **Review when:** a supported runtime version or the Fetch adapter contract changes
+**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421, the Fetch standard, and executed Node and Deno transport tests · **Review when:** a supported runtime version or the Fetch adapter contract changes
 
 # Fetch
 
@@ -117,3 +117,8 @@ await server.shutdown();
 - [Node HTTP](node-http.md) verifies incoming requests on Node, behind Express or Fastify.
 - [Replay protection](replay-protection.md) rejects a verified request that is sent a second time.
 - [Testing](testing.md) explains the runtime lanes and what each measured runtime proves.
+
+Retained body readers accept fewer than 16,384 producer chunks, including empty
+chunks, as well as enforcing the byte bound and Context deadline. Empty chunks
+are discarded. Reaching the work ceiling returns `limit` before another pull;
+a stalled producer is canceled through the operation's Context.

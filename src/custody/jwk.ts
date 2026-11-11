@@ -15,6 +15,24 @@ import {unsigned} from '../crypto/primitive.ts';
 import {CURVE_ORDERS, type Spec} from '../crypto/algorithm.ts';
 import {validateRsa} from './der.ts';
 export type Jwk = Readonly<Record<string, unknown>>;
+// RFC 8032 Section 5.1.3. Public inputs only; recover x from the encoded y.
+function ed25519Point(y: bigint, sign: number): void {
+  const p = (1n << 255n) - 19n;
+  const d = 37095705934669439343138083508754565189542113879843219016388785533085940283555n;
+  const sqrtM1 = 19681161376707505956807079304988542015446066515923890162744021073123829784752n;
+  const y2 = y * y % p, u = (y2 + p - 1n) % p, v = (d * y2 + 1n) % p;
+  const v3 = v * v % p * v % p, v7 = v3 * v3 % p * v % p;
+  let power = (p - 5n) / 8n, base = u * v7 % p, factor = 1n;
+  for (; power > 0n; power >>= 1n) {
+    if (power & 1n) factor = factor * base % p;
+    base = base * base % p;
+  }
+  let x = u * v3 % p * factor % p;
+  const vx2 = v * x % p * x % p;
+  ensure(vx2 === u || vx2 === (p - u) % p);
+  if (vx2 !== u) x = x * sqrtM1 % p;
+  ensure(x !== 0n || sign === 0);
+}
 function ensure(value: unknown, reason = 'invalid_key'): asserts value {
   if (!value) throw reason;
 }
@@ -179,6 +197,7 @@ export function validateComponents(j: Jwk, privateKey: boolean): void {
       0x7a03ac9277fdc74ec6cc392cfa53202a0f67100d760b3cba4fd84d3d706a17c7n,
     ];
     ensure(y < (1n << 255n) - 19n && !small.includes(y));
+    ed25519Point(y, x[31]! >> 7);
     if (privateKey) {
       const d = component(j.d);
       try {

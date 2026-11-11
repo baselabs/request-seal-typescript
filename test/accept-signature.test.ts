@@ -21,7 +21,6 @@ test("signature requests preserve published bytes and use separate brands", () =
     wire,
   );
   assert.equal(A.isAcceptSignature(requests), true);
-  assert.equal(A.isQuorum(requests), false);
   assert.equal(Object.isFrozen(requests[0].parameters), true);
   assert.equal(
     value(A.AcceptSignature.parse("", { target: "request" })).length,
@@ -117,7 +116,6 @@ test('reference string requests normalize token and byte parameter values', () =
 
 test('fulfillment appends requests in order and preserves requested strings and times', async () => {
   assert.equal(typeof A.AcceptSignature.fulfill, 'function');
-  const {policy, quorum} = await import('./support/quorum.ts');
   const handle = value(await api.Custody.local('hmac-sha256', {hmac: crypto.getRandomValues(new Uint8Array(32)), identity: 'signer'}));
   try {
     const base = value(await api.Message.request('POST', 'https://example.com/a', [['content-type', 'text/plain']], 'hello'));
@@ -127,9 +125,9 @@ test('fulfillment appends requests in order and preserves requested strings and 
     const signed = value(await A.AcceptSignature.fulfill(base, requests, choice, signer, {}));
     const inputs = signed.fields.filter((f: any) => f.name.toLowerCase() === 'signature-input');
     assert.deepEqual(inputs.map((f: any) => new TextDecoder().decode(f.value).split('=')[0]), ['first', 'second']);
-    const p = policy({keyResolver: () => api.ok({algorithm: 'hmac-sha256', key: handle})});
-    const r = value(await api.verifyQuorum(signed, quorum([{id: 'only', required: false, policy: p}]), {acceptSignature: requests}));
-    assert.equal(r.negotiation, 'fulfilled');
+    const p = value(api.Policy.create({algorithms: ['hmac-sha256'], components: '()',
+      keyResolver: () => api.ok({algorithm: 'hmac-sha256', key: handle}),
+      freshness: 'not_evaluated', content: 'not_required', replay: 'not_required'}));
     const first = value(await api.verify(signed, p, {label: 'first'}));
     const second = value(await api.verify(signed, p, {label: 'second'}));
     assert.equal(Object.fromEntries(first.signature.parameters.map(([k, v]: any) => [k, v.value])).nonce, requests[0].parameters.nonce);
@@ -137,20 +135,9 @@ test('fulfillment appends requests in order and preserves requested strings and 
     assert.equal(Object.fromEntries(second.signature.parameters.map(([k, v]: any) => [k, v.value])).created, 1618884473);
     assert.equal(Object.fromEntries(second.signature.parameters.map(([k, v]: any) => [k, v.value])).expires, 1618884540);
     assert.equal(Object.fromEntries(second.signature.parameters.map(([k, v]: any) => [k, v.value])).keyid, undefined);
-    for (const wire of ['first=("@method");nonce="other"', 'first=("@method");tag="other"', 'first=("@method");keyid="other"', 'renamed=("@method")', 'first=("@path")', 'first=("@method" "@path")', 'first=("@method");created']) {
-      const expected = value(api.AcceptSignature.parse(wire, {target: 'request'}));
-      const denied = await api.verifyQuorum(signed, quorum([{id: 'only', required: false, policy: p}]), {acceptSignature: expected});
-      assert.equal(denied.ok, false); if (!denied.ok) assert.equal(denied.error.reason, 'negotiation_unfulfilled');
-    }
-    // Exact covered identity sets ignore order but preserve component parameters.
     const sf = value(api.AcceptSignature.parse('sf=("content-type";bs "@method")', {target: 'request'}));
     const sfSigned = value(await A.AcceptSignature.fulfill(base, sf, choice, signer, {}));
-    for (const [wire, succeeds] of [['sf=("@method" "content-type";bs)', true], ['sf=("@method" "content-type")', false]]) {
-      const expected = value(api.AcceptSignature.parse(wire, {target: 'request'}));
-      const result = await api.verifyQuorum(sfSigned, quorum([{id: 'only', required: false, policy: p}]), {acceptSignature: expected});
-      assert.equal(result.ok, succeeds);
-      if (!result.ok) assert.equal(result.error.reason, 'negotiation_unfulfilled');
-    }
+    value(await api.verify(sfSigned, p, {label: 'sf'}));
     assert.equal(value(await A.AcceptSignature.fulfill(base, value(api.AcceptSignature.parse('', {target: 'request'})), choice, signer, {})), base);
   } finally { await handle.release(); }
 });

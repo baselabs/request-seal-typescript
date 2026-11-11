@@ -18,7 +18,7 @@ const source = (more = {}) => value(DiscoverySource.create({type:'jwks_uri', loc
 const snapshot = (s: unknown, now: number) => Discovery.resolver.fromSnapshot(s, bytes(jwks()), now, headers);
 const read = (p: string) => readFileSync(p, 'utf8');
 test('status-derived retryability at the real TLS entry point', async () => {
-  const fixture = JSON.parse(read('test/fixtures/elixir-reasons-53b6690.json'));
+  const fixture = JSON.parse(read('test/fixtures/elixir-reasons-ffea562.json'));
   assert.equal(fixture.modules.find((m: {kind:string})=>m.kind==='discovery').retryable.rules.unexpected_status.kind, 'status-derived (5xx)');
   let status = 200;
   const p = await peer((_q,r) => { r.writeHead(status, {'content-type':'application/json'}); r.end(); });

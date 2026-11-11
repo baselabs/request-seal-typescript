@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 ·
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 ·
 **Governed by:** RFC 9421, RFC 7515, RFC 7516, protocol-00, and RequestSeal
 v0.5.2 · **Review when:** peer pins, exchange protocol, or CI changes
 
@@ -127,13 +127,13 @@ rounds, cases, rejections, and disagreements per family and direction.
 
 The peer is Hex `request_seal == 0.5.2`, checksum
 `b8632c4cd4ec8ab989cf5d919765c34dbb3a2774939a0e3e7f104f329558229b`, locked in
-both interop projects. This matches `ELIXIR_ERROR_PIN`'s v0.5.2 release, commit
-`53b6690ccd5036d58b280d08cf0cacc6427262fe`, and the vendored corpus pin, which
-the v0.5.2 release assets supplied. The source and case files retain their
+both interop projects. The vendored corpus retains the v0.5.2 release pin,
+commit `53b6690ccd5036d58b280d08cf0cacc6427262fe`. The public error vocabulary
+independently tracks Elixir 1.0.0, commit `ffea562f139e80a6f9783fcfc0877718c2476bf5`. The source and case files retain their
 v0.4.0 bytes; `index.json` changes its release metadata, so the complete corpus
 and its index digest are not byte-identical across those releases. One test checks
 both projects’ Elixir and OTP pins, both Hex versions and checksums, and every
-CI setup-beam input against the error release. The exchange asserts its selector
+CI setup-beam input against the declared toolchain. The exchange asserts its selector
 sets equal to both implementations’ runtime registries. No local checkout
 supplies the peer dependency.
 

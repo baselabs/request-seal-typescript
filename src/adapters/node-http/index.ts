@@ -17,19 +17,17 @@ import {
 } from "../../message/index.ts";
 import { sign } from "../../sign.ts";
 import { verify } from "../../verify.ts";
-import { verifyQuorum as coreVerifyQuorum } from "../../verify-quorum.ts";
-import type { QuorumVerification } from "../../quorum/verification.ts";
 import { verifyWebBotAuth as coreVerifyWebBotAuth } from "../../web-bot-auth/verify.ts";
 import type { WebBotAuthVerification } from "../../web-bot-auth/verification.ts";
 export type { WebBotAuthVerification } from "../../web-bot-auth/verification.ts";
 import { parseAddress } from "../../discovery/address.ts";
 import type { Verification } from "../../verification.ts";
 import { isPolicy } from "../../policy.ts";
-import { isAcceptSignature } from "../../accept-signature.ts";
 import { type Context, run, withDeadline } from "../../context.ts";
 import { timeoutMs as validTimeout } from "../../numbers.ts";
 import { err, ok, type Result } from "../../result.ts";
 import {
+  BODY_MAX_CHUNKS,
   MESSAGE_MAX_FIELD_BYTES,
   MESSAGE_MAX_FIELDS_BYTES,
   MESSAGE_MAX_OCCURRENCES,
@@ -69,12 +67,6 @@ export type VerifiedRequest = Readonly<{
   verification: Verification;
   bytes: Uint8Array;
 }>;
-/** Captured request bytes accompanied by a quorum verification. */
-export type VerifiedQuorumRequest = Readonly<{
-  capture: Capture;
-  verification: QuorumVerification;
-  bytes: Uint8Array;
-}>;
 /** Captured request bytes accompanied by a Web Bot Auth verification. */
 export type VerifiedWebBotAuthRequest = Readonly<{
   capture: Capture;
@@ -97,7 +89,7 @@ const states = new WeakMap<
     read: boolean;
     done: boolean;
     hash: ReturnType<typeof createHash>;
-    verified?: Result<VerifiedRequest | VerifiedQuorumRequest | VerifiedWebBotAuthRequest>;
+    verified?: Result<VerifiedRequest | VerifiedWebBotAuthRequest>;
   }
 >();
 const branded = new WeakSet<object>();
@@ -281,7 +273,8 @@ function origin(
 ) {
   if (!Object.hasOwn(a, "trustedProxies")) {
     return Object.freeze({
-      ...normalized(ingress.scheme, ingress.authority),
+      scheme: ingress.scheme,
+      authority: ingress.authority,
       source: "connection" as const,
     });
   }
@@ -337,9 +330,8 @@ function origin(
     scheme = parsed.proto;
     authority = parsed.host;
   }
-  scheme = scheme?.toLowerCase();
   S.need(
-    (scheme === "http" || scheme === "https") &&
+    typeof scheme === "string" && ["http", "https"].includes(scheme.toLowerCase()) &&
       typeof authority === "string" &&
       authority.length > 0,
     "node-http",
@@ -347,7 +339,8 @@ function origin(
     "invalid_request",
   );
   return Object.freeze({
-    ...normalized(scheme, authority),
+    scheme,
+    authority,
     source: "forwarded" as const,
   });
 }
@@ -377,7 +370,7 @@ async function read(
   try {
     return await run(c, async () => {
       const chunks: Uint8Array[] = [];
-      let size = 0;
+      let size = 0, count = 0;
       const close = () => {
         if ("destroy" in req) (req as Readable).destroy();
       };
@@ -397,8 +390,8 @@ async function read(
             "parser_order",
           );
           size += part.length;
-          S.need(size <= max, "node-http", "capture", "limit");
-          chunks.push(new Uint8Array(part));
+          S.need(++count < BODY_MAX_CHUNKS && size <= max, "node-http", "capture", "limit");
+          if (part.length) chunks.push(new Uint8Array(part));
         }
         S.need(
           !exclusive || !competing && stream.readableFlowing !== true,
@@ -858,68 +851,6 @@ export async function verifyRequest(
     return rejected;
   }
 }
-/** Composite verification over the same captured facts. */
-export async function verifyQuorum(
-  req: unknown,
-  quorum: unknown,
-  options: unknown = {},
-): Promise<Result<VerifiedQuorumRequest>> {
-  try {
-    const a = S.take(
-      options,
-      ["acceptSignature", "context"],
-      "node-http",
-      "verify",
-    );
-    S.context(a, "node-http", "verify");
-    S.need(
-      !Object.hasOwn(a, "acceptSignature") ||
-        isAcceptSignature(a.acceptSignature),
-      "node-http",
-      "verify",
-      "invalid_options",
-    );
-    S.need(
-      typeof req === "object" && req !== null && captures.has(req),
-      "node-http",
-      "verify",
-      "not_captured",
-    );
-    const capture = S.unwrap(
-      await captures.get(req)!,
-      "node-http",
-      "verify",
-      "request_rejected",
-    );
-    const state = beginVerification(req, capture);
-    const r = await coreVerifyQuorum(capture.message, quorum, a);
-    if (!r.ok) {
-      const rejected = err<VerifiedQuorumRequest>(
-        S.failure("node-http", "verify", "request_rejected", r.error),
-      );
-      state.verified = rejected;
-      return rejected;
-    }
-    const bytes = capture.message.body.bytes!;
-    const result = Object.freeze({
-      capture,
-      verification: r.value,
-      get bytes() {
-        return new Uint8Array(bytes);
-      },
-    });
-    state.verified = ok(result);
-    return ok(result);
-  } catch (e) {
-    const rejected = S.caught<VerifiedQuorumRequest>(
-      e,
-      "node-http",
-      "verify",
-      "request_rejected",
-    );
-    return rejected;
-  }
-}
 /** Web Bot Auth verification over the same captured facts and shared attempt. */
 export async function verifyWebBotAuth(
   req: unknown,
@@ -985,7 +916,7 @@ export async function verifyWebBotAuth(
 /** Read the verification result associated with a captured Node request. */
 export function verification(
   req: unknown,
-): Result<Verification | QuorumVerification | WebBotAuthVerification> {
+): Result<Verification | WebBotAuthVerification> {
   const s = typeof req === "object" && req !== null
     ? states.get(req)
     : undefined;

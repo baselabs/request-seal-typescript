@@ -24,7 +24,6 @@ import { createSshAgent } from "../src/custody/ssh-agent/index.ts";
 import { rawRequest, wireServer } from "./support/wire-server.ts";
 import { peer } from "./support/discovery-peer.ts";
 import { X509Certificate } from "node:crypto";
-import { quorum, signedPool } from "./support/quorum.ts";
 function value<T>(r: api.Result<T>): T {
   if (!r.ok) assert.fail(JSON.stringify(r.error));
   return r.value;
@@ -371,7 +370,9 @@ test("matches trusted CIDRs and mapped peers and parses Forwarded tokens", async
         `GET / HTTP/1.1\r\nHost: internal.example\r\nForwarded: ${forwarded}\r\nConnection: close\r\n\r\n`,
       );
       assert.ok(result);
-      assert.equal(value(result).origin.scheme, "https");
+      assert.equal(value(result).origin.scheme, "Https");
+      assert.equal(new TextDecoder().decode(value(api.SignatureBase.build(value(result).message, '("@scheme")'))),
+        '"@scheme": https\n"@signature-params": ("@scheme")');
     }
     peers = ["127.0.0.0/8"];
     forwarded = "proto=https;host=external.example;for=bad:value";
@@ -582,69 +583,6 @@ test("records complete chunked request frames including trailers", async () => {
     await server.close();
   }
 });
-test("verifies a captured two-signature quorum once and rejects partial replay", async () => {
-  const pool = await signedPool(2);
-  const q = quorum([{
-    id: "first",
-    required: true,
-    label: "s0",
-    policy: pool.policy,
-  }, { id: "second", required: true, label: "s1", policy: pool.policy }], {
-    mode: "all",
-    unit: "keys",
-  });
-  let partial = false;
-  let outcome: Promise<void> | undefined;
-  const server = createServer((req, res) => {
-    outcome = (async () => {
-      const c = value(await N.captureRequest(req));
-      const verifyQuorum = (N as unknown as {
-        verifyQuorum?: (
-          req: unknown,
-          q: unknown,
-          o: unknown,
-        ) => Promise<
-          api.Result<{ bytes: Uint8Array; verification: unknown }>
-        >;
-      }).verifyQuorum;
-      assert.equal(typeof verifyQuorum, "function");
-      if (partial) {
-        const stream = value(c.replay());
-        stream.read(1);
-        refused(await verifyQuorum!(req, q, {}), "parser_order");
-        stream.resume();
-        await once(stream, "end");
-      }
-      const result = value(await verifyQuorum!(req, q, {}));
-      assert.deepEqual(result.bytes, text("hello"));
-      assert.ok(result.verification);
-      refused(
-        await N.verifyRequest(req, pool.policy, { label: "s0" }),
-        "already_verified",
-      );
-      refused(await verifyQuorum!(req, q, {}), "already_verified");
-      res.end();
-    })();
-    void outcome.catch(() => res.end());
-  });
-  const port = await listen(server);
-  try {
-    const headers = pool.message.fields.map((f) =>
-      `${f.name}: ${Buffer.from(f.value).toString()}\r\n`
-    ).join("");
-    for (const flag of [false, true]) {
-      partial = flag;
-      await rawRequest(
-        port,
-        `POST /a HTTP/1.1\r\nHost: localhost\r\n${headers}Content-Length: 5\r\nConnection: close\r\n\r\nhello`,
-      );
-      await outcome;
-    }
-  } finally {
-    await close(server);
-    await pool.release();
-  }
-});
 
 test("refuses incomplete Content-Length on the real request stream", async () => {
   let outcome: Promise<api.Result<N.Capture>> | undefined;
@@ -668,7 +606,7 @@ test("refuses incomplete Content-Length on the real request stream", async () =>
   }
 });
 
-test("refuses default-port absolute targets and HTTP/2 without authority as documented", async () => {
+test("preserves default-port absolute targets and refuses HTTP/2 without authority", async () => {
   let result: api.Result<N.Capture> | undefined;
   const server = createServer((req, res) => {
     void N.captureRequest(req).then((r) => {
@@ -683,7 +621,8 @@ test("refuses default-port absolute targets and HTTP/2 without authority as docu
       "GET http://127.0.0.1:80/p HTTP/1.1\r\nHost: 127.0.0.1:80\r\nConnection: close\r\n\r\n",
     );
     assert.ok(result);
-    refused(result, "invalid_request");
+    assert.equal(value(result).message.authority, "127.0.0.1:80");
+    assert.equal(value(result).message.rawTarget, "http://127.0.0.1:80/p");
   } finally {
     await close(server);
   }
@@ -1118,60 +1057,6 @@ test("refuses response coverage of hop-by-hop fields", async () => {
   }
 });
 
-test("validates quorum option values before reserving verification state", async () => {
-  const pool = await signedPool(2);
-  const q = quorum([{
-    id: "one",
-    required: true,
-    label: "s0",
-    policy: pool.policy,
-  }], { mode: "all", unit: "keys" });
-  let outcome: Promise<void> | undefined;
-  const server = createServer((req, res) => {
-    outcome = (async () => {
-      value(await N.captureRequest(req));
-      for (
-        const options of [
-          { context: null },
-          { context: {} },
-          { acceptSignature: null },
-          { acceptSignature: [] },
-          { unknown: true },
-        ]
-      ) {
-        refused(await N.verifyQuorum(req, q, options), "invalid_options");
-      }
-      let reads = 0;
-      refused(
-        await N.verifyQuorum(req, q, {
-          get context() {
-            reads++;
-            return null;
-          },
-        }),
-        "invalid_options",
-      );
-      assert.equal(reads, 1);
-      // Invalid options must not consume the shared verification attempt.
-      value(await N.verifyRequest(req, pool.policy, { label: "s0" }));
-    })();
-    void outcome.finally(() => res.end()).catch(() => {});
-  });
-  const port = await listen(server);
-  try {
-    const fields = pool.message.fields.map((f) =>
-      `${f.name}: ${Buffer.from(f.value).toString()}\r\n`
-    ).join("");
-    await rawRequest(
-      port,
-      `POST /a HTTP/1.1\r\nHost: localhost\r\n${fields}Content-Length: 5\r\nConnection: close\r\n\r\nhello`,
-    );
-    await outcome;
-  } finally {
-    await close(server);
-    await pool.release();
-  }
-});
 
 test("signs Node redirect and retry attempts with three distinct nonces", async () => {
   const h = await key();
@@ -1466,50 +1351,6 @@ test("stores core invalid-option rejection after reserving single verification",
   }
 });
 
-test("stores a quorum resolver rejection without throwing out of core verification", async () => {
-  const pool = await signedPool(1);
-  const policy = value(
-    api.Policy.create({
-      algorithms: ["hmac-sha256"],
-      components: '("@method")',
-      keyResolver() {
-        throw new Error("private quorum diagnostic");
-      },
-      freshness: "not_evaluated",
-      content: "not_required",
-      replay: "not_required",
-    }),
-  );
-  const q = quorum([{ id: "one", required: true, label: "s0", policy }], {
-    mode: "all",
-    unit: "keys",
-  });
-  let outcome: Promise<void> | undefined;
-  const server = createServer((req, res) => {
-    outcome = (async () => {
-      value(await N.captureRequest(req));
-      const e = refused(await N.verifyQuorum(req, q), "request_rejected");
-      assert.deepEqual(refused(N.verification(req), "request_rejected"), e);
-      assert.doesNotMatch(JSON.stringify(e), /private quorum diagnostic/);
-      refused(await N.verifyQuorum(req, q), "already_verified");
-    })();
-    void outcome.finally(() => res.end()).catch(() => {});
-  });
-  const port = await listen(server);
-  try {
-    const fields = pool.message.fields.map((f) =>
-      `${f.name}: ${Buffer.from(f.value).toString()}\r\n`
-    ).join("");
-    await rawRequest(
-      port,
-      `POST /a HTTP/1.1\r\nHost: localhost\r\n${fields}Content-Length: 5\r\nConnection: close\r\n\r\nhello`,
-    );
-    await outcome;
-  } finally {
-    await close(server);
-    await pool.release();
-  }
-});
 
 test("counts HTTP/2 cookie separators in the aggregate field byte bound", async () => {
   const max = 1_048_576;

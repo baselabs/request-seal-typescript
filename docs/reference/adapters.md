@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · **Review when:** runtime versions or adapter contracts change
 
 # HTTP and custody adapters
 
@@ -57,8 +57,8 @@ Host must equal normalized :authority when both occur. A Host without :authority
 is refused by this adapter: RFC 9113 Section 8.3.1 permits that rejection.
 Use :authority on HTTP/2 requests.
 For absolute-form targets the core requires the target's scheme and authority to
-match the selected origin byte for byte. An explicit default port such as
-`http://127.0.0.1:80/p` is therefore refused after origin normalization. The
+match the selected origin byte for byte. Captured origin spelling is preserved, including an explicit default port such as
+`http://127.0.0.1:80/p`, when it agrees with the selected origin. The
 reference Plug boundary refuses exact-target coverage when raw transport evidence
 is unavailable; origin reconstruction does not restore those bytes.
 
@@ -70,14 +70,11 @@ verification authenticates captured bytes, not parser output.
 
 `verifyRequest(req, policy, {label, context?, representation?, digestState?})`
 returns `{capture, verification, bytes}`. Byte access returns copies. Concurrent
-or repeated verification is refused. `verification(req)` retrieves successful core, quorum, or Web Bot Auth facts, or the stored
+or repeated verification is refused. `verification(req)` retrieves successful core or Web Bot Auth facts, or the stored
 bounded rejection after a verification attempt; it returns `already_verified` while an
 attempt is still running and `not_captured` before any attempt. Required layers still follow the core Policy.
-`verifyQuorum(req, quorum, {context?, acceptSignature?})` returns captured bytes
-and the composite verification. All three entry points share the one-verification and
-parser-order guards. All three reject malformed option keys and invalid contexts
-before reserving the shared attempt. `verifyQuorum` also validates
-acceptSignature before reservation. `verifyRequest` reserves its attempt before
+Both verification entry points share the one-verification and parser-order guards.
+Both reject malformed option keys and invalid contexts before reserving the shared attempt. `verifyRequest` reserves its attempt before
 core validation of label, representation, and digestState; those core rejections
 remain stored and consume the attempt.
 
@@ -85,7 +82,7 @@ remain stored and consume the attempt.
 uses the core Web Bot Auth verifier on the captured message and returns
 `VerifiedWebBotAuthRequest`: `{capture, verification, bytes}`. The verification is
 a `WebBotAuthVerification` envelope; byte access returns copies. It shares the
-same reservation and replay-drain checks with generic and quorum verification.
+same reservation and replay-drain checks with generic verification.
 Own option keys are read once. Unknown keys, invalid contexts, and invalid
 `timeoutMs` values reject with adapter `invalid_options` before reservation;
 `timeoutMs` defaults to 5,000 and accepts integers from 1 through 300,000.
@@ -387,3 +384,8 @@ OpenSSL verification of every algorithm's returned signature.
 
 Connection ENOENT, ECONNREFUSED, and ECONNRESET return custodian_unavailable;
 other connection errors return custodian_failure. No socket diagnostics enter errors.
+
+Retained body readers accept fewer than 16,384 producer chunks, including empty
+chunks, as well as enforcing the byte bound and Context deadline. Empty chunks
+are discarded. Reaching the work ceiling returns `limit` before another pull;
+a stalled producer is canceled through the operation's Context.

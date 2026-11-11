@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 17, 2026 ·
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 ·
 **Governed by:** the versioned telemetry contract v1, mirroring RequestSeal for Elixir ·
 **Review when:** the event surface, outcomes, or emission sites change
 
@@ -42,12 +42,11 @@ await h.value.release();
 | Event | Emitted by | Outcomes |
 | --- | --- | --- |
 | `verify` | `verify` | `ok`, `error` |
-| `verifyQuorum` | `verifyQuorum` | `ok`, `error` |
 | `webBotAuthVerify` | `WebBotAuth.verify` | `ok`, `error` |
 | `replayClaim` | the required-replay commit every profile shares | `claimed`, `already_claimed`, `error` |
 | `custodySign` | the shared custody signing path of both `sign` forms | `ok`, `error` |
 
-`Telemetry.events()` lists the names. Internal per-label work inside `verifyQuorum` emits nothing; the quorum event covers the whole call.
+`Telemetry.events()` lists the names. Internal per-label work emits nothing; public verification entry points report their calls.
 
 ## Payload
 
@@ -58,14 +57,14 @@ Every event is a frozen object with exactly six fields:
 | `event` | one of the v1 names |
 | `outcome` | the closed outcome vocabulary above |
 | `reason` | the parity rule id exactly as the caller receives it (`core/fields.unknown_label`, `custody/deadline_exceeded`), or `null` on success |
-| `layer` | the error's layer (`fields`, `quorum`, `internal`, …), or `null` |
+| `layer` | the error's layer (`fields`, `internal`, …), or `null` |
 | `detail` | the error's bounded detail (an exception class for `core/internal.internal`), or `null` |
 | `durationMs` | monotonic milliseconds covering the emitting call |
 
-No signature label, key ID, header name or value, URL, principal, nonce, body or base bytes, exception message, or any other attacker-controlled or high-cardinality value ever appears in an event. A rejected verification reports its bounded `reason` and `layer` exactly as returned to the caller, so resource exhaustion (`core/input.limit`, the retryable `core/quorum.deadline`) and internal faults (`core/internal.internal`) are countable without reading anything else.
+No signature label, key ID, header name or value, URL, principal, nonce, body or base bytes, exception message, or any other attacker-controlled or high-cardinality value ever appears in an event. A rejected verification reports its bounded `reason` and `layer` exactly as returned to the caller, so resource exhaustion (`core/input.limit`) and internal faults (`core/internal.internal`) are countable without reading anything else.
 
 ## Attachment
 
 `Telemetry.attach` accepts one function and returns `ok(handle)` or a `core/input.invalid_options` error. At most sixteen subscribers run at once; a seventeenth attaches only after a slot is freed by `detach`. `detach` is idempotent. Attachment and dispatch are synchronous and O(subscribers); there is no global state beyond the subscriber list itself.
 
-The event names, outcomes, and payload fields are a versioned public contract: additive events and fields may arrive in minor releases; renames and removals require a major version. The Elixir package's `:telemetry` contract carries the same five events with the same closed metadata vocabulary.
+The event names, outcomes, and payload fields are a versioned public contract: additive events and fields may arrive in minor releases; renames and removals require a major version. The Elixir package's `:telemetry` contract carries the same four events with the same closed metadata vocabulary.

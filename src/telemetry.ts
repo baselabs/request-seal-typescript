@@ -4,7 +4,6 @@ import { coreError, isRequestSealError, ruleId } from "./errors/types.ts";
 /** The versioned event names (v1), mirroring the reference telemetry contract. */
 export type TelemetryEventName =
   | "verify"
-  | "verifyQuorum"
   | "webBotAuthVerify"
   | "replayClaim"
   | "custodySign";
@@ -28,7 +27,6 @@ export type TelemetryHandle = Readonly<{
 }>;
 const names: readonly TelemetryEventName[] = Object.freeze([
   "verify",
-  "verifyQuorum",
   "webBotAuthVerify",
   "replayClaim",
   "custodySign",

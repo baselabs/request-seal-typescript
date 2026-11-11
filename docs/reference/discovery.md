@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** RFC 7517, RFC 7638, the public discovery API, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** RFC 7517, RFC 7638, the public discovery API, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
 
 # Discovery
 
@@ -29,7 +29,8 @@ if (source.ok) {
 
 Sources select `directory`, `jwks_uri`, or `cimd`. Directory origins expand to
 `/.well-known/http-message-signatures-directory`. CIMD client IDs retain their
-exact configured spelling and require a path. URLs require HTTPS and reject
+exact configured spelling and require a non-root document path; `/` rejects
+even with a query (CIMD-03 Section 3). URLs require HTTPS and reject
 userinfo, fragments, malformed escapes, dot segments, and escaped line breaks.
 `DiscoverySource.directoryId()` returns a Result containing whether a directory
 ID has 1–256 printable ASCII bytes.
@@ -195,7 +196,7 @@ source's `timeoutMs`. A fresh unknown
 ID does not trigger a fetch. Without a fetch function, a miss returns
 `source_unavailable`. The resolver bridge also accepts `{cache, source}`.
 
-Freshness follows max-age before Expires, adjusted for Date and Age and capped
+Freshness follows max-age before Expires, adjusted for Date, Age, and each request's response delay (RFC 9111 Section 4.2.3), and capped
 by source policy, key expiry and proof expiry. Explicit freshness is never
 extended by `minTtl`. No-cache/no-store responses serve current waiters only.
 Failures never extend the last observed snapshot; stale keys are never served.
@@ -243,3 +244,10 @@ fetch results are refused against the selected fetch clock.
 No-store responses, expiry and invalidation retain that mark, preventing an older
 snapshot from restoring rotated-out keys. Snapshot construction already caps
 expiry at fetch time plus `maxTtl`. Body parsing is internal; use `Discovery.resolver.fromSnapshot`.
+
+Field-value boundaries trim only SP and HTAB (RFC 9110 Section 5.6.3).
+Other whitespace cannot normalize malformed framing, content codings, media types,
+or cache directives into accepted values. Network response collection and gzip
+output share the retained-body ceiling of 16,384 chunks, including empty chunks;
+EOF must arrive before that ceiling. Empty chunks consume work but are discarded.
+Snapshots have no request timing and therefore use zero response delay.

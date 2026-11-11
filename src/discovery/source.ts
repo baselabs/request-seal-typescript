@@ -145,7 +145,7 @@ export function createSource(input: unknown): Result<DiscoverySource> {
     );
     const url = sourceUrl(a.location);
     const rawPath = /^https:\/\/[^/?]+([^?]*)/i.exec(a.location as string)![1]!;
-    ensure(a.type !== "cimd" || rawPath.length > 0, "invalid_source");
+    ensure(a.type !== "cimd" || (rawPath.length > 0 && rawPath !== "/"), "invalid_source");
     let location = a.location as string;
     if (a.type === "directory" && ["", "/"].includes(rawPath))
       location = sourceOrigin(url) + directoryPath;

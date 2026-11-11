@@ -252,13 +252,12 @@ transportTest("Node Web Bot Auth rejects an untrusted agent before directory acc
     assert.equal(directory.requests, before);
   });
 });
-transportTest("Node Web Bot Auth shares its single attempt with generic and quorum verification", async () => {
+transportTest("Node Web Bot Auth shares its single attempt with generic verification", async () => {
   const verify = verifier();
   await exchange(true, async (req, p) => {
     const first = verify(req, p);
     rejected(await verify(req, p), "already_verified");
     rejected(await N.verifyRequest(req, null, { label: "agent" }), "already_verified");
-    rejected(await N.verifyQuorum(req, null), "already_verified");
     const accepted = value(await first);
     assert.equal(value(N.verification(req)), accepted.verification);
     rejected(await verify(req, p), "already_verified");

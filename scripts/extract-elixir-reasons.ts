@@ -140,7 +140,7 @@ export function extractCallSites(sources: Record<string, string>): {entries: Ent
     if (n.call === 'throw') {
       const tuple = obj(n.args?.[0]).tuple ?? (obj(n.args?.[0]).call === '{}' ? obj(n.args?.[0]).args : undefined);
       const tag = obj(tuple?.[0]).atom;
-      const kind = tag === 'structured_fields' || tag === 'digest' ? tag : tag === 'jose_error' ? 'jose' : tag && ['authentication_error','quorum_error','negotiation_error','web_bot_auth_error'].includes(tag) ? 'core' : undefined;
+      const kind = tag === 'structured_fields' || tag === 'digest' ? tag : tag === 'jose_error' ? 'jose' : tag && ['authentication_error','negotiation_error','web_bot_auth_error'].includes(tag) ? 'core' : undefined;
       if (kind) emit(kind, values(tuple?.[1], env, owner), values(tuple?.[2], env, owner), owner, n, via);
     }
     if (n.call) for (const d of targets(n.call, n.receiver, owner)) {

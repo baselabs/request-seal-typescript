@@ -26,11 +26,10 @@ test('vendored release inventory ties out implemented and pending items', {timeo
   assert.equal(report.listed, report.executed + report.not_applicable + report.runtime_limited + report.pending.reduce((n, p) => n + p.items, 0));
   assert.equal(report.cases, 173);
   assert.equal(report.listed, 3064);
-  // Foundation/wire/crypto/sign: 2,652; JOSE: 309; discovery.body: 4; replay.claim: 11; quorum.verify: 2; accept_signature.parse: 1; web_bot_auth.verify: 14; profile.name: 9.
-  // 3,064 listed = 3,002 executed/runtime-limited + 62 not applicable; zero pending.
-  assert.equal(report.executed + report.runtime_limited, 3002);
+  // Foundation/wire/crypto/sign: 2,652; JOSE: 309; discovery.body: 4; replay.claim: 11; accept_signature.parse: 1; web_bot_auth.verify: 14; profile.name: 9.
+  // 3,064 listed = 3,000 executed/runtime-limited + 62 not applicable + 2 retired pending.
+  assert.equal(report.executed + report.runtime_limited, 3000);
   assert.equal(report.not_applicable, 62);
-  assert.deepEqual(report.pending, []);
   const expected = JSON.parse(await readFile('tools/conformance/pending.json', 'utf8'));
   assert.deepEqual(report.pending, expected);
 });
@@ -45,7 +44,7 @@ async function pendingCli(corpus: string, pendingOk: boolean, unregister: boolea
     await writeFile(join(root, 'package.json'), '{"type":"module"}');
     const index = JSON.parse(await readFile('conformance/index.json', 'utf8'));
     const ids = index.cases.filter((c: any) => c.surface === 'profile.name').map((c: any) => c.id);
-    await writeFile(join(root, 'tools/conformance/pending.json'), canonicalJson([{surface:'profile.name',cases:ids.length,items:ids.length,ids}]));
+    await writeFile(join(root, 'tools/conformance/pending.json'), canonicalJson([...JSON.parse(await readFile('tools/conformance/pending.json', 'utf8')), {surface:'profile.name',cases:ids.length,items:ids.length,ids}]));
     if (unregister) {
       const path = join(root, 'tools/conformance/loader.ts');
       const source = await readFile(path, 'utf8');
@@ -62,12 +61,12 @@ test('pending release surfaces fail closed; CLI flag only permits exact pending'
   for (const pendingOk of [false,true]) {
     const {status,report} = await pendingCli('conformance', pendingOk, true);
     assert.equal(status, pendingOk ? 0 : 1, canonicalJson(report));
-    assert.equal(report.ok, pendingOk); assert.equal(report.pending[0]!.items, 9);
+    assert.equal(report.ok, pendingOk); assert.equal(report.pending.find(p => p.surface === "profile.name")!.items, 9);
     assert.equal(report.known_positive_executed, true);
     if (!pendingOk) assert.ok(report.failures.some((f: any) => f.reason === 'pending_surface'));
     const complete = spawnSync(process.execPath, [...prefix, 'tools/conformance/cli.ts', '--corpus', 'conformance', ...(pendingOk ? ['--pending-ok'] : [])], {encoding:'utf8',timeout:30_000});
-    assert.equal(complete.status,0,complete.stdout+complete.stderr);
-    assert.deepEqual(JSON.parse(complete.stdout).pending,[]);
+    assert.equal(complete.status,pendingOk ? 0 : 1,complete.stdout+complete.stderr);
+    assert.deepEqual(JSON.parse(complete.stdout).pending, JSON.parse(await readFile('tools/conformance/pending.json','utf8')));
   }
 });
 for (const path of ['index.json', 'sources/httpwg-structured-fields/binary.json']) test(`vendored byte tamper: ${path}`, {timeout: 90_000}, async () => {
@@ -284,7 +283,7 @@ for (const path of ['cases/jwe/aes_gcm_test.json', 'cases/jwe/rsa_oaep_2048_sha2
       assert.equal(report.not_applicable, 63, canonicalJson(report));
       assert.equal(report.ok, true, canonicalJson(report));
       // One newly excluded item leaves each registered Wycheproof batch format.
-      assert.equal(report.executed + report.runtime_limited, 3001);
+      assert.equal(report.executed + report.runtime_limited, 2999);
       assert.ok(report.failures.every(f => !['invalid_overrides', 'unexpected_item_shape', 'not_applicable_count'].includes(f.reason)));
     });
   });
@@ -369,28 +368,6 @@ test('rejection comparisons require the expected surface error family', {timeout
   assert.equal(matches(expected, err(planted)), false);
 });
 
-test('quorum corpus defaults use published principals and reject unmatched or invalid labels', {timeout: 90_000}, async () => {
-  const {quorumSurface} = await import('../tools/conformance/quorum-surfaces.ts');
-  const registry = new Map(surfaceRegistry());
-  const observed: any[] = [];
-  registry.set('quorum.verify', Object.assign(async (manifest: CorpusCase, resources: import('../tools/conformance/loader.ts').CorpusResources) => {
-    const actual = await quorumSurface(manifest, resources);
-    if (manifest.id === 'quorum/rfc9421-ed25519') {
-      observed.push(actual);
-      observed.push(await quorumSurface({...manifest, inputs: {...manifest.inputs, label: 'unmatched'}}, resources));
-      observed.push(await quorumSurface({...manifest, policy: {...manifest.policy, components: '("@query")'}}, resources));
-    }
-    return actual;
-  }, {errorKinds: registry.get('quorum.verify')!.errorKinds ?? []}));
-  const report = await runCorpus('conformance', {pendingOk: true, registry});
-  assert.equal(report.ok, true, JSON.stringify(report));
-  assert.equal(observed.length, 3);
-  assert.equal(observed[0].value.verification.unit, 'principal');
-  assert.equal(observed[0].value.verification.qualifying[0].principal, 'published');
-  assert.equal(observed[1].error.reason, 'unexpected_signature');
-  assert.equal(observed[2].error.reason, 'nonqualifying_signature');
-});
-
 test('vendoring skips only an explicit offline request', {timeout:30_000}, () => {
   const env = {...process.env};
   delete env.REQUEST_SEAL_OFFLINE;
@@ -440,10 +417,10 @@ test('smoke rejection matching declares its JOSE error family', async () => {
   assert.ok(matches({...manifest, expected: {rule_id: 'jose/input.invalid_base64'}}, err(joseError('invalid_base64', 'input'))));
   for (const [name, surface] of surfaceRegistry()) assert.ok(surface.errorKinds?.length, name);
 });
-test('pending permission rejects stale entries even when no surfaces remain pending', {timeout:30_000}, async () => {
+test('pending permission rejects stale entries alongside retired surfaces', {timeout:30_000}, async () => {
   const {status,report} = await pendingCli('conformance', true, false);
   assert.equal(status,1);
-  assert.deepEqual(report.pending,[]);
+  assert.deepEqual(report.pending, JSON.parse(await readFile('tools/conformance/pending.json','utf8')));
   assert.ok(report.failures.some((f: any) => f.reason === 'stale_pending_allowlist'), canonicalJson(report));
 });
 

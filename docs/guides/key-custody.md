@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** WebCrypto, the OpenSSH agent protocol, and the executed examples in this guide · **Review when:** custody mechanics, adapter contracts, or runtime behavior changes
+**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** WebCrypto, the OpenSSH agent protocol, and the executed examples in this guide · **Review when:** custody mechanics, adapter contracts, or runtime behavior changes
 
 # Key custody
 
@@ -134,3 +134,8 @@ try {
 - [JOSE](jose.md) uses handles bound to JOSE algorithms.
 - [Rotating keys](key-rotation.md) replaces a signing key without failed requests.
 - The [threat model](../design/threat-model.md) explains what custody does not defend against: holders who misuse their handle, memory disclosure, debugger access, malicious custodian code, and code that patches globals before RequestSeal loads.
+
+Every Ed25519 import validates RFC 8032 Section 5.1.3 point decompression,
+canonical encoding, and the small-order blocklist before creating a key handle
+or public key. An encoding that does not represent a curve point returns
+`invalid_key`, consistently across JWK, PEM, and SPKI imports.

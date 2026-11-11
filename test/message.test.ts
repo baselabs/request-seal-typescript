@@ -201,7 +201,7 @@ test('all target forms, explicit origins, transport and unread real stream', asy
   assert.equal(stream.locked, false);
   assert.equal(text((await stream.getReader().read()).value!).slice(0, 8), 'HTTP/1.1');
 });
-test('builders preserve target octets, origin normalization, duplicate fields and actual digest bytes', async () => {
+test('builders preserve target octets, origin spelling, duplicate fields and actual digest bytes', async () => {
   const { Message } = await model();
   const bytes = new Uint8Array([0, 255, 1]);
   const m = await Message.request(
@@ -216,7 +216,8 @@ test('builders preserve target octets, origin normalization, duplicate fields an
   );
   assert.ok(m.ok);
   assert.equal(m.value.rawTarget, '/a%2Fb?');
-  assert.equal(m.value.authority, 'example.com');
+  assert.equal(m.value.authority, 'EXAMPLE.COM:443');
+  assert.equal(m.value.scheme, 'HTTPS');
   bytes[0] = 9;
   assert.equal(m.value.body.bytes![0], 0);
   const digest = m.value.fields.at(-1)!;

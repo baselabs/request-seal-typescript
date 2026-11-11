@@ -175,8 +175,8 @@ async function verifyLabel(message: unknown, policy: unknown, selectedLabel: unk
     const selectedInput = inputs.get(selectedLabel)!;
     ensure(equalParsed(input, selectedInput), "invalid_signature_input", "fields");
     ensure(equalParsed(selectedSignature, signatures.get(selectedLabel)), "invalid_signature_field", "fields");
-    return await authenticateLabel(validated.value, policy, {label: selectedLabel}, undefined,
-      {input: selectedInput, signature: signatures.get(selectedLabel)! as Item, baseCache: new Map()}, profile);
+    return await authenticateLabel(validated.value, policy, {label: selectedLabel},
+      {input: selectedInput, signature: signatures.get(selectedLabel)! as Item}, profile);
   } catch (e) { return err(protectedError(e)); }
 }
 /** Unstable extension boundary. Pin the package exactly and keep profile names constant. */

@@ -461,7 +461,7 @@ test("reconstructs forwarded origins only for explicit socket peers and retains 
       } else {
         const capture = value(c);
         assert.equal(capture.ingress.authority, "ingress.test");
-        assert.equal(capture.message.authority, "example.test");
+        assert.equal(capture.message.authority, "EXAMPLE.TEST:443");
         assert.equal(capture.message.scheme, "https");
       }
       res.end();

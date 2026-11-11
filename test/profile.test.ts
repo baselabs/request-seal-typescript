@@ -8,7 +8,6 @@ import type { InnerList, Item } from "../src/structured-fields/index.ts";
 import type { FreshnessFacts } from "../src/verification.ts";
 import { signatureSchema } from "../src/signature-fields.ts";
 import { verificationFacts } from "../src/verification.ts";
-import { verifyLabel as authenticateLabel } from "../src/verify.ts";
 
 type Surface = Readonly<{
   validSignatureInput(input: unknown): boolean;
@@ -315,10 +314,6 @@ test("selected signature 1025-byte rejection precedes dictionaries", async () =>
   rejection(await check(stamp, {message: missing, signature: {kind: "item", value: {kind: "bytes", value: new Uint8Array(1025)}, parameters: []}}), "invalid_signature_field", "fields");
 });
 
-test("extension pipeline unexpected faults retain invalid_policy", async () => {
-  const c = await fixture();
-  rejection(await authenticateLabel(c.message, c.policy, {label: "sig-b26"}, () => {throw new Error("CANARY");}, undefined, stamp), "invalid_policy", "input");
-});
 
 test("reordered stamps agree in serialization and replay commitment input; the name tuple resists callback mutation", async () => {
   const c = await fixture(), store = value(api.createMemoryStore({maxEntries: 16}));

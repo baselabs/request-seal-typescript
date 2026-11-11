@@ -39,13 +39,8 @@ export {Claim, Replay, createClaim, isReplayClaim, isReplayReceipt, createReplay
 export {createMemoryStore} from './replay/memory.ts';
 export {Telemetry, type TelemetryEvent, type TelemetryEventName, type TelemetryHandle, type TelemetryOutcome, type TelemetrySubscriber} from './telemetry.ts';
 export * from './discovery/index.ts';
-export {Quorum,createQuorum,isQuorum} from './quorum.ts';
-export type {QuorumMode,QuorumUnit,SignerSlot,QuorumBinding} from './quorum.ts';
 export {AcceptSignature,parseAcceptSignature,serializeAcceptSignature,fulfillAcceptSignature,isAcceptSignature} from './accept-signature.ts';
 export type {SignatureRequest, SignatureChoice, SignatureChooser} from './accept-signature.ts';
-export {verifyQuorum} from './verify-quorum.ts';
-export {isQuorumVerification} from './quorum/verification.ts';
-export type {QuorumVerification} from './quorum/verification.ts';
 export * from './web-bot-auth/index.ts';
 
 export {Profile, type ProfileStamp, type ProfileMetadataValue, type SignatureDictionaries} from './profile.ts';

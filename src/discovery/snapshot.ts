@@ -62,6 +62,8 @@ export async function fromResource(
   outerExpiry?: number,
   nested = false,
   context?: Context,
+  requestedAt = now,
+  receivedAt = now,
 ): Promise<Result<KeySet>> {
   try {
     ensure(!context || remainingMs(context) > 0, "deadline_exceeded");
@@ -94,7 +96,7 @@ export async function fromResource(
         : { proof: "not_applicable" as const, expiresAt: now + source.maxTtl };
     ensure(!context || remainingMs(context) > 0, "deadline_exceeded");
     let expiresAt = Math.min(
-      expiry(fs, source, now),
+      expiry(fs, source, receivedAt, requestedAt),
       proven.expiresAt,
       outerExpiry ?? Infinity,
     );

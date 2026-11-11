@@ -294,15 +294,12 @@ async function commitReplaySpanned<F>(
     releaseContext(child.value);
   }
 }
-/** Per-label cache; schemas remain part of the key so slot policies stay independent. */
-export type BaseCache = Map<string, ReturnType<typeof build>>;
-type ParsedCandidate = Readonly<{input: InnerList; signature: Item; baseCache: BaseCache}>;
+type ParsedSignature = Readonly<{input: InnerList; signature: Item}>;
 export async function verifyLabel(
   message: unknown,
   policy: unknown,
   options: unknown,
-  observeIdentity?: (identity: KeyIdentity) => void,
-  parsed?: ParsedCandidate,
+  parsed?: ParsedSignature,
   profile: ReplayFacts["profile"] = Object.freeze({name: "rfc9421"}),
 ): Promise<Result<Verification>> {
   try {
@@ -410,7 +407,7 @@ export async function verifyLabel(
     );
     ensure(selected.ok && (selected.value.family !== "hmac" || typeof key === "function" || isKeyHandle(key)), "key_resolver_failed", "key");
     let canonicalIdentity: KeyIdentity | undefined;
-    if (isPublicKey(key) || (isKeyHandle(key) && selected.ok && selected.value.family !== "hmac" && (observeIdentity !== undefined || Object.hasOwn(binding, "identity")))) {
+    if (isPublicKey(key) || (isKeyHandle(key) && selected.ok && selected.value.family !== "hmac" && Object.hasOwn(binding, "identity"))) {
       const id = isPublicKey(key) ? KeyIdentity.fromPublic(key) : await key.identity(c.value);
       if (!id.ok && id.error.kind === "custody" && id.error.reason === "deadline_exceeded") throw id.error;
       ensure(id.ok && isKeyIdentity(id.value), "key_resolver_failed", "key");
@@ -433,9 +430,7 @@ export async function verifyLabel(
       "algorithm_not_permitted",
       "policy",
     );
-    const cacheKey = JSON.stringify(policy.fieldSchemas);
-    const base = parsed?.baseCache.get(cacheKey) ?? build(m, input, { fieldSchemas: policy.fieldSchemas });
-    parsed?.baseCache.set(cacheKey, base);
+    const base = build(m, input, { fieldSchemas: policy.fieldSchemas });
     if (!base.ok)
       fail("signature_base_failed", "crypto", base.error.reason as "limit");
     const checked = await run(c.value, async (context) => {
@@ -483,19 +478,6 @@ export async function verifyLabel(
       fail("digest_unsupported", "content");
     }
     const replayFacts = await replay(params, algorithm, fresh, policy.replay, c.value, profile);
-    let identity: KeyIdentity | undefined;
-    if (observeIdentity) {
-      const id = await run(c.value, async () => {
-        if (canonicalIdentity) return ok(canonicalIdentity);
-        if (isKeyIdentity(binding.identity)) return ok(binding.identity);
-        if (isPublicKey(key)) return KeyIdentity.fromPublic(key);
-        if (isKeyHandle(key)) return key.identity(c.value);
-        return KeyIdentity.unknown();
-      });
-      if (!id.ok && id.error.kind === "custody" && id.error.reason === "deadline_exceeded") throw id.error;
-      ensure(id.ok && isKeyIdentity(id.value), "key_resolver_failed", "key");
-      identity = id.value;
-    }
     const result = completed({
       label: a.label as string,
       signature: {
@@ -508,16 +490,6 @@ export async function verifyLabel(
       profile, content: contentResult.value, freshness: fresh,
       replay: replayFacts, principal: "unattributed", authorization: "not_evaluated",
     });
-    if (result.ok && identity) {
-      // An extension pipeline step is a caller callback: its fault keeps the
-      // profile's deliberate invalid_policy classification, like a failing
-      // signer keeps signer_failed.
-      try {
-        observeIdentity!(identity);
-      } catch {
-        fail("invalid_policy", "input");
-      }
-    }
     return result;
   } catch (e) {
     if (isRequestSealError(e) && e.kind === "custody" && e.reason === "deadline_exceeded") return err(e);
@@ -547,10 +519,4 @@ export async function verifyLabel(
 export function verify(message: unknown, policy: unknown, options: unknown): Promise<Result<Verification>> {
   // The public entry carries the telemetry span; internal per-label calls do not.
   return span("verify", () => verifyLabel(message, policy, options), r => r.ok ? "ok" : "error", r => r.ok ? undefined : r.error);
-}
-/** Internal composition of the single-label pipeline; identities stay private. */
-export async function verifyCandidate(message: unknown, policy: Policy, options: unknown, parsed?: ParsedCandidate): Promise<Result<Readonly<{verification: Verification; identity: KeyIdentity}>>> {
-  let identity: KeyIdentity | undefined;
-  const result = await verifyLabel(message, policy, options, id => {identity = id;}, parsed);
-  return result.ok ? ok(Object.freeze({verification: result.value, identity: identity!})) : result;
 }

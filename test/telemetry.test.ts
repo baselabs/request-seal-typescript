@@ -6,7 +6,7 @@ const value = <T>(r: api.Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); 
 
 test("verify emits a bounded stop event and detach stops delivery", async () => {
   assert.equal(typeof api.Telemetry, "object", "Telemetry is exported");
-  assert.deepEqual([...api.Telemetry.events()], ["verify", "verifyQuorum", "webBotAuthVerify", "replayClaim", "custodySign"]);
+  assert.deepEqual([...api.Telemetry.events()], ["verify", "webBotAuthVerify", "replayClaim", "custodySign"]);
   const seen: api.TelemetryEvent[] = [];
   const handle = value(api.Telemetry.attach((event: api.TelemetryEvent) => seen.push(event)));
   const h = value(await api.Custody.local("ed25519", execFileSync("openssl", ["genpkey", "-algorithm", "ed25519"], { encoding: "utf8" })));
@@ -47,17 +47,10 @@ test("verify emits a bounded stop event and detach stops delivery", async () => 
     await h.release();
   }
 });
-test("verifyQuorum, Web Bot Auth, replay claims, and custody signing all report", async () => {
+test("Web Bot Auth, replay claims, and custody signing all report", async () => {
   const seen: api.TelemetryEvent[] = [];
   const handle = value(api.Telemetry.attach((event: api.TelemetryEvent) => seen.push(event)));
   try {
-    // Quorum: an invalid definition reports the bounded reason.
-    const quorum = await api.verifyQuorum({}, {invalid: true}, {});
-    assert.equal(quorum.ok, false);
-    const quorumEvent = seen.find((e) => e.event === "verifyQuorum");
-    assert.ok(quorumEvent);
-    assert.equal(quorumEvent.outcome, "error");
-    assert.equal(quorumEvent.reason, "core/input.invalid_quorum");
     // Web Bot Auth: an invalid policy reports without touching the message.
     const wba = await api.WebBotAuth.verify({}, {invalid: true});
     assert.equal(wba.ok, false);

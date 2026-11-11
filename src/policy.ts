@@ -8,7 +8,6 @@ import {
 } from "./structured-fields/index.ts";
 import { token } from "./message/index.ts";
 import {
-  QUORUM_MAX_SIGNATURES,
   CLOCK_MAX_SECONDS,
   FRESHNESS_MAX_SKEW_SECONDS,
   STRUCTURED_FIELDS_LIMITS,
@@ -80,6 +79,7 @@ export type Policy = Readonly<{
   extraComponents: "allow" | "reject";
   maxSignatures: number;
 }>;
+const MAX_POLICY_ITEMS = 64;
 const policies = new WeakSet<object>();
 const integer = (n: unknown, min: number, max: number): n is number =>
   typeof n === "number" && Number.isSafeInteger(n) && n >= min && n <= max;
@@ -97,7 +97,7 @@ function list(
 ): readonly string[] {
   ensure(Array.isArray(input), "invalid_policy", "input");
   const length = input.length;
-  ensure(integer(length, 1, QUORUM_MAX_SIGNATURES), "invalid_policy", "input");
+  ensure(integer(length, 1, MAX_POLICY_ITEMS), "invalid_policy", "input");
   const values = Array.from({ length }, (_, i) => input[i] as unknown);
   ensure(
     values.every(pred) && new Set(values).size === length,
@@ -109,7 +109,7 @@ function list(
 function algorithmList(input: unknown): readonly SigningAlgorithm[] {
   ensure(Array.isArray(input), "invalid_policy", "input");
   const length = input.length;
-  ensure(integer(length, 1, QUORUM_MAX_SIGNATURES), "invalid_policy", "input");
+  ensure(integer(length, 1, MAX_POLICY_ITEMS), "invalid_policy", "input");
   const ids = new Set<string>(), choices: SigningAlgorithm[] = [];
   for (let i = 0; i < length; i++) {
     const r = resolveAlgorithm(input[i]);
@@ -280,7 +280,7 @@ export function createPolicy(input: unknown): Result<Policy> {
         : SIGNATURE_DEFAULT_MAX_MEMBERS;
     ensure(
       (extra === "allow" || extra === "reject") &&
-        integer(max, 1, QUORUM_MAX_SIGNATURES),
+        integer(max, 1, MAX_POLICY_ITEMS),
       "invalid_policy",
       "input",
     );

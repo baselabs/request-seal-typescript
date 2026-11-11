@@ -2,7 +2,7 @@ import {nodeAdapterTest} from './support/node-adapter-test.ts';
 const test = nodeAdapterTest(import.meta.url);
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {spawnSync} from 'node:child_process';
+import {workingTreeFiles} from './support/repository-files.ts';
 import {randomBytes, generateKeyPairSync} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {reciprocalPeers, reciprocalRequest} from './support/reciprocal-peers.ts';
@@ -130,12 +130,10 @@ test('real signature rejections name the exact rule and recipients release', {ti
   } finally {await peers.close();}
 });
 
-test('tracked test titles describe behavior without review identifiers', () => {
+test('working-tree test titles describe behavior without review identifiers', () => {
   const pattern = /\b[SGN]\d+\b/;
   assert.equal(pattern.test(['S', '1'].join('')), true, 'known-positive review identifier probe');
-  const listed = spawnSync('git', ['ls-files', '-z', 'test'], {encoding: 'utf8'});
-  assert.equal(listed.status, 0, listed.stderr);
-  const titles = listed.stdout.split('\0').filter(path => path.endsWith('.test.ts')).flatMap(path => {
+  const titles = workingTreeFiles(process.cwd(), ['test']).filter(path => path.endsWith('.test.ts')).flatMap(path => {
     return [...readFileSync(path, 'utf8').matchAll(/\btest\((['"`])([^\n]*)/g)].map(match => ({path, title: match[2]!}));
   });
   assert.ok(titles.some(entry => entry.title.includes('both published peers')), 'the instrument reads the existing pin test');

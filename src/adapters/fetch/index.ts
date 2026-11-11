@@ -8,7 +8,7 @@ import { verify } from "../../verify.ts";
 import { isPolicy, type Policy } from "../../policy.ts";
 import type { Verification } from "../../verification.ts";
 import { type Context, run, withDeadline } from "../../context.ts";
-import { TIMEOUT_MAX_MS } from "../../constants.ts";
+import { BODY_MAX_CHUNKS, TIMEOUT_MAX_MS } from "../../constants.ts";
 import { dictionaries, inner } from "../../signature-fields.ts";
 import { err, ok, type Result } from "../../result.ts";
 import { canVerify, runtime, signingRefusals } from "./runtime.ts";
@@ -115,7 +115,7 @@ async function bytes(
       let complete = false;
       try {
         const parts: Uint8Array[] = [];
-        let size = 0;
+        let size = 0, count = 0;
         for (;;) {
           const next = await reader.read();
           if (next.done) {
@@ -129,8 +129,8 @@ async function bytes(
             "body_unavailable",
           );
           size += next.value.length;
-          S.need(size <= max, "fetch", stage, "limit");
-          parts.push(new Uint8Array(next.value));
+          S.need(++count < BODY_MAX_CHUNKS && size <= max, "fetch", stage, "limit");
+          if (next.value.length) parts.push(new Uint8Array(next.value));
         }
         const result = new Uint8Array(size);
         let offset = 0;
@@ -140,7 +140,7 @@ async function bytes(
         }
         return ok(result);
       } finally {
-        if (!complete) await reader.cancel().catch(() => {});
+        if (!complete) cancel();
         reader.releaseLock();
         c.signal.removeEventListener("abort", cancel);
       }

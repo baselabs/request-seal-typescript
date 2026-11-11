@@ -399,10 +399,10 @@ async function builder(
       ensure(url.length <= MESSAGE_MAX_URL_BYTES && !url.includes('#'), 'invalid_message');
       const parts = /^(https?):\/\/([^/?]+)((?:[/?].*)?)$/i.exec(url);
       ensure(parts, 'invalid_message');
-      protocol = parts[1]!.toLowerCase();
-      origin = parts[2]!.toLowerCase();
-      const port = /^(\[[^\]]+\]|[^:]+):([0-9]+)$/.exec(origin);
-      if (port && Number(port[2]) === (protocol === 'https' ? 443 : 80)) origin = port[1]!;
+      // RFC 9421 Section 2.2.2 preserves the sent URI's spelling.
+      // Authority and scheme normalization belongs to component derivation.
+      protocol = parts[1]!;
+      origin = parts[2]!;
       tail = parts[3]!;
     }
     const content = body({ state: 'retained', bytes: bytes === null ? '' : bytes });

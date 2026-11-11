@@ -160,7 +160,7 @@ they fail instead. Cross-language
 checks additionally require `REQUESTSEAL_REPLAY_ELIXIR=1` and dependencies installed
 with `mix deps.get` in `interop/replay`; the peer pins published RequestSeal 0.5.2. Its Hex lock checksum is
 `b8632c4cd4ec8ab989cf5d919765c34dbb3a2774939a0e3e7f104f329558229b`.
-The error vocabulary and released corpus also pin v0.5.2; see
+The released corpus retains v0.5.2; the public error vocabulary tracks v1.0.0. See
 [reciprocal interoperability](reciprocity.md#pins-and-ci).
 
 `ddl()` preserves the reference table definition byte for byte.

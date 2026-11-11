@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { execFileSync } from "node:child_process";
 import { documentationFences, executeFence, extractFences, runtime } from "./support/docs-fences.ts";
 
 const fences = documentationFences();
@@ -72,7 +71,7 @@ test("fence collection includes Markdown outside the guides", async () => {
   } finally { await rm(copy, {recursive: true, force: true}); }
 });
 
-test("new repository Markdown cannot bypass fence collection before staging", async () => {
+test("new and deleted repository Markdown follow the working tree before staging", async () => {
   const copy = await mkdtemp(join(tmpdir(), "request-seal-coverage-"));
   try {
     // Git reads the real index here; object history is unnecessary for ls-files.
@@ -80,7 +79,7 @@ test("new repository Markdown cannot bypass fence collection before staging", as
     await mkdir(join(copy, ".git/refs"), {recursive: true});
     for (const file of ["HEAD", "index", "config"]) await cp(join(".git", file), join(copy, ".git", file));
     // Preserve the Git-backed collector while isolating the probe from the working tree.
-    const files = execFileSync("git", ["ls-files", "--", "*.md"], {encoding: "utf8"}).trim().split("\n");
+    const files = [...new Set(fences.map(fence => fence.file))];
     for (const file of files) {
       await mkdir(dirname(join(copy, file)), {recursive: true});
       await cp(file, join(copy, file));
@@ -88,7 +87,11 @@ test("new repository Markdown cannot bypass fence collection before staging", as
     const file = "test/docs-coverage.md";
     await mkdir(join(copy, "test"), {recursive: true});
     await writeFile(join(copy, file), "```typescript\nthrow Error('new repository fence');\n```\n");
+    const deleted = "docs/guides/fetch.md";
+    assert.ok(files.includes(deleted));
+    await rm(join(copy, deleted));
     const collected = documentationFences(copy);
+    assert.equal(collected.some(fence => fence.file === deleted), false);
     assert.ok(collected.some(f => f.file === "README.md"), "known README programs remain visible through the copied index");
     const found = collected.find(f => f.file === file);
     assert.ok(found);
