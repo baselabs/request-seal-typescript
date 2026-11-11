@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { documentationFences, executeFence, extractFences, runtime } from "./support/docs-fences.ts";
 
 const fences = documentationFences();
@@ -74,10 +75,11 @@ test("fence collection includes Markdown outside the guides", async () => {
 test("new and deleted repository Markdown follow the working tree before staging", async () => {
   const copy = await mkdtemp(join(tmpdir(), "request-seal-coverage-"));
   try {
-    // Git reads the real index here; object history is unnecessary for ls-files.
-    await mkdir(join(copy, ".git/objects"), {recursive: true});
-    await mkdir(join(copy, ".git/refs"), {recursive: true});
-    for (const file of ["HEAD", "index", "config"]) await cp(join(".git", file), join(copy, ".git", file));
+    // Git resolves index storage for ordinary checkouts and linked worktrees.
+    // The probe needs the real index inventory, not object history or local config.
+    execFileSync("git", ["init", "--quiet", copy]);
+    const index = execFileSync("git", ["rev-parse", "--git-path", "index"], {encoding: "utf8"}).trim();
+    await cp(index, join(copy, ".git/index"));
     // Preserve the Git-backed collector while isolating the probe from the working tree.
     const files = [...new Set(fences.map(fence => fence.file))];
     for (const file of files) {

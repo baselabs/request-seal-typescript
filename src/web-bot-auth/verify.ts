@@ -39,7 +39,7 @@ import {
   envelope,
 } from "../signature-fields.ts";
 import { CLOCK_MAX_SECONDS } from "../constants.ts";
-import { retentionEnd } from "../replay/claim.ts";
+import { retainUntil } from "../replay/claim.ts";
 import {
   agents,
   identifier,
@@ -450,68 +450,42 @@ async function verifyWebBotAuthSpanned(
       // RFC 9421 Section 7.2.5 leaves labels uncovered. A set of signatures
       // also changes when captures are stripped or combined: claim one only.
       ensure(selected.length === 1, "unexpected_signature", "policy");
-      const facts: WebBotAuthReplayFacts["signatures"][number][] = [];
-      const ends: number[] = [];
-      for (const v of Object.values(results)) {
-        const params = Object.fromEntries(
-          v.signature.parameters.map(([k, b]) => [k, b.value]),
-        );
-        ensure(
-          typeof params.nonce === "string" && params.nonce.length > 0,
-          "missing_replay_identifier",
-          "replay",
-        );
-        ensure(v.freshness !== "not_evaluated", "invalid_policy", "input");
-        const f = v.freshness;
-        const end = retentionEnd({
-          created: f.created,
-          expires: f.expires,
-          maxAge: f.maxAge,
-          skew: f.skew,
-        });
-        if (!end.ok) throw end.error;
-        ends.push(end.value);
-        const principal = v.principal;
-        const agent =
-          principal.kind === "key"
-            ? principal
-            : Object.freeze({
-                kind: principal.kind,
-                identifier: principal.identifier,
-                type: principal.type,
-                origin: principal.origin,
-                thumbprint: principal.thumbprint,
-              });
-        facts.push(
-          Object.freeze({
-            identifier: params.nonce,
-            algorithm: v.signature.algorithm,
-            keyid: params.keyid as string,
-            agent,
-            created: params.created as number,
-            expires: params.expires as number,
-          }),
-        );
-      }
+      const [label] = selected[0]!;
+      const v = results[label]!;
+      const params = Object.fromEntries(
+        v.signature.parameters.map(([k, b]) => [k, b.value]),
+      );
       ensure(
-        Math.min(...ends) <= CLOCK_MAX_SECONDS,
-        "retention_exceeded",
+        typeof params.nonce === "string" && params.nonce.length > 0,
+        "missing_replay_identifier",
         "replay",
       );
-      replay = await commitReplay(
-        Object.freeze({
-          profile: WEB_BOT_AUTH_PROFILE,
-          signatures: Object.freeze(facts),
-        }),
-        Math.min(...ends),
-        p.replay,
-        c,
-      );
-      for (const [label, v] of Object.entries(results)) {
-        const stamped = completed({ ...v, replay });
-        if (!stamped.ok) throw stamped.error;
-        results[label] = stamped.value as WebBotAuthSignature;
-      }
+      ensure(v.freshness !== "not_evaluated", "invalid_policy", "input");
+      const f = v.freshness;
+      const end = retainUntil({ created: f.created, expires: f.expires,
+        maxAge: f.maxAge, skew: f.skew });
+      if (!end.ok) throw end.error;
+      const principal = v.principal;
+      const agent = principal.kind === "key" ? principal : Object.freeze({
+        kind: principal.kind,
+        identifier: principal.identifier,
+        type: principal.type,
+        origin: principal.origin,
+        thumbprint: principal.thumbprint,
+      });
+      const facts: WebBotAuthReplayFacts = Object.freeze({
+        identifier: params.nonce,
+        algorithm: v.signature.algorithm,
+        keyid: params.keyid as string,
+        agent,
+        created: params.created as number,
+        expires: params.expires as number,
+        profile: WEB_BOT_AUTH_PROFILE,
+      });
+      replay = await commitReplay(facts, end.value, p.replay, c);
+      const stamped = completed({ ...v, replay });
+      if (!stamped.ok) throw stamped.error;
+      results[label] = stamped.value as WebBotAuthSignature;
     }
     return completedEnvelope(results, evidence, ignored, replay);
   } catch (e) {

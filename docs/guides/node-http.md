@@ -30,7 +30,7 @@ import { captureRequest, signedRequest, verifyRequest } from "@request-seal/core
 const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
 const key = must(await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) }));
 const components = '("@method" "@request-target" "content-digest")';
-// Single sender: select by keyid when you have several.
+// Resolve the accepted key ID.
 const keyResolver: KeyResolver = () => ok({ algorithm: "hmac-sha256", key });
 const policy = must(Policy.create({
   algorithms: ["hmac-sha256"], components, keyResolver,
@@ -76,7 +76,7 @@ import { captureRequest, verifyRequest } from "@request-seal/core/node-http";
 const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
 const key = must(await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) }));
 const components = '("@method" "@scheme" "@authority" "@path")';
-// Single sender: select by keyid when you have several.
+// Resolve the accepted key ID.
 const keyResolver: KeyResolver = () => ok({ algorithm: "hmac-sha256", key });
 const policy = must(Policy.create({
   algorithms: ["hmac-sha256"], components, keyResolver,
@@ -137,7 +137,7 @@ import { captureRequest, signedRequest, verifyRequest } from "@request-seal/core
 const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
 const key = must(await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) }));
 const components = '("@method" "@request-target" "content-digest")';
-// Single sender: select by keyid when you have several.
+// Resolve the accepted key ID.
 const keyResolver: KeyResolver = () => ok({ algorithm: "hmac-sha256", key });
 const policy = must(Policy.create({
   algorithms: ["hmac-sha256"], components, keyResolver,
@@ -196,7 +196,7 @@ import { capture, captureRequest, signedRequest, verifyRequest } from "@request-
 const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
 const key = must(await Custody.local("hmac-sha256", { hmac: crypto.getRandomValues(new Uint8Array(32)) }));
 const components = '("@method" "@request-target" "content-digest")';
-// Single sender: select by keyid when you have several.
+// Resolve the accepted key ID.
 const keyResolver: KeyResolver = () => ok({ algorithm: "hmac-sha256", key });
 const policy = must(Policy.create({
   algorithms: ["hmac-sha256"], components, keyResolver,

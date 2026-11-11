@@ -109,7 +109,7 @@ const signed = must(await sign(request, { label: "sig", components, algorithm: "
 // The receiving side keeps the headers but not the body bytes.
 const received = must(Message.create({ ...signed, body: { state: "consumed", bytes: null, source: null, ownership: "caller", maxBytes: 1_048_576 } }));
 
-// Single sender: select by keyid when you have several.
+// Resolve the accepted key ID.
 const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: trusted });
 const policy = must(Policy.create({
   algorithms: ["ed25519"], components, keyResolver,
@@ -129,9 +129,9 @@ assert.ok(!rejected.ok && rejected.error.kind === "core" && rejected.error.reaso
 
 A representation digest (`kind: "representation"`) needs the complete representation, passed as `representation` to `verify`. A content body does not stand in for it.
 
-### Several signatures
+### Per-label verification
 
-RequestSeal verifies each signature label independently with `verify(message, policy, { label })` and returns its result. Each signature must satisfy its complete policy; coverage is never pooled. Deciding how many signers or which signers an application requires, and mapping a verified signer to application identity or authority, is the application's job.
+Verify each label you accept with `verify(message, policy, { label })`. Each signature must satisfy its complete policy; coverage is never pooled. Mapping the verified key to application identity or authority is the application's job.
 
 ## Respond to a rejection
 

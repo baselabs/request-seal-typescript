@@ -318,7 +318,7 @@ const policy = must(WebBotAuth.Policy.create({
   replay: {                                                 // One use per nonce, across every selected signature.
     identifier: "nonce", namespace: new TextEncoder().encode("crawlers"), timeoutMs: 1000,
     store: must(createMemoryStore({ maxEntries: 100_000 })),
-    commitment: async (facts: WebBotAuthReplayFacts) => ok(await sha256(JSON.stringify([facts.profile, facts.signatures.map((s) => [s.keyid, s.identifier]).sort()]))),
+    commitment: async (facts: WebBotAuthReplayFacts) => ok(await sha256(JSON.stringify([facts.profile, facts.identifier, facts.keyid, facts.agent.kind === "agent" ? facts.agent.identifier : null]))),
   },
 }));
 
@@ -353,7 +353,7 @@ For core `agent_unresolved`, `timeout` and `source_unavailable` map to 503; `unt
 
 | Standard | What RequestSeal implements |
 | --- | --- |
-| [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html) HTTP Message Signatures | Signing and verification, derived components, multiple signatures, `Accept-Signature`, and the six algorithms in the [IANA registry](https://www.iana.org/assignments/http-message-signature) that the library supports. |
+| [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html) HTTP Message Signatures | Signing and per-label verification, derived components, `Accept-Signature`, and the six algorithms in the [IANA registry](https://www.iana.org/assignments/http-message-signature) that the library supports. |
 | [RFC 9530](https://www.rfc-editor.org/rfc/rfc9530.html) Digest Fields | `Content-Digest` and `Repr-Digest` with SHA-256 and SHA-512, including streamed bodies. |
 | [RFC 8941](https://www.rfc-editor.org/rfc/rfc8941.html) and [RFC 9651](https://www.rfc-editor.org/rfc/rfc9651.html) Structured Field Values | Parsing and serialization under explicit schemas. |
 | [draft-ietf-webbotauth-httpsig-protocol-00](https://www.ietf.org/archive/id/draft-ietf-webbotauth-httpsig-protocol-00.html) | Web Bot Auth signing, verification, key directories, and nested signatures. A draft can change; pin your version. |

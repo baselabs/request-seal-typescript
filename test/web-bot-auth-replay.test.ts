@@ -37,15 +37,14 @@ test("documented profile commitment separates equal nonces while nonce-only comm
   const set = value(await trust({type: "directory", location: "https://signature-agent.test", identifier: ""}));
   const key = Object.values(set.keys).find(k => k.algorithm === "ed25519")!.key;
   const m = await request();
-  const identifiers: string[][] = [];
+  const identifiers: string[] = [];
   for (const scoped of [true, false]) {
     const counted = counting();
     const commit = async (facts: Seal.ReplayFacts | Seal.WebBotAuthReplayFacts) => {
-      const nonces = "signatures" in facts ? facts.signatures.map(s => s.identifier).sort() : [facts.identifier];
-      identifiers.push(nonces);
+      identifiers.push(facts.identifier);
       const encoded = JSON.stringify(scoped
-        ? [facts.profile, nonces]
-        : nonces);
+        ? [facts.profile, facts.identifier]
+        : facts.identifier);
       const expected = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(encoded)));
       if (!scoped) return Seal.ok(expected);
       const result = await commitment(facts);
@@ -120,14 +119,18 @@ test("required replay claims one selected signature over covered facts only", as
   const r = value(await Seal.WebBotAuth.verify(single, p));
   assert.equal(counted.claims.length, 1);
   assert.equal(committed.length, 1);
-  assert.equal(committed[0]!.signatures.length, 1);
-  assert.equal(Object.hasOwn(committed[0]!.signatures[0]!, "label"), false);
+  assert.deepEqual(Object.keys(committed[0]!).sort(),
+    ["agent", "algorithm", "created", "expires", "identifier", "keyid", "profile"]);
+  assert.equal(Object.hasOwn(committed[0]!, "label"), false);
+  assert.equal(Object.isFrozen(committed[0]), true);
+  assert.equal(Object.isFrozen(committed[0]!.agent), true);
+  assert.deepEqual(Object.keys(committed[0]!.agent).sort(),
+    ["identifier", "kind", "origin", "thumbprint", "type"]);
   assert.equal(
     committed[0]!.profile.revision,
     "draft-ietf-webbotauth-httpsig-protocol-00",
   );
-  for (const f of committed[0]!.signatures)
-    assert.equal("provenance" in f.agent, false);
+  assert.equal("provenance" in committed[0]!.agent, false);
   for (const v of Object.values(r.signatures)) assert.equal(v.replay, r.replay);
   assert.equal(r.replay !== "not_required" && r.replay.retainUntil, now + 3600);
   rejection(await Seal.WebBotAuth.verify(single, p), "replayed");
@@ -199,19 +202,11 @@ test("identical nonces have distinct generic and Web Bot Auth commitments in one
     f: Seal.ReplayFacts | Seal.WebBotAuthReplayFacts,
   ) => {
     facts.push(f);
-    const identifiers =
-      "signatures" in f
-        ? f.signatures.map((v) => [
-            v.identifier,
-            v.keyid,
-            v.agent.kind === "agent" ? v.agent.identifier : null,
-          ])
-        : [[f.identifier, f.keyid, null]];
     return Seal.ok(
       new Uint8Array(
         await crypto.subtle.digest(
           "SHA-256",
-          new TextEncoder().encode(JSON.stringify([f.profile, identifiers])),
+          new TextEncoder().encode(JSON.stringify([f.profile, f.identifier, f.keyid])),
         ),
       ),
     );
@@ -258,8 +253,8 @@ test("identical nonces have distinct generic and Web Bot Auth commitments in one
   assert.equal(counted.claims.length, 2);
   assert.notDeepEqual(counted.claims[0]!.key, counted.claims[1]!.key);
   assert.equal(
-    "signatures" in facts[0]! && facts[0]!.signatures[0]!.identifier,
-    "identifier" in facts[1]! && facts[1]!.identifier,
+    facts[0]!.identifier,
+    facts[1]!.identifier,
   );
   t.diagnostic(
     "same nonce, same namespace: Web Bot Auth=claimed, generic=claimed; commitment bytes distinct",

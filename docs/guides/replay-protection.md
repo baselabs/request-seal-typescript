@@ -41,7 +41,7 @@ const trusted = must(await PublicKey.import(pair.publicKey.export({ format: "jwk
 // One store per process. A multi-process service needs a shared store (see the PostgreSQL section).
 const store = must(createMemoryStore({ maxEntries: 10_000 }));
 const components = '("@method" "@authority" "@path")';
-// Single sender: select by keyid when you have several.
+// Resolve the accepted key ID.
 const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: trusted });
 // The commitment decides what "the same request" means. Here: the same key and the same nonce.
 const commitment = async (facts: ReplayFacts) => ok(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([facts.profile, facts.keyid, facts.identifier])))));
@@ -134,7 +134,7 @@ Sweep with a trusted clock that agrees with your verifiers. With more than one n
 
 ## Web Bot Auth
 
-Required Web Bot Auth replay accepts exactly one selected signature and returns `unexpected_signature` at `policy` for more, after verification and before any claim. Nested envelopes require `replay: "not_required"`. Your commitment receives `{ profile, signatures: [...] }` with exactly one entry containing covered facts, without the uncovered label (RFC 9421 Section 7.2.5). The library does not add the profile to your namespace or your commitment, so put the profile into the commitment yourself: a nonce-only commitment in a namespace shared by generic and Web Bot Auth verification lets one profile's nonce consume the other's. The program signs with a held key, verifies once, and sees the second use refused.
+Required Web Bot Auth replay accepts exactly one selected signature and returns `unexpected_signature` at `policy` for more, after verification and before any claim. Nested envelopes require `replay: "not_required"`. Your commitment receives one flat map containing `identifier` (nonce), `algorithm`, `keyid`, `agent`, `created`, `expires`, and `profile`, without the uncovered label (RFC 9421 Section 7.2.5). Generic verification uses `tag` in place of `agent`. Commit to the nonce, key ID, and agent identifier; held keys have no agent identifier. The library does not add the profile to your namespace or your commitment, so put the profile into the commitment yourself: a nonce-only commitment in a namespace shared by generic and Web Bot Auth verification lets one profile's nonce consume the other's. The program signs with a held key, verifies once, and sees the second use refused.
 
 ```ts
 import assert from "node:assert/strict";
@@ -158,7 +158,7 @@ const policy = must(WebBotAuth.Policy.create({
     // Required replay supplies one signature without its uncovered label. Put the profile in the commitment
     // so an identical nonce under another profile in the same namespace never collides with this one.
     commitment: async (facts: WebBotAuthReplayFacts) => ok(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(
-      JSON.stringify([facts.profile, facts.signatures.map((signature) => [signature.keyid, signature.identifier]).sort()]))))),
+      JSON.stringify([facts.profile, facts.identifier, facts.keyid, facts.agent.kind === "agent" ? facts.agent.identifier : null]))))),
     store: must(createMemoryStore({ maxEntries: 10_000 })),
     timeoutMs: 1000,
   },

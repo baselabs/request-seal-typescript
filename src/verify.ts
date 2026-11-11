@@ -15,14 +15,12 @@ import {
   isPolicy,
   type Policy,
   type Freshness,
-  type ResolvedKey,
   type Verifier,
 } from "./policy.ts";
 import { resolveAlgorithm, selection, type SigningAlgorithm } from "./crypto/algorithm.ts";
 import { Crypto } from "./crypto/index.ts";
 import { isKeyHandle } from "./key_handle.ts";
 import { isPublicKey } from "./public_key.ts";
-import { isKeyIdentity, KeyIdentity } from "./key_identity.ts";
 import { build } from "./signature-base/index.ts";
 import { digestField, checkDigest, isDigestState } from "./digest.ts";
 import {
@@ -391,35 +389,21 @@ export async function verifyLabel(
     const resolved = snapshotOptions(resolution.value, ["ok", "value", "error"]);
     ensure(resolved.ok && resolved.value.ok === true && Object.hasOwn(resolved.value, "value"), "key_resolver_failed", "key");
     ensure(resolved.value.value !== null, "unknown_key", "key");
-    const r = snapshotOptions(resolved.value.value, ["algorithm", "key", "verify", "identity"]);
+    const r = snapshotOptions(resolved.value.value, ["algorithm", "key"]);
     ensure(r.ok, "key_resolver_failed", "key");
     const binding = r.value,
       selected = resolveAlgorithm(binding.algorithm),
       algorithm = selected.ok ? selection(selected.value) as SigningAlgorithm : null,
-      key = Object.hasOwn(binding, "verify") ? binding.verify : binding.key;
+      key = binding.key;
     ensure(
       algorithm !== null &&
         Object.hasOwn(binding, "algorithm") &&
-        Object.hasOwn(binding, "key") !== Object.hasOwn(binding, "verify") &&
+        Object.hasOwn(binding, "key") &&
         (typeof key === "function" || isPublicKey(key) || isKeyHandle(key)),
       "key_resolver_failed",
       "key",
     );
     ensure(selected.ok && (selected.value.family !== "hmac" || typeof key === "function" || isKeyHandle(key)), "key_resolver_failed", "key");
-    let canonicalIdentity: KeyIdentity | undefined;
-    if (isPublicKey(key) || (isKeyHandle(key) && selected.ok && selected.value.family !== "hmac" && Object.hasOwn(binding, "identity"))) {
-      const id = isPublicKey(key) ? KeyIdentity.fromPublic(key) : await key.identity(c.value);
-      if (!id.ok && id.error.kind === "custody" && id.error.reason === "deadline_exceeded") throw id.error;
-      ensure(id.ok && isKeyIdentity(id.value), "key_resolver_failed", "key");
-      canonicalIdentity = id.value;
-    }
-    if (Object.hasOwn(binding, "identity")) {
-      ensure(isKeyIdentity(binding.identity), "key_resolver_failed", "key");
-      if (canonicalIdentity) {
-        const same = KeyIdentity.same(canonicalIdentity, binding.identity);
-        ensure(same.ok && same.value, "key_resolver_failed", "key");
-      }
-    }
     ensure(
       !Object.hasOwn(params, "alg") || (typeof algorithm === "string" && params.alg === algorithm),
       "algorithm_mismatch",

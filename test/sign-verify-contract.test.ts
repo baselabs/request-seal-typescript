@@ -92,13 +92,33 @@ test("resolver errors cannot inject a replay reason", async () => {
     reason(await api.verify(x.signed, x.policy({keyResolver: () => ok(null)}), {label: "s"}), "unknown_key", "key");
   } finally {await x.h.release();}
 });
+test("resolver accepts exactly algorithm and key and rejects extra members", async () => {
+  const x = await setup();
+  try {
+    const verifier = (a: api.SigningAlgorithm, b: Uint8Array, s: Uint8Array) => api.Crypto.verify(a, x.pub, s, b);
+    const identity = value(api.KeyIdentity.fromPublic(x.pub));
+    for (const key of [x.pub, x.h, verifier]) {
+      const binding = {algorithm: "ed25519", key};
+      value(await api.verify(x.signed, x.policy({keyResolver: () => ok(binding)}), {label: "s"}));
+      for (const extra of [{identity}, {identity: undefined}, {extra: true}, {verify: verifier}])
+        reason(await api.verify(x.signed, x.policy({keyResolver: () => ok({...binding, ...extra})}), {label: "s"}), "key_resolver_failed", "key");
+    }
+  } finally {await x.h.release();}
+});
+test("resolver accepts no alternate verification member in place of key", async () => {
+  const x = await setup();
+  try {
+    const verifier = (a: api.SigningAlgorithm, b: Uint8Array, s: Uint8Array) => api.Crypto.verify(a, x.pub, s, b);
+    reason(await api.verify(x.signed, x.policy({keyResolver: () => ok({algorithm: "ed25519", verify: verifier})}), {label: "s"}), "key_resolver_failed", "key");
+  } finally {await x.h.release();}
+});
 test("verifier validates exact result discriminants and negative shapes", async () => {
   const x = await setup();
   try {
     for (const [result, expected] of [[true, "verifier_failed"], [{}, "verifier_failed"], [{ok: 1, value: true}, "verifier_failed"], [{ok: false}, "verifier_failed"], [{ok: undefined, error: "no"}, "verifier_failed"], [{ok: true, value: true, extra: 1}, "verifier_failed"], [{ok: false, error: "no", value: true}, "verifier_failed"], [{ok: true, value: false}, "invalid_signature"], [{ok: false, error: null}, "invalid_signature"], [{ok: false, error: coreError("replayed", "replay")}, "invalid_signature"]] as const) {
-      reason(await api.verify(x.signed, x.policy({keyResolver: () => ok({algorithm: "ed25519", verify: () => result})}), {label: "s"}), expected, "crypto");
+      reason(await api.verify(x.signed, x.policy({keyResolver: () => ok({algorithm: "ed25519", key: () => result})}), {label: "s"}), expected, "crypto");
     }
-    value(await api.verify(x.signed, x.policy({keyResolver: () => ok({algorithm: "ed25519", verify: (a: any, b: any, s: any) => api.Crypto.verify(a, x.pub, s, b)})}), {label: "s"}));
+    value(await api.verify(x.signed, x.policy({keyResolver: () => ok({algorithm: "ed25519", key: (a: any, b: any, s: any) => api.Crypto.verify(a, x.pub, s, b)})}), {label: "s"}));
   } finally {await x.h.release();}
 });
 test("reserved options precede unknown option rejection and are read once", async () => {
@@ -215,7 +235,7 @@ test("already-aborted signals keep the clock resolver crypto and signer mappings
       const r = await api.verify(x.signed, x.policy({freshness}), {label: "s", context: context()}); reason(r, "deadline_exceeded"); assert.equal(!r.ok && r.error.kind, "custody");
     }
     const live = new AbortController();
-    reason(await api.verify(x.signed, x.policy({keyResolver: () => ok({algorithm: "ed25519", verify: async (a: any, b: any, sig: any) => {live.abort(); return api.Crypto.verify(a, x.pub, sig, b);}})}), {label: "s", context: value(api.withDeadline({signal: live.signal}))}), "deadline_exceeded");
+    reason(await api.verify(x.signed, x.policy({keyResolver: () => ok({algorithm: "ed25519", key: async (a: any, b: any, sig: any) => {live.abort(); return api.Crypto.verify(a, x.pub, sig, b);}})}), {label: "s", context: value(api.withDeadline({signal: live.signal}))}), "deadline_exceeded");
   } finally {await x.h.release();}
 });
 test("every reference JWS selection is accepted; RS256 signs and verifies through the registry", async () => {
@@ -299,7 +319,7 @@ for (const required of [false, true]) test(required
       const margin = [0.002, 0.005, 0.01, 0.02, 0.05][i % 5]!;
       const p = x.policy({
         content: required ? {kind: "content", algorithms: ["sha-256"], section: "headers"} : "not_required",
-        keyResolver: () => ok({algorithm: "ed25519", verify: async (a: any, b: any, sig: any, ctx: api.Context) => {
+        keyResolver: () => ok({algorithm: "ed25519", key: async (a: any, b: any, sig: any, ctx: api.Context) => {
           const r = await api.Crypto.verify(a, x.pub, sig, b);
           while (ctx.deadline - performance.now() > margin) {}
           return r;

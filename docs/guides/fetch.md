@@ -85,7 +85,7 @@ const pair = generateKeyPairSync("ed25519");
 const signer = must(await Custody.local("ed25519", pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string));
 const trusted = must(await PublicKey.import(pair.publicKey.export({ format: "jwk" })));
 const components = '("@method" "@scheme" "@authority" "content-digest")';
-// Single sender: select by keyid when you have several.
+// Resolve the accepted key ID.
 const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: trusted });
 const policy = must(Policy.create({
   algorithms: ["ed25519"], components, keyResolver,

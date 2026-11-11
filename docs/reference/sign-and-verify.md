@@ -57,16 +57,16 @@ a retained body (otherwise `body_unavailable` at `content`), and adds
 are exact tokens from `Crypto.algorithms()`. JWS selections use `{jws: name}`
 for RS256, PS256, PS384, PS512, HS256, ES256, ES384, or EdDSA; sender `alg`
 must be absent for these selections. A resolver receives `{keyid, label,
-tag}` and Context, and returns a Result containing `{algorithm, key}` or
-`{algorithm, verify}`; `null` means unknown key. A verification callback receives
+tag}` and Context, and returns a Result containing exactly `{algorithm, key}`;
+`null` means unknown key. `key` is a PublicKey, KeyHandle, or verification callback. A verification callback receives
 `(algorithm, base, signature, context)` and returns `Result<boolean>`; true succeeds, false or an error rejects the signature.
 Malformed callback results map to `verifier_failed`. Every non-ok resolver
 result, malformed binding, or resolver exception maps to `key_resolver_failed`
 at the key layer; `ok(null)` maps to `unknown_key`. Callback errors never pass
 through as resolver reasons. HMAC keys must be verification functions or
 KeyHandles; public keys reject at resolution.
-The resolver's algorithm is authoritative. Optional identity is a branded
-KeyIdentity and must agree with a supplied public key.
+The resolver's algorithm is authoritative. Any extra result member, including
+`identity` or `verify`, rejects as `key_resolver_failed` at `key`.
 
 Freshness is `"not_evaluated"` or `{clock, maxAge, skew, requireExpires}`.
 `maxAge` is null or a positive integer through 253,402,300,799 seconds; skew is

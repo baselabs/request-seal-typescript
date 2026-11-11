@@ -425,7 +425,7 @@ test("resolver and verifier faults return bounded errors without callback diagno
         async () =>
           ok({
             algorithm: "ed25519",
-            verify: () => {
+            key: () => {
               throw new Error("DIAGNOSTIC-CANARY");
             },
           }),

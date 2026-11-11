@@ -20,7 +20,7 @@ async function setup() {
     assert.equal(api.isContext(c), true);
     return api.ok(new TextEncoder().encode(facts.identifier));
   };
-  const attrs = {algorithms: ['ed25519'], components: '("@method")', keyResolver: async () => {events.push('key'); return api.ok({algorithm: 'ed25519', verify: async (algorithm: api.SigningAlgorithm, base: Uint8Array, signature: Uint8Array) => {events.push('crypto'); return api.Crypto.verify(algorithm, key, signature, base);}});}, freshness: {clock: () => {events.push('freshness'); return 100;}, maxAge: 60, skew: 2, requireExpires: false}, content: 'not_required', replay: {identifier: 'nonce', namespace: new Uint8Array([1]), commitment, store, timeoutMs: 5000}};
+  const attrs = {algorithms: ['ed25519'], components: '("@method")', keyResolver: async () => {events.push('key'); return api.ok({algorithm: 'ed25519', key: async (algorithm: api.SigningAlgorithm, base: Uint8Array, signature: Uint8Array) => {events.push('crypto'); return api.Crypto.verify(algorithm, key, signature, base);}});}, freshness: {clock: () => {events.push('freshness'); return 100;}, maxAge: 60, skew: 2, requireExpires: false}, content: 'not_required', replay: {identifier: 'nonce', namespace: new Uint8Array([1]), commitment, store, timeoutMs: 5000}};
   const policy = (extra: Record<string, unknown> = {}) => value(api.Policy.create({...attrs, ...extra}));
   return {h, m, signed, signer, events, memory, store, commitment, attrs, policy};
 }

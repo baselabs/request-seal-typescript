@@ -26,7 +26,15 @@ export type AgentTrust = (
 ) =>
   | Result<DiscoverySource | KeySet | null>
   | Promise<Result<DiscoverySource | KeySet | null>>;
-/** Replay rules with a commitment callback over the verified signature envelope. */
+/**
+ * Replay rules over one verified signature's flat facts: identifier (nonce),
+ * algorithm, keyid, agent, created, expires, and profile. Generic verification
+ * uses tag in place of agent, so one commitment function can serve both paths.
+ * Commit to identifier, keyid, and agent.identifier within the caller namespace;
+ * held keys have no agent identifier. Agent facts retain kind, identifier, type,
+ * origin, and thumbprint, excluding provenance, fetch time, and cache revision.
+ * The facts have no label or signature list and stay stable across refreshes.
+ */
 export type WebBotAuthReplayPolicy = Omit<ReplayPolicy, "commitment"> &
   Readonly<{
     /** Derive caller-owned replay commitment bytes from verified facts. */
@@ -35,7 +43,11 @@ export type WebBotAuthReplayPolicy = Omit<ReplayPolicy, "commitment"> &
       context: Context,
     ) => Result<Uint8Array> | Promise<Result<Uint8Array>>;
   }>;
-/** A branded agent-trust policy for Web Bot Auth verification. */
+/**
+ * A branded agent-trust policy for Web Bot Auth verification.
+ * Required replay supplies the flat WebBotAuthReplayFacts described by
+ * WebBotAuthReplayPolicy after the single selected signature succeeds.
+ */
 export type WebBotAuthPolicy = Omit<
   GenericPolicy,
   "keyResolver" | "replay" | "freshness"

@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
 import * as api from '../src/index.ts';
 import {createNodeHasher} from '../src/node_hasher.ts';
 import {dictionaries} from '../src/signature-fields.ts';
@@ -67,20 +66,5 @@ test('negotiation accepts callable arities, bound signers, and branded handles',
       const policy = value(api.Policy.create({algorithms: ['hmac-sha256'], components: '("@method")', keyResolver: () => api.ok({algorithm: 'hmac-sha256', key: handle}), freshness: 'not_evaluated', content: 'not_required', replay: 'not_required'}));
       assert.ok((await api.verify(signed, policy, {label: 's'})).ok);
     }
-  } finally {await handle.release();}
-});
-test('managed handle identity bounds a hanging custodian', async () => {
-  const local = value(await api.Custody.local('ed25519', await readFile('test/fixtures/upstream/crypto/ed25519_private.pem', 'utf8')));
-  const port = Object.create(null) as api.Custodian;
-  for (const name of ['sign','verify','publicKey','unwrap','release'] as const) Object.defineProperty(port, name, {value: local[name].bind(local)});
-  Object.defineProperty(port, 'identity', {value: () => new Promise(() => {})});
-  const handle = value(api.createKeyHandle('ed25519', port));
-  try {
-    const base = value(await api.Message.request('GET', 'https://example.com/', [], null));
-    const signed = value(await api.sign(base, {label: 's', algorithm: 'ed25519', signatureInput: '("@method")'}, (algorithm: api.SigningAlgorithm, bytes: Uint8Array) => local.sign(algorithm, bytes, value(api.withDeadline()))));
-    const identity = value(api.KeyIdentity.fromPublic(value(await local.publicKey())));
-    const policy = value(api.Policy.create({algorithms: ['ed25519'], components: '("@method")', keyResolver: () => api.ok({algorithm: 'ed25519', key: handle, identity}), freshness: 'not_evaluated', content: 'not_required', replay: 'not_required'}));
-    const c = value(api.withDeadline({timeoutMs: 30}));
-    const r = await api.verify(signed, policy, {label: 's', context: c}); assert.equal(!r.ok && r.error.reason, 'deadline_exceeded');
   } finally {await handle.release();}
 });

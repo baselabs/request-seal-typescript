@@ -207,7 +207,7 @@ export async function manifestPolicy(
     p.keyResolver = async () =>
       ok({
         algorithm: "ed25519",
-        verify: () => {
+        key: () => {
           throw new Error("Verifier fault");
         },
       });

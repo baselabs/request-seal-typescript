@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the atomic replay envelope and the shared v0.5.2 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
+**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the atomic replay port and the shared v0.5.2 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
 
 # Replay protection
 
@@ -31,17 +31,14 @@ profiles with distinct caller namespaces or encode the whole stamp inside the
 commitment, including every extension metadata key and value. Name and revision
 alone omit metadata that can define an extension's security scope. For a scope
 defined by authenticated nonces, this recipe
-works with both fact shapes and separates equal nonces in the same namespace:
+works with both verification paths and separates equal nonces in the same namespace:
 
 ```js
 // Profile-aware commitment; import ok from @request-seal/core.
 const commitment = async (facts) => {
-  const identifiers = "signatures" in facts
-    ? facts.signatures.map((signature) => signature.identifier).sort()
-    : [facts.identifier];
   const encoded = JSON.stringify([
     facts.profile,
-    identifiers,
+    facts.identifier,
   ]);
   return ok(new Uint8Array(await crypto.subtle.digest(
     "SHA-256", new TextEncoder().encode(encoded),

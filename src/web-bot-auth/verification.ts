@@ -1,6 +1,5 @@
 import type { Verification } from "../verification.ts";
-import type { ReplayReceipt } from "../replay-port.ts";
-import type { SigningAlgorithm } from "../crypto/algorithm.ts";
+import type { ReplayFacts, ReplayReceipt } from "../replay-port.ts";
 import type { Proof } from "../discovery/body.ts";
 import { inspection } from "../brand.ts";
 /** Pinned Web Bot Auth profile metadata. */
@@ -32,17 +31,13 @@ export type WebBotAuthSignature = Omit<Verification, "profile" | "principal"> &
     profile: WebBotAuthProfile;
     principal: AgentPrincipal | HeldPrincipal;
   }>;
-/** One verified Web Bot Auth signature's covered facts, without its uncovered label. */
-export type WebBotAuthReplayFacts = Readonly<{
+/** Flat generic replay facts with stable agent facts in place of tag, without a label. */
+export type WebBotAuthReplayFacts = Omit<ReplayFacts, "tag" | "profile"> & Readonly<{
   profile: WebBotAuthProfile;
-  signatures: readonly Readonly<{
-    identifier: string;
-    algorithm: SigningAlgorithm;
-    keyid: string;
-    agent: Omit<AgentPrincipal, "provenance"> | HeldPrincipal;
-    created: number;
-    expires: number;
-  }>[];
+  keyid: string;
+  agent: Omit<AgentPrincipal, "provenance"> | HeldPrincipal;
+  created: number;
+  expires: number;
 }>;
 /** A branded Web Bot Auth envelope with per-label facts, evidence, and replay status. */
 export type WebBotAuthVerification = Readonly<{

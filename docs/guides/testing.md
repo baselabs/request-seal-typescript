@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** AGENTS.md, the shared conformance corpus, and the executed examples in this guide · **Review when:** an advertised capability, test runner, or evidence source changes
+**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** AGENTS.md, the shared conformance corpus, and the executed examples in this guide · **Review when:** an advertised capability, test runner, or evidence source changes
 
 # Testing
 
@@ -40,7 +40,7 @@ const stranger = must(await Custody.local("ed25519", strangerPair.privateKey.exp
 
 const now = Math.floor(Date.now() / 1000);
 const components = '("@method" "@authority" "@path" "content-digest")';
-// Single sender: select by keyid when you have several.
+// Resolve the accepted key ID.
 const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: trusted });
 const policy = (replay: unknown = "not_required") => must(Policy.create({
   algorithms: ["ed25519"], components, keyResolver,

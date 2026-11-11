@@ -322,7 +322,7 @@ test("claim 13: the published short HMAC secret signs; RequestSeal handles refus
     algorithms: ["hmac-sha256"], components: "()",
     keyResolver: ({ keyid }: {keyid: string | null}) => ok(keyid === "my-key-id" ? {
       algorithm: "hmac-sha256",
-      verify: async (_algorithm: unknown, base: Uint8Array, signature: Uint8Array) => {
+      key: async (_algorithm: unknown, base: Uint8Array, signature: Uint8Array) => {
         const expected = createHmac("sha256", shortSecret).update(base).digest();
         return ok(signature.length === expected.length && timingSafeEqual(expected, signature));
       },

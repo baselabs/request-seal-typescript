@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421 and the comparison tests in `interop/migration` · **Review when:** the compared package version, or either library's signing or verification behavior, changes
+**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421 and the comparison tests in `interop/migration` · **Review when:** the compared package version, or either library's signing or verification behavior, changes
 
 # Migrating from http-message-signatures
 
@@ -37,7 +37,7 @@ const message = must(await Message.request("POST", "https://example.com", [
 
 const keyResolver: KeyResolver = ({ keyid }) => ok(keyid === "my-key-id" ? {
   algorithm: "hmac-sha256",
-  verify: async (_algorithm, base, signature) => ok(timingSafeEqual(createHmac("sha256", secret).update(base).digest(), Buffer.from(signature))),
+  key: async (_algorithm, base, signature) => ok(timingSafeEqual(createHmac("sha256", secret).update(base).digest(), Buffer.from(signature))),
 } : null);
 const policy = (clock: () => number) => must(Policy.create({
   algorithms: ["hmac-sha256"], components: "()", keyResolver,

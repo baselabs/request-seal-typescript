@@ -109,7 +109,7 @@ try {
   const components = '("@method" "@authority")';
   const request = must(await Message.request("GET", "https://api.example.com/", [], ""));
   const signed = must(await sign(request, { label: "sig", components, algorithm: "ed25519", expiresIn: 60, keyid: "agent-key" }, handle));
-  // Single sender: select by keyid when you have several.
+  // Resolve the accepted key ID.
   const keyResolver: KeyResolver = () => ok({ algorithm: "ed25519", key: publicKey });
   const policy = must(Policy.create({
     algorithms: ["ed25519"], components, keyResolver,

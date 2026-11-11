@@ -93,12 +93,17 @@ map before relying on them as verified signatures.
 Required replay accepts exactly one selected signature, otherwise returning
 `unexpected_signature` at `policy` after verification and before commitment or
 storage. Nested envelopes require `replay: "not_required"`. A claim runs after
-the signature, content, and nested-coverage checks succeed. The commitment callback receives frozen
-`{profile: {name: "web_bot_auth", revision}, signatures: [...]}`. Each entry
-contains `identifier` (nonce), `algorithm`, `keyid`, stable `agent`
-facts, `created`, and `expires`. Agent facts are `{kind, identifier, type, origin, thumbprint}`
+the signature, content, and nested-coverage checks succeed. The commitment callback receives one frozen
+facts map: `identifier` (nonce), `algorithm`, `keyid`, `agent`, `created`,
+`expires`, and `profile: {name: "web_bot_auth", revision}`. This is the generic
+verification shape with `agent` in place of `tag`; one commitment function can
+serve both paths. Within the caller's namespace, commit to `identifier`, `keyid`,
+and the agent's `identifier`. Agent facts are `{kind, identifier, type, origin, thumbprint}`
 without `provenance`, so they omit source proof, cache revision, and fetch time;
-held-key facts are `{kind: "key", thumbprint}`.
+held-key facts are `{kind: "key", thumbprint}` and have no agent identifier.
+The facts have no signature list or label, and remain stable across directory
+refreshes. Full provenance stays in the verification result. The
+[Web Bot Auth guide](../guides/web-bot-auth.md#required-replay) provides a runnable example.
 Include the profile name and revision in the caller's commitment encoding to
 separate generic and Web Bot Auth claims. The library does not prefix the
 namespace or commitment output with the profile; a nonce-only commitment in a

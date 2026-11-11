@@ -16,7 +16,6 @@ import {
 } from "./constants.ts";
 import { ok, err, type Result } from "./result.ts";
 import type { Context } from "./context.ts";
-import type { KeyIdentity } from "./key_identity.ts";
 import type { KeyHandle } from "./key_handle.ts";
 import type { PublicKey } from "./public_key.ts";
 import { boundedReplayBytes } from "./replay/claim.ts";
@@ -29,12 +28,10 @@ export type Verifier = (
   signature: Uint8Array,
   context: Context,
 ) => Result<boolean> | Promise<Result<boolean>>;
-/** A resolved algorithm and key or verification capability with optional identity. */
+/** Exactly the authoritative algorithm and its key or verification capability. */
 export type ResolvedKey = Readonly<{
   algorithm: SigningAlgorithm;
-  key?: PublicKey | KeyHandle | Verifier;
-  verify?: Verifier;
-  identity?: KeyIdentity;
+  key: PublicKey | KeyHandle | Verifier;
 }>;
 /** Resolve a verification key from signature facts and an operation context. */
 export type KeyResolver = (

@@ -157,8 +157,9 @@ transportTest("real signed TLS directories prove possession, rotate keys, remove
       permittedAddresses: ["127.0.0.1"],
     }),
   );
+  let observedAt = now;
   const cache = value(
-    Seal.createCache({ clock: () => now, fetch: Discovery.fetch }),
+    Seal.createCache({ clock: () => observedAt, fetch: Discovery.fetch }),
   );
   try {
     current = response(authority, directory.body, signingKey, kid, now);
@@ -192,6 +193,7 @@ transportTest("real signed TLS directories prove possession, rotate keys, remove
       cache,
       agents: (a: Seal.AgentRequest) =>
         a.location === location ? Seal.ok(source) : Seal.ok(null),
+      freshness: { clock: () => observedAt, maxAge: null, skew: 0 },
     });
     const r = value(await Seal.WebBotAuth.verify(signed, p));
     const principal = r.signatures.agent!.principal;
@@ -204,6 +206,31 @@ transportTest("real signed TLS directories prove possession, rotate keys, remove
     t.diagnostic(
       `signed directory: proof=signed, valid request=accepted, TLS requests=${server.requests}`,
     );
+    const facts: Seal.WebBotAuthReplayFacts[] = [];
+    const oncePolicy = policy({ cache, agents: p.agents, freshness: p.freshness,
+      replay: { identifier: "nonce", namespace: new Uint8Array([5]), timeoutMs: 1000,
+        store: value(Seal.createMemoryStore({ maxEntries: 10 })),
+        commitment: async (f: Seal.WebBotAuthReplayFacts) => {
+          facts.push(f);
+          return Seal.ok(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(f)))));
+        } },
+    });
+    value(await Seal.WebBotAuth.verify(signed, oncePolicy));
+    observedAt++;
+    current = response(authority, JSON.stringify(JSON.parse(directory.body), null, 2), signingKey, kid, observedAt);
+    value(await cache.refresh(source));
+    const refreshed = value(await Seal.WebBotAuth.verify(signed, p)).signatures.agent!.principal;
+    assert.equal(refreshed.kind, "agent");
+    if (principal.kind === "agent" && refreshed.kind === "agent") {
+      assert.notEqual(refreshed.provenance.fetchedAt, principal.provenance.fetchedAt);
+      assert.notEqual(refreshed.provenance.revision, principal.provenance.revision);
+    }
+    rejection(await Seal.WebBotAuth.verify(signed, oncePolicy), "replayed");
+    assert.equal(facts.length, 2);
+    assert.deepEqual(Object.keys(facts[0]!).sort(),
+      ["agent", "algorithm", "created", "expires", "identifier", "keyid", "profile"]);
+    assert.equal(facts[0]!.identifier, "tls-nonce");
+    assert.deepEqual(facts[1], facts[0]);
     const pair = generateKeyPairSync("ed25519"),
       jwk = pair.publicKey.export({ format: "jwk" }),
       nextKey = value(await Seal.PublicKey.import(jwk)),

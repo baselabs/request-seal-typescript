@@ -371,7 +371,7 @@ test("extension docs describe whole-stamp replay binding and public type widenin
   const signing = readFileSync("docs/reference/sign-and-verify.md", "utf8");
   const changelog = readFileSync("CHANGELOG.md", "utf8");
   assert.match(profiles, /whole stamp/);
-  assert.match(replay, /facts\.profile,\s*identifiers/);
+  assert.match(replay, /facts\.profile,\s*facts\.identifier/);
   assert.match(signing, /extension stamps/);
   assert.match(changelog, /Verification\.profile.*ReplayFacts\.profile/s);
   assert.match(changelog, /exhaustive narrowing/);

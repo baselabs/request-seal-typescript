@@ -145,6 +145,64 @@ assert.ok(!refused.ok && refused.error.kind === "core" && refused.error.reason =
 
 `WebBotAuth.verify` accepts `{ timeoutMs, context, representation, digestState }` as its third argument; the last two work as they do for generic `verify`. Time-limited work runs under one deadline: `timeoutMs` (1 to 300,000 milliseconds, default 5,000) covers trust, discovery, verification, content, and replay. A deadline during trust or discovery is `agent_unresolved` with detail `timeout`; a deadline inside signature checking is a retryable `custody/deadline_exceeded`.
 
+### Required replay
+
+The commitment receives one flat facts map: `identifier` (the nonce), `algorithm`,
+`keyid`, `agent`, `created`, `expires`, and `profile`. Generic verification uses
+the same shape with `tag` in place of `agent`. Agent facts contain `kind`,
+`identifier`, `type`, `origin`, and `thumbprint`; held keys contain only `kind`
+and `thumbprint`, with no agent identifier. Within your namespace, commit to
+the nonce, key ID, and agent identifier. Excluding provenance, fetch time and
+cache revision keeps a claim stable across directory refreshes. The label never
+enters the facts (RFC 9421 Section 7.2.5).
+
+This program uses one commitment function for generic and Web Bot Auth verification.
+The profile separates their claims in the shared namespace. The explicit held-key
+policy trusts only its pinned public key and does not attribute an agent URL.
+
+```ts
+import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
+import { Custody, Message, Policy, PublicKey, WebBotAuth, createMemoryStore, ok, sign, verify,
+  type ReplayFacts, type WebBotAuthReplayFacts, type Result } from "@request-seal/core";
+
+const must = <T>(r: Result<T>): T => { assert.ok(r.ok, JSON.stringify(r)); return (r as { value: T }).value; };
+const pair = generateKeyPairSync("ed25519");
+const key = must(await PublicKey.import(pair.publicKey.export({ format: "jwk" })));
+const keyid = must(await key.thumbprint());
+const signer = must(await Custody.local("ed25519", pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string));
+const now = Math.floor(Date.now() / 1000);
+const commitment = async (facts: ReplayFacts | WebBotAuthReplayFacts) => {
+  const agentIdentifier = "agent" in facts && facts.agent.kind === "agent" ? facts.agent.identifier : null;
+  const encoded = JSON.stringify([facts.profile, facts.identifier, facts.keyid, agentIdentifier]);
+  return ok(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(encoded))));
+};
+const replay = { identifier: "nonce", namespace: new TextEncoder().encode("agents"), commitment,
+  store: must(createMemoryStore({ maxEntries: 10_000 })), timeoutMs: 1000 };
+const keyResolver = ({ keyid: id }: { keyid: string | null }) => ok(id === keyid ? { algorithm: "ed25519" as const, key } : null);
+const freshness = { clock: () => now, maxAge: 60, skew: 5 };
+try {
+  const policy = must(WebBotAuth.Policy.create({
+    algorithms: ["ed25519"], agents: () => ok(null), cache: null,
+    unresolved: { heldKeys: keyResolver }, freshness, content: "not_required", replay,
+  }));
+  const request = must(await Message.request("GET", "https://site.example/page", [], ""));
+  const signed = must(await WebBotAuth.sign(request, {
+    label: "bot", key, algorithm: "ed25519", agent: { location: "https://bot.example", type: "directory" },
+    created: now, expires: now + 60, nonce: "same-nonce",
+  }, signer));
+  must(await WebBotAuth.verify(signed, policy));
+  const again = await WebBotAuth.verify(signed, policy);
+  assert.ok(!again.ok && again.error.reason === "replayed");
+
+  const genericPolicy = must(Policy.create({ algorithms: ["ed25519"], components: '("@authority")', keyResolver,
+    freshness: { ...freshness, requireExpires: true }, content: "not_required", replay }));
+  const generic = must(await sign(request, { label: "sig", algorithm: "ed25519",
+    signatureInput: `("@authority");created=${now};expires=${now + 60};keyid="${keyid}";nonce="same-nonce"` }, signer));
+  must(await verify(generic, genericPolicy, { label: "sig" }));
+} finally { await signer.release(); }
+```
+
 ### Express, Hono, and the Node adapter
 
 [`verifyWebBotAuth` in the Node adapter](node-http.md) verifies a captured Node request, which is how the Express example in the [README](../../README.md) works. On Deno, build a `Message` from the incoming `Request` with the origin your service owns and call `WebBotAuth.verify`, as the Hono example in the README does. Hono is your dependency, not RequestSeal's: the README example pins `jsr:@hono/hono@4.10.3` so it runs as written, and you install the version you choose. The Fetch adapter's `verifyRequest` takes generic policies only.
