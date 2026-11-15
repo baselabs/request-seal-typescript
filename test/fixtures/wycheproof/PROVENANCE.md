@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** provenance · **Updated:** October 9, 2026 · **Governed by:** upstream Wycheproof bytes · **Review when:** vector pin changes
+<!-- Status: current · Kind: provenance · Updated: 2026-10-09 · Governed by: upstream Wycheproof bytes · Review when: vector pin changes -->
 
 Source: https://github.com/C2SP/wycheproof/tree/12fd3aa
 

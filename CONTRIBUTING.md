@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** AGENTS.md and the shared conformance corpus · **Review when:** development commands or runtime requirements change
+<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: AGENTS.md and the shared conformance corpus · Review when: development commands or runtime requirements change -->
 
 # Contributing
 

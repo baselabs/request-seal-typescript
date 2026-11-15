@@ -68,10 +68,10 @@ test('an early-exiting real peer still closes the real database', {skip: !proces
   await assert.rejects(db.query('SELECT 1'), /after calling end/);
 });
 
-test('run dates format the supplied clock in US English', async () => {
+test('run dates format the supplied clock as a UTC calendar date', async () => {
   const {runDate} = await import('../interop/reciprocal/records.ts');
-  assert.equal(runDate(new Date('2026-10-11T23:59:59Z')), 'October 11, 2026');
-  assert.equal(runDate(new Date('2026-10-12T00:00:00Z')), 'October 12, 2026');
+  assert.equal(runDate(new Date('2026-10-11T23:59:59Z')), '2026-10-11');
+  assert.equal(runDate(new Date('2026-10-12T00:00:00Z')), '2026-10-12');
 });
 
 test('unrelated peer failures cannot satisfy a rejection assertion', async () => {

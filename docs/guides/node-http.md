@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421, RFC 9113, and executed Node, Express, and Fastify transport tests · **Review when:** a supported Node version, framework version, or adapter contract changes
+<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 9113, and executed Node, Express, and Fastify transport tests · Review when: a supported Node version, framework version, or adapter contract changes -->
 
 # Node HTTP, Express, and Fastify
 

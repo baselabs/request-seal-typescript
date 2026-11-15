@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** Elixir release 1.0.0 at 511fed142044ccea28bdcbb317c091cb2c8a515d · **Review when:** the shared error vocabulary changes
+<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: Elixir release 1.0.0 at 511fed142044ccea28bdcbb317c091cb2c8a515d · Review when: the shared error vocabulary changes -->
 
 # Error parity
 

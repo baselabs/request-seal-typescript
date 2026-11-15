@@ -10,11 +10,11 @@ import { documentationFences, executeFence } from "./support/docs-fences.ts";
 const documents = await documentationFiles();
 const read = (path: string) => readFileSync(path, "utf8");
 
-test("every document starts with the metadata line", () => {
-  const pattern = /^\*\*Status:\*\* [^·]+ · \*\*Kind:\*\* [^·]+ · \*\*Updated:\*\* (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4} · \*\*Governed by:\*\* [^·]+ · \*\*Review when:\*\* .+$/;
+test("every document starts with the hidden metadata comment", () => {
+  const pattern = /^<!-- Status: [^·]+ · Kind: [^·]+ · Updated: \d{4}-\d{2}-\d{2} · Governed by: [^·]+ · Review when: (?:(?!-->).)+ -->$/;
   for (const document of documents) {
     const first = read(document).split(/\n\s*\n/, 1)[0]!.replace(/\s*\n\s*/g, " ");
-    assert.match(first, pattern, `${document} must start with the Status, Kind, Updated, Governed by, and Review when line`);
+    assert.match(first, pattern, `${document} must start with the hidden Status, Kind, Updated, Governed by, and Review when comment`);
   }
 });
 

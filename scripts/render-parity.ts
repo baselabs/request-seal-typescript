@@ -7,7 +7,7 @@ export function renderParity(): string {
     const statuses = Object.entries(rules).flatMap(([reason, rule]) => rule.kind === 'constant' ? [] : [`${kind}/${reason}: ${rule.minimum}–${rule.maximum} (status-derived)`]);
     return [...(constants.length ? [`${kind}: ${constants.join(', ')}.`] : []), ...statuses];
   }).join(' · ');
-  return `**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** Elixir release 1.0.0 at ${ELIXIR_ERROR_PIN} · **Review when:** the shared error vocabulary changes
+  return `<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: Elixir release 1.0.0 at ${ELIXIR_ERROR_PIN} · Review when: the shared error vocabulary changes -->
 
 # Error parity
 

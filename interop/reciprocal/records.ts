@@ -18,7 +18,7 @@ export function assertRejection(response: {accepted?: boolean; rule?: string}, e
 }
 
 export function runDate(now = new Date()) {
-  return new Intl.DateTimeFormat('en-US', {month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC'}).format(now);
+  return now.toISOString().slice(0, 10);
 }
 
 export async function cleanupDatabase(db: {query(sql: string): Promise<unknown>; end(): Promise<unknown>}, table: string, original?: unknown) {

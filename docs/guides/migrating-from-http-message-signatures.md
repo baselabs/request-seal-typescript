@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421 and the comparison tests in `interop/migration` · **Review when:** the compared package version, or either library's signing or verification behavior, changes
+<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421 and the comparison tests in `interop/migration` · Review when: the compared package version, or either library's signing or verification behavior, changes -->
 
 # Migrating from http-message-signatures
 

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421 and the executed examples in this guide · **Review when:** replay contracts, retention bounds, or store interfaces change
+<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421 and the executed examples in this guide · Review when: replay contracts, retention bounds, or store interfaces change -->
 
 # Replay protection
 

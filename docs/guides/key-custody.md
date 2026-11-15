@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** WebCrypto, the OpenSSH agent protocol, and the executed examples in this guide · **Review when:** custody mechanics, adapter contracts, or runtime behavior changes
+<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: WebCrypto, the OpenSSH agent protocol, and the executed examples in this guide · Review when: custody mechanics, adapter contracts, or runtime behavior changes -->
 
 # Key custody
 

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** AGENTS.md, the shared conformance corpus, and the executed examples in this guide · **Review when:** an advertised capability, test runner, or evidence source changes
+<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: AGENTS.md, the shared conformance corpus, and the executed examples in this guide · Review when: an advertised capability, test runner, or evidence source changes -->
 
 # Testing
 

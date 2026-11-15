@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the public crypto and custody API, RFC 9421, RFC 9530, and the shared conformance corpus · **Review when:** signing, policy, digest, or verification contracts change
+<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: the public crypto and custody API, RFC 9421, RFC 9530, and the shared conformance corpus · Review when: signing, policy, digest, or verification contracts change -->
 
 # Signing and verification
 

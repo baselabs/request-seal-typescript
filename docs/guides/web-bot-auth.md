@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** draft-ietf-webbotauth-httpsig-protocol-00, RFC 9421, and the executed examples in this guide · **Review when:** the Web Bot Auth draft, discovery behavior, or the policy contract changes
+<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: draft-ietf-webbotauth-httpsig-protocol-00, RFC 9421, and the executed examples in this guide · Review when: the Web Bot Auth draft, discovery behavior, or the policy contract changes -->
 
 # Web Bot Auth
 

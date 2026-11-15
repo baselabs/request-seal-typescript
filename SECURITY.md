@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** policy · **Updated:** November 11, 2026 · **Governed by:** the public error contract · **Review when:** reporting channels or security boundaries change
+<!-- Status: current · Kind: policy · Updated: 2026-11-11 · Governed by: the public error contract · Review when: reporting channels or security boundaries change -->
 
 # Security
 

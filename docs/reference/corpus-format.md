@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the shared RequestSeal corpus contract · **Review when:** manifest schema or canonical serialization changes
+<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: the shared RequestSeal corpus contract · Review when: manifest schema or canonical serialization changes -->
 
 # Conformance corpus format
 

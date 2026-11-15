@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** October 14, 2026 · **Governed by:** exact CI pins, package engines, public standards, and executed runtime probes · **Review when:** runtime lanes, permissions, Playwright, or declared limitations change
+<!-- Status: current · Kind: reference · Updated: 2026-10-14 · Governed by: exact CI pins, package engines, public standards, and executed runtime probes · Review when: runtime lanes, permissions, Playwright, or declared limitations change -->
 
 # Runtime matrix
 

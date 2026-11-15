@@ -1,4 +1,4 @@
-**Status:** pinned · **Kind:** conformance decisions · **Updated:** October 9, 2026 · **Governed by:** RFC 4648, RFC 8941, RFC 9651, and the HTTPWG suite · **Review when:** shared corpus decisions change
+<!-- Status: pinned · Kind: conformance decisions · Updated: 2026-10-09 · Governed by: RFC 4648, RFC 8941, RFC 9651, and the HTTPWG suite · Review when: shared corpus decisions change -->
 
 The adjacent `PINNED.ts` data table owns the decisions used by the test and conformance runner. All eight HTTPWG `can_fail` parsing cases have fixed outcomes. Serialization of their expected values follows the published canonical bytes.
 

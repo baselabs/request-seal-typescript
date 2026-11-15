@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** RFC 7515, RFC 7516, RFC 7518, RFC 8725, and the executed examples in this guide · **Review when:** JOSE policies or custody boundaries change
+<!-- Status: current · Kind: guide · Updated: 2026-11-03 · Governed by: RFC 7515, RFC 7516, RFC 7518, RFC 8725, and the executed examples in this guide · Review when: JOSE policies or custody boundaries change -->
 
 # Signed and encrypted tokens (JOSE)
 

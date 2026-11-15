@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421, RFC 9530, and the executed examples in this guide · **Review when:** signing, policy, digest, or verification contracts change
+<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 9530, and the executed examples in this guide · Review when: signing, policy, digest, or verification contracts change -->
 
 # Signing and verifying
 

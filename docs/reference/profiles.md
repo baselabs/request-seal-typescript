@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 3, 2026 · **Governed by:** the public Profile contract and extension-profile boundary, RFC 9421, and the shared conformance corpus · **Review when:** extension surface, stamps, or verification facts change
+<!-- Status: current · Kind: reference · Updated: 2026-11-03 · Governed by: the public Profile contract and extension-profile boundary, RFC 9421, and the shared conformance corpus · Review when: extension surface, stamps, or verification facts change -->
 
 # Extension profiles
 

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** provenance · **Updated:** October 9, 2026 · **Governed by:** RFC 9421 Sections 2.1 and 2.2 · **Review when:** published examples change
+<!-- Status: current · Kind: provenance · Updated: 2026-10-09 · Governed by: RFC 9421 Sections 2.1 and 2.2 · Review when: published examples change -->
 
 Component example bytes are transcribed from [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.txt), Sections 2.1 through 2.2.9. Each entry cites its section and quotes the published signature base line in `example_bytes`. Expected bytes never come from either implementation. The RFC Trust Legal Provisions apply.
 

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** RFC 7517, RFC 7638, draft-ietf-webbotauth-httpsig-protocol-00, and the executed examples in this guide · **Review when:** discovery policy, body formats, or runtime compatibility changes
+<!-- Status: current · Kind: guide · Updated: 2026-11-03 · Governed by: RFC 7517, RFC 7638, draft-ietf-webbotauth-httpsig-protocol-00, and the executed examples in this guide · Review when: discovery policy, body formats, or runtime compatibility changes -->
 
 # Key discovery
 

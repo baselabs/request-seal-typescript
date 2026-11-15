@@ -1,6 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 ·
-**Governed by:** RFC 9421, RFC 7515, RFC 7516, protocol-00, and RequestSeal
-v1.0.0 · **Review when:** peer pins, exchange protocol, or CI changes
+<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 7515, RFC 7516, protocol-00, and RequestSeal v1.0.0 · Review when: peer pins, exchange protocol, or CI changes -->
 
 # Reciprocal interoperability
 

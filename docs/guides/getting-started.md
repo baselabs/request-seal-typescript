@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** October 14, 2026 · **Governed by:** RFC 9421, RFC 9530, and the executed examples in this guide · **Review when:** the public signing or verification API changes
+<!-- Status: current · Kind: guide · Updated: 2026-10-14 · Governed by: RFC 9421, RFC 9530, and the executed examples in this guide · Review when: the public signing or verification API changes -->
 
 # Getting started
 

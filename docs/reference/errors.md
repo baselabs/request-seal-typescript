@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the error vocabulary in `src/errors/parity.ts` and the code that returns each reason · **Review when:** a reason is added, removed, or starts to be returned on a new path
+<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: the error vocabulary in `src/errors/parity.ts` and the code that returns each reason · Review when: a reason is added, removed, or starts to be returned on a new path -->
 
 # Error reasons
 

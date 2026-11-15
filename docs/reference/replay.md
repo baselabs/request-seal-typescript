@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** the atomic replay port and the shared v1.0.0 conformance corpus · **Review when:** replay contracts, retention bounds, or driver interfaces change
+<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: the atomic replay port and the shared v1.0.0 conformance corpus · Review when: replay contracts, retention bounds, or driver interfaces change -->
 
 # Replay protection
 

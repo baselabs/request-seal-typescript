@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 11, 2026 · **Governed by:** RFC 9421, the Fetch standard, and executed Node and Deno transport tests · **Review when:** a supported runtime version or the Fetch adapter contract changes
+<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421, the Fetch standard, and executed Node and Deno transport tests · Review when: a supported runtime version or the Fetch adapter contract changes -->
 
 # Fetch
 

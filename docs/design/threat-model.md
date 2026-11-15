@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** design · **Updated:** November 11, 2026 · **Governed by:** the public security invariants, the pinned Elixir peer, WebCrypto, public standards, and executed boundary tests · **Review when:** a trust boundary, profile, adapter, data shape, custody mechanic, or runtime behavior changes
+<!-- Status: current · Kind: design · Updated: 2026-11-11 · Governed by: the public security invariants, the pinned Elixir peer, WebCrypto, public standards, and executed boundary tests · Review when: a trust boundary, profile, adapter, data shape, custody mechanic, or runtime behavior changes -->
 
 # RequestSeal threat model
 

@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** guide · **Updated:** November 3, 2026 · **Governed by:** RFC 9421, RFC 7517, RFC 7638, and the executed examples in this guide · **Review when:** key resolution, discovery snapshots, or custody contracts change
+<!-- Status: current · Kind: guide · Updated: 2026-11-03 · Governed by: RFC 9421, RFC 7517, RFC 7638, and the executed examples in this guide · Review when: key resolution, discovery snapshots, or custody contracts change -->
 
 # Rotating keys
 

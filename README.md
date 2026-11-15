@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** overview · **Updated:** November 11, 2026 · **Governed by:** RFC 9421, RFC 9530, the Web Bot Auth protocol draft, and the executed examples in this file · **Review when:** package scope, installation, or the public API changes
+<!-- Status: current · Kind: overview · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 9530, the Web Bot Auth protocol draft, and the executed examples in this file · Review when: package scope, installation, or the public API changes -->
 
 # RequestSeal for TypeScript
 

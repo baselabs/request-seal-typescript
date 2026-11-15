@@ -1,4 +1,4 @@
-**Status:** maintained · **Kind:** reference · **Updated:** November 11, 2026 · **Governed by:** RFC 7517, RFC 7638, the public discovery API, and the shared conformance corpus · **Review when:** discovery policy, body formats, or runtime compatibility changes
+<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: RFC 7517, RFC 7638, the public discovery API, and the shared conformance corpus · Review when: discovery policy, body formats, or runtime compatibility changes -->
 
 # Discovery
 
