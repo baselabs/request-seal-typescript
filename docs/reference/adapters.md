@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 9113, Fetch, the OpenSSH agent protocol, and executed transport tests · Review when: runtime versions or adapter contracts change -->
-
 # HTTP and custody adapters
 
 Adapters translate transport values to the existing Message, Policy, signing,

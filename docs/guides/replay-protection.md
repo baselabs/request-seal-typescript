@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421 and the executed examples in this guide · Review when: replay contracts, retention bounds, or store interfaces change -->
-
 # Replay protection
 
 A valid signature stays valid until it expires. Anyone who captures a signed request can send it again, and the signature still verifies. Replay protection closes that gap: each signed request is accepted once, and a second arrival is refused.

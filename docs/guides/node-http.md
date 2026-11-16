@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 9113, and executed Node, Express, and Fastify transport tests · Review when: a supported Node version, framework version, or adapter contract changes -->
-
 # Node HTTP, Express, and Fastify
 
 `@request-seal/core/node-http` connects RequestSeal to Node servers and clients. It turns a live request into a `Message` that keeps the exact target, the raw header occurrences in order, the trailers, and the body bytes, and it verifies that message against your policy. The [adapter reference](../reference/adapters.md#node-http) lists every option.

@@ -17,10 +17,6 @@ export function assertRejection(response: {accepted?: boolean; rule?: string}, e
   assert.equal(response.rule, expected, 'the intended rule rejected the input');
 }
 
-export function runDate(now = new Date()) {
-  return now.toISOString().slice(0, 10);
-}
-
 export async function cleanupDatabase(db: {query(sql: string): Promise<unknown>; end(): Promise<unknown>}, table: string, original?: unknown) {
   let failure = original;
   try {await db.query(`DROP TABLE IF EXISTS "${table}"`);} catch (error) {failure ??= error;}

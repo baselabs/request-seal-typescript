@@ -15,12 +15,9 @@ Do not add a server, database, mandatory fetch, global key store, implicit autho
 or fail-open fallback. Do not copy private material, machine paths, personal information,
 or internal work records into public source, package contents, or documentation.
 
-## Workflow
+## Publication
 
-Make the change, run the tests that cover it, commit with named paths, and push to `main`.
-CI runs once on `main`; if it goes red, fix forward. CI runs `npm run check`; run the parts
-that cover your change. Publishing to npm, deploying and pushes to mirrors need the owner's
-approval. Update the CHANGELOG when behavior, a dependency or a contract changes.
+Publishing to npm, deploying, and pushes to mirrors need the owner's approval. Update the CHANGELOG when behavior, a dependency, or a contract changes.
 
 ## Verification
 
@@ -35,12 +32,7 @@ Keep core results and errors free of stack
 traces, callback diagnostics, key material, and caller bytes. Read own option keys once
 into null-prototype snapshots; reject unknown keys. Branding uses private WeakSets.
 
-## Documents and releases
-
-README, CONTRIBUTING, SECURITY and `docs/` Markdown start with Status, Kind, Updated,
-Governed by, and Review when metadata (`test/docs-contract.test.ts` checks it). The
-changelog is a record. Public docs explain technical usage
-and maintenance.
+Public documentation explains technical usage and maintenance.
 
 The package allowlist governs publication. Corpus data and repository tools stay outside
 the tarball. Release tags run the full battery and stage with provenance through the

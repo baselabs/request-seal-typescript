@@ -1,7 +1,4 @@
-<!-- Status: accepted · Kind: decision record · Updated: 2026-11-15 · Governed by: public API, compatibility contract, and cited decisions · Review when: the implementation or a governing decision changes -->
-
 # 0010 — Run the PostgreSQL replay store over a caller-provided query
-Status: Accepted
 
 ## Context
 
@@ -25,15 +22,6 @@ already manage.
 4. `ddl(table)` and `ddlIndex(table)` return the table and retention-index SQL for a validated
    name (`src/replay/postgres.ts:12-19`); a sweep deletes rows whose `retain_until` has passed
    (`src/replay/postgres.ts:54`).
-
-## Alternatives
-
-1. **Depend on a PostgreSQL driver.** Turnkey setup. It adds a runtime dependency and a second
-   holder of connection state.
-2. **Advisory locks or transactions inside the library.** More control. A conflict-free insert
-   is already atomic, and the library would have to manage a session.
-3. **A generic key-value port only.** Smaller surface. Applications would each write the claim
-   SQL and its row-count rules, which is where replay bugs occur.
 
 ## Consequences
 

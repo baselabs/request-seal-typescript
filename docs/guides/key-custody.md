@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: WebCrypto, the OpenSSH agent protocol, and the executed examples in this guide · Review when: custody mechanics, adapter contracts, or runtime behavior changes -->
-
 # Key custody
 
 Custody decides where a private key lives and who can use it. RequestSeal never asks for a private key to travel through its API after import. You import the key once and get a **handle**: an object that can sign and verify but cannot hand the key back. Everything that signs, from HTTP signatures to JOSE tokens, accepts a handle.

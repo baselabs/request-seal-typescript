@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421 and the comparison tests in `interop/migration` · Review when: the compared package version, or either library's signing or verification behavior, changes -->
-
 # Migrating from http-message-signatures
 
 This guide is for projects that sign or verify HTTP messages with the npm package [`http-message-signatures`](https://www.npmjs.com/package/http-message-signatures) and want RequestSeal's explicit policies, replay protection, and body checks. It compares exactly one release: **`http-message-signatures` 1.0.6**.

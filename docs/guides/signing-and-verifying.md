@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 9530, and the executed examples in this guide · Review when: signing, policy, digest, or verification contracts change -->
-
 # Signing and verifying
 
 This guide covers the core of RequestSeal: building messages, signing them, and verifying them under an explicit policy. It uses [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html) signatures and [RFC 9530](https://www.rfc-editor.org/rfc/rfc9530.html) content digests. Start with [getting started](getting-started.md) if you have not signed anything yet. The [signing and verification reference](../reference/sign-and-verify.md) lists every option and bound.

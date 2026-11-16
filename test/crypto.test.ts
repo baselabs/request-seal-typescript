@@ -13,7 +13,6 @@ function value<T>(r: api.Result<T>): T {
   if (!r.ok) throw new Error('Rejected');
   return r.value;
 }
-// This assertion executes before accessing new exports, so the initial red names the absent behavior.
 test('crypto exports a real signature boundary', () => {
   assert.equal(
     Object.hasOwn(api, 'Crypto'),

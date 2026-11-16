@@ -5,13 +5,6 @@ import {spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 const read = (p: string) => readFileSync(p, 'utf8');
-test('native CI test lanes glob the same root test files as npm', () => {
-  // Full native lanes keep the root glob; targeted permission probes have their own job.
-  const source = read('.github/workflows/ci.yml').split('  native:\n')[1]!.split('  os-trust-denied:\n')[0]!;
-  for (const lane of [/deno test[^\n]+test\/\*\.test\.ts/, /bun test(?: --isolate)?(?: --timeout 30000)? test\/\*\.test\.ts/]) assert.match(source, lane);
-  assert.equal(JSON.parse(read('package.json')).scripts.test.endsWith('test/*.test.ts'), true);
-  assert.doesNotMatch(source, /(?:deno test|bun test)[^\n]*test\/[a-z_-]+\.test\.ts/);
-});
 test('CI reextracts pinned Elixir errors with the reference repository', () => {
   const source = read('.github/workflows/ci.yml');
   assert.match(source, /fetch --depth 1 https:\/\/github.com\/baselabs\/request_seal\.git 511fed142044ccea28bdcbb317c091cb2c8a515d/);

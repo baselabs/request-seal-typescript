@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: the shared RequestSeal corpus contract · Review when: manifest schema or canonical serialization changes -->
-
 # Conformance corpus format
 
 The Elixir and TypeScript implementations consume the same corpus. Source bytes and expected outcomes are shared data. Neither consumer regenerates expectations from its own output.

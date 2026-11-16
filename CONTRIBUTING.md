@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: AGENTS.md and the shared conformance corpus · Review when: development commands or runtime requirements change -->
-
 # Contributing
 
 Use Node 22.12.0 or newer. Elixir must be on PATH for the replay peer URL check;
@@ -13,8 +11,6 @@ npm run check
 ```
 
 `npm run check` runs, in order: `typecheck`, `typecheck:web`, `build`, `test`, `self-checks`, `conformance`, and `pack:check`. CI also runs `npm run docs` and the migration claims test after `npm ci --prefix interop/migration --ignore-scripts`: `node --experimental-strip-types --no-warnings --test interop/migration/claims.test.ts`. Build the [API reference](https://baselabs.github.io/request-seal-typescript/) locally with `npm run docs` and open `site-dist/index.html`; warnings fail the build.
-
-Write behavior tests before implementation and verify that they fail before the fix and pass afterward. Use `node:test` and fast-check properties. Test actual cryptography and published vectors; no substitutes for an external peer. `npm run test:red` deliberately fails and verifies the runner's exit status.
 
 Keep the core independent of Node modules and runtime dependencies. Regenerate `docs/reference/error-parity.md` in place with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 511fed142044ccea28bdcbb317c091cb2c8a515d <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-511fed1.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
 
@@ -32,34 +28,14 @@ The package uses ESM with declaration exports. Use a modern TypeScript module re
 
 ## Runtime test compatibility
 
-Observed on Bun 1.3.14 with the native CI lane and direct API probes:
-
-| Unimplemented `node:test` API | Portable replacement |
-| --- | --- |
-| Imported `test()` called inside a running test | Register independent tests at module scope. |
-| `TestContext.test()` (`t.test()`) | Register independent tests at module scope. |
-
-The Bun lane uses a 30-second default test budget; explicit per-test bounds and
-application Context deadlines remain separate. The Elixir URL check has a
-30-second parent bound around its 25-second subprocess bound.
-
-The native files already use top-level `test()` and `t.diagnostic()`; they do not
-use `describe` or `mock`. Bun keeps a running test's state after a timeout and then rejects later files'
-module-level registrations as nested tests, so one slow test can fail many files.
-Give tests that run the whole corpus through the CLI an explicit 90-second timeout
-around 30-second subprocess bounds, and the live vendoring tests an explicit
-180-second timeout matching their bounded subprocess commands.
-The message-override and override-container corpus checks use
-30-second budgets for complete inventory reads and repeated corpus validation.
-The private-byte tracker test has a 15-second timeout around its 10-second child
-process bound. The parent-deadline test also has a 15-second timeout because it
-waits for a 5-second application deadline. The red-proof test has a 60-second
-timeout around four subprocesses, each bounded to 10 seconds. No unsupported
-nested API is used in the native suite. Keep runtime-only skips
-explicit, with their reason printed. Context deadline child processes bound
-themselves with an unreferenced watchdog because Deno's `spawnSync` ignores
-`timeout`; the throwing-unref check skips Deno, whose timer functions are captured
-at load.
+Register independent `node:test` tests at module scope; Bun 1.3.14 does not support
+nested imported `test()` calls or `TestContext.test()` (`t.test()`).
+Keep runtime-only skips explicit and print their reasons.
+Give subprocess tests explicit bounds within their parent test budget.
+Context deadline children need an unreferenced watchdog because Deno's
+`spawnSync` ignores `timeout`. The throwing-unref check skips Deno because
+the library captures its timer functions at load.
+Run one file with `node --experimental-strip-types --no-warnings --test test/<name>.test.ts`.
 
 Conformance limitations live only in `tools/conformance/runtime-limits.json`.
 The CLI and crypto tests select exact runtime versions and share the same

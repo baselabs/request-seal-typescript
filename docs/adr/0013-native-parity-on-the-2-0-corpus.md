@@ -1,7 +1,4 @@
-<!-- Status: proposed · Kind: decision record · Updated: 2026-11-15 · Governed by: public API, compatibility contract, and cited decisions · Review when: the implementation or a governing decision changes -->
-
 # 0013 — Reach native parity with RequestSeal for Elixir 2.0 in 0.6
-Status: Proposed
 
 ## Context
 
@@ -41,16 +38,6 @@ The existing 1.0.0 corpus already uses cases/<surface prefix>/<name>.json, and t
 9. The reciprocal exchange ([0008](0008-reciprocal-exchange-with-the-published-elixir-package.md))
    repins to the published 2.0.0 and adds rounds for the new algorithms. `CHANGELOG.md` lists
    each break under 0.6.0.
-
-## Alternatives
-
-1. **Wrap a JOSE library for the new algorithms.** Faster to cover the list. It breaks the
-   zero-dependency rule and puts key material in code this package does not control.
-2. **Keep encrypting with GCMKW and `dir`.** No break for current callers. The two
-   implementations would then accept different encryption allowlists, and reciprocity rounds
-   would test a combination Elixir refuses.
-3. **Repin before Elixir 2.0 is published.** Earlier signal. The reciprocal exchange runs only
-   against a published package, so the parity claim would have no peer.
 
 ## Consequences
 

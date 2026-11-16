@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: the error vocabulary in `src/errors/parity.ts` and the code that returns each reason · Review when: a reason is added, removed, or starts to be returned on a new path -->
-
 # Error reasons
 
 Every failure is a `Result` whose `error` has a stable `kind` and `reason`, and for `core` and `jose` a `layer`. This page says what each reason means and what to do about it. Branch on these values, never on message text. The [error vocabulary](error-parity.md) is the generated list with its pin, and the [README](../../README.md#reason-to-http-status-recommendation) recommends an HTTP status for each. A test checks that this page lists every reason in the vocabulary.

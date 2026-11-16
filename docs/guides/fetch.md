@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: RFC 9421, the Fetch standard, and executed Node and Deno transport tests · Review when: a supported runtime version or the Fetch adapter contract changes -->
-
 # Fetch
 
 `@request-seal/core/fetch` signs outgoing `Request` and `Response` objects and sends signed requests with `fetch`. It also verifies incoming requests and responses on the runtime versions the tests have measured. It exports `signedFetch`, `signRequest`, `signResponse`, `verifyRequest`, and `verifyResponse`. The [adapter reference](../reference/adapters.md#fetch) describes each function's options and errors.

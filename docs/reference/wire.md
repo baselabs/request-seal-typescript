@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: RFC 8941, RFC 9651, and RFC 9421 · Review when: wire API contracts change -->
-
 # Wire APIs
 
 `StructuredFields.parse(fieldType, raw, options)` and

@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-03 · Governed by: RFC 7517, RFC 7638, draft-ietf-webbotauth-httpsig-protocol-00, and the executed examples in this guide · Review when: discovery policy, body formats, or runtime compatibility changes -->
-
 # Key discovery
 
 To verify a signature you need the sender's public key. When the sender publishes its keys at an HTTPS address, discovery turns that address into keys you can use without hard-coding them. RequestSeal keeps the two halves apart: the core validates key documents you hand it and never opens a connection, and an optional Node module fetches them over HTTPS under strict network rules. The [discovery reference](../reference/discovery.md) lists every bound.

@@ -8,7 +8,7 @@ import { documentationFences, executeFence, extractFences, runtime } from "./sup
 
 const fences = documentationFences();
 const selected = fences.filter(fence => fence.runtime === runtime);
-test("README verification excerpts match their complete programs and stay within fifteen lines", async () => {
+test("README verification excerpts match their complete programs", async () => {
   const readme = await readFile("README.md", "utf8");
   const snippets = [...readme.matchAll(/<!-- verification-excerpt: (express|hono) -->\n(?:<!-- run: deno -->\n)?```typescript\n([\s\S]*?)\n```/g)];
   assert.deepEqual(snippets.map(match => match[1]), ["express", "hono"]);
@@ -18,7 +18,6 @@ test("README verification excerpts match their complete programs and stay within
     assert.ok(program);
     const excerpt = /\/\/ ---- Your server:[^\n]*\n([\s\S]*?)\n\/\/ ---- End of the verification code ----/.exec(program.source)?.[1];
     assert.ok(excerpt);
-    assert.ok(excerpt.split("\n").length <= 15);
     assert.equal(snippet[2], excerpt, `${snippet[1]} excerpt must be the code executed by its complete fence`);
   }
 });

@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 7515, RFC 7516, protocol-00, and RequestSeal v1.0.0 · Review when: peer pins, exchange protocol, or CI changes -->
-
 # Reciprocal interoperability
 
 The isolated exchange runs the TypeScript implementation and the published
@@ -58,8 +56,7 @@ starts a database. Then run:
 ```sh
 elixir --version
 npm run typecheck --prefix interop/reciprocal
-REQUESTSEAL_RECIPROCAL_RECEIPT=interop/reciprocal/.cache/receipt.md \
-  npm run exchange --prefix interop/reciprocal
+npm run exchange --prefix interop/reciprocal
 REQUESTSEAL_REPLAY_ELIXIR=1 node --experimental-strip-types --no-warnings --test \
   test/peer-process.test.ts test/replay-reciprocal.test.ts test/reciprocal.test.ts \
   test/reciprocal-driver.test.ts test/reciprocal-record.test.ts
@@ -124,18 +121,10 @@ rounds, cases, rejections, and disagreements per family and direction.
 ## Pins and CI
 
 The peer is Hex `request_seal == 1.0.0`, checksum
-`b2c9746349be720d7052d209b697a62829e1c2dd89467562633a2f60d9c56285`, in
-both interop projects. The corpus and public error vocabulary pin release commit
+`b2c9746349be720d7052d209b697a62829e1c2dd89467562633a2f60d9c56285`, in both interop projects.
+The corpus and public error vocabulary pin release commit
 `511fed142044ccea28bdcbb317c091cb2c8a515d`. The published corpus archive SHA-256 is
 `7be50afc500fad4148cbb8368181796858396cd40bb44dd5ad3575bf95c26ea0`;
 its index SHA-256 is `34dcdcae8af03d45d7bf222d46cd368a683b365ae2f470756dd1d461c9ecd798`.
-Vendoring preserves every retained source and case byte and removes the two retired cases.
-
-The Linux CI job is named exactly `reciprocal`. It uses
-`erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124`, locked Hex
-dependency installation, the same PostgreSQL service as the Node lanes, and the
-full exchange. The job has a 20-minute timeout and retains its public exchange
-artifact for three days. `release.yml` calls this CI workflow before publishing.
-A Hex outage fails the job. The required check names on `main` are
-`Node 24.21.0`, `Node 22.12.0`, `Node 26`, `deno`, `bun`, `reciprocal`, `browsers`, and
-`Deno denied OS roots`.
+CI runs the full exchange with locked peers and PostgreSQL and retains its sanitized JSONL artifact.
+The release workflow calls the same CI workflow before publishing; peer or registry failures fail verification.

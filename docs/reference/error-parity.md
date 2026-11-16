@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: Elixir release 1.0.0 at 511fed142044ccea28bdcbb317c091cb2c8a515d · Review when: the shared error vocabulary changes -->
-
 # Error parity
 
 OBSERVED: extraction with `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 511fed142044ccea28bdcbb317c091cb2c8a515d <output.json>` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.

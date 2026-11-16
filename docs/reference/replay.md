@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: the atomic replay port and the shared v1.0.0 conformance corpus · Review when: replay contracts, retention bounds, or driver interfaces change -->
-
 # Replay protection
 
 Required replay is an explicit Policy choice: `{identifier: "nonce", namespace,

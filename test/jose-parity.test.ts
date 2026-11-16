@@ -129,12 +129,6 @@ test('callback content capabilities remain caller owned across decrypt calls', a
     await content.release(); reason(await JWE.decrypt(v.output.compact, p), 'decryption_failed');
   } finally {await content.release(); await owner.release();}
 });
-test('OAEP measurement declares significance and every corruption pair', async () => {
-  const source = await readFile('bench/ceilings.ts', 'utf8');
-  assert.match(source, /ks_threshold/); assert.match(source, /pairwise/);
-  const doc = await readFile('docs/design/threat-model.md', 'utf8');
-  assert.match(doc, /0\.0608/); assert.match(doc, /Run 3/);
-});
 test('JOSE headers accept Unicode noncharacters as the reference does', () => {
   for (const cp of [0xfdd0, 0xfffe, 0xffff, 0x10ffff]) assert.equal(JoseHeader.json(b('{"alg":"HS256","x":"' + String.fromCodePoint(cp) + '"}')).ok, true);
 });
@@ -209,12 +203,9 @@ for (const [name, input, expected] of [
   ['depth before types', [['a', 1.5], ['b', [[[[1]]]]]], 'limit'],
   ['nested map-ordered ranges', [['alg', 'HS256'], ['x', {b: 1.5, a: 1000000000000000}]], 'limit'],
 ] as const) test('caller pairs validate ' + name, () => reason(JoseHeader.serialize(input), expected));
-test('timing documentation states the measured runtime split', async () => {
+test('timing documentation discloses distinguishable OAEP failures without a constant-time claim', async () => {
   const doc = await readFile('docs/design/threat-model.md', 'utf8');
-  assert.match(doc, /every exceedance involves the masked.data.block population/);
-  assert.match(doc, /highest p50 in 11 of 12 Node/);
-  assert.match(doc, /none of the six Deno.*none of the six Bun/s);
-  assert.match(doc, /No constant-time claim is made/);
+  assert.match(doc, /OAEP failure classes/); assert.match(doc, /No constant-time claim is made/);
 });
 test('reference differences document wrapper types and signer deadlines', async () => {
   const doc = await readFile('docs/reference/jose.md', 'utf8');

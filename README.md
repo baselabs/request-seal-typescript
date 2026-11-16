@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: overview · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 9530, the Web Bot Auth protocol draft, and the executed examples in this file · Review when: package scope, installation, or the public API changes -->
-
 # RequestSeal for TypeScript
 
 RequestSeal signs and verifies HTTP messages ([RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html)) and compact JOSE tokens in TypeScript. You choose trusted keys, required coverage, freshness, body integrity, and replay rules. Verification reports what those checks establish; your application decides access. The package uses WebCrypto, has no runtime dependencies, and runs on Node, Deno, and Bun.

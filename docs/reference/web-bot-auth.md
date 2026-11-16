@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: draft-ietf-webbotauth-httpsig-protocol-00 and the shared v1.0.0 conformance corpus · Review when: profile acceptance, discovery, or replay contracts change -->
-
 # Web Bot Auth
 
 `WebBotAuth` signs and verifies the source-bound protocol-00 request profile.

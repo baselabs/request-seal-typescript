@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: draft-ietf-webbotauth-httpsig-protocol-00, RFC 9421, and the executed examples in this guide · Review when: the Web Bot Auth draft, discovery behavior, or the policy contract changes -->
-
 # Web Bot Auth
 
 Web Bot Auth lets an automated agent, such as a crawler or an AI assistant, sign its HTTP requests so that a site can tell who is calling. The agent publishes its public keys at a URL it controls, names that URL in a `Signature-Agent` header, and signs each request. The site decides which agents to trust, checks the signature against keys it learned from that trusted source, and gets back a verified agent identity.

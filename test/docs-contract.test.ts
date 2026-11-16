@@ -6,17 +6,8 @@ import { ERROR_PARITY } from "../src/index.ts";
 import { documentationFiles } from "./support/docs-links.ts";
 import { documentationFences, executeFence } from "./support/docs-fences.ts";
 
-// Metadata, referenced paths, ADR shape, and the status table supplement the link check.
 const documents = await documentationFiles();
 const read = (path: string) => readFileSync(path, "utf8");
-
-test("every document starts with the hidden metadata comment", () => {
-  const pattern = /^<!-- Status: [^·]+ · Kind: [^·]+ · Updated: \d{4}-\d{2}-\d{2} · Governed by: [^·]+ · Review when: (?:(?!-->).)+ -->$/;
-  for (const document of documents) {
-    const first = read(document).split(/\n\s*\n/, 1)[0]!.replace(/\s*\n\s*/g, " ");
-    assert.match(first, pattern, `${document} must start with the hidden Status, Kind, Updated, Governed by, and Review when comment`);
-  }
-});
 
 test("repository paths named in code spans exist", () => {
   const roots = /^(?:src|test|tools|scripts|docs|interop|conformance|bench|\.github)\//;

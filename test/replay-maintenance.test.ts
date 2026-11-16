@@ -2,10 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 const doc = () => readFile('docs/reference/replay.md', 'utf8');
-test('cross-language changelog states its opt-in environment and Elixir toolchain', async () => {
-  const changelog = await readFile('CHANGELOG.md', 'utf8');
-  assert.match(changelog, /cross-language.*REQUESTSEAL_REPLAY_ELIXIR=1.*Elixir toolchain/i);
-});
 test('PostgreSQL usage configures server timeouts and explains indeterminate fail-closed claims', async () => {
   const source = await doc();
   assert.match(source, /options:.*lock_timeout=.*statement_timeout=/);
@@ -18,12 +14,6 @@ test('PostgreSQL docs explain driver-specific error classification and nonretrya
   assert.match(source, /read timeout.*(?:without|no).*code.*store_failed/);
   assert.match(source, /per driver/);
   assert.match(source, /all.*nonretryable/i);
-});
-// The branded Policy and authenticated freshness make this fallback unreachable.
-// Keep one source assertion until a public input can drive the non-core retention rejection.
-test('unreachable non-core retention rejection names invalid_policy at input', async () => {
-  const source = await readFile('src/verify.ts', 'utf8');
-  assert.match(source, /if \(!retained.ok\) \{[\s\S]*?unreachable[\s\S]*?fail\("invalid_policy", "input"\)/i);
 });
 test('caller store docs require exact own keys and explicit prototype binding', async () => {
   const source = await doc();

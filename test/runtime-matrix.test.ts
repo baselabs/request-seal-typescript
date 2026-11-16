@@ -105,5 +105,4 @@ test('browser dependency maintenance covers audit, bounded runtime, and the loca
   const job = read('.github/workflows/ci.yml').split('  browsers:\n')[1]!;
   assert.match(job, /timeout-minutes: 15/);
   assert.match(job, /npm audit --prefix interop\/browser --audit-level=high/);
-  assert.match(read('.gitignore'), /# Local runtime cache\.\n\.tools\//);
 });

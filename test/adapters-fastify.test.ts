@@ -115,10 +115,8 @@ test("Fastify parses a fully drained replay and authenticates the original bytes
         key,
       ),
     );
-    // Fastify 5.12.7's parser decodes invalid UTF-8 leniently, so the drained
-    // replay completes and the request authenticates over the exact original
-    // bytes. The mid-stream parser_order rejection this case used to pin is
-    // covered directly by the node-http adapter suite.
+    // Fastify 5.12.7 decodes invalid UTF-8 leniently; the drained replay
+    // authenticates the exact original bytes.
     assert.equal(accepted.status, 200);
     assert.ok(resolutions > before, "the request authenticated through the resolver");
     assert.equal(handled, 2, "both requests reached the handler");

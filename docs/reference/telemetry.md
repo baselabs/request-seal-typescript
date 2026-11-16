@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: the versioned telemetry contract v1, mirroring RequestSeal for Elixir · Review when: the event surface, outcomes, or emission sites change -->
-
 # Telemetry
 
 `Telemetry.attach(subscriber)` observes verification, replay, and custody operations with bounded, low-cardinality events. Handlers own storage and aggregation; the library keeps no history. The surface is opt-in, has zero dependencies, and never changes what an operation returns — a subscriber that throws is silently skipped, and the operation it observes still completes.

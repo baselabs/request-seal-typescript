@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-03 · Governed by: RFC 9421, RFC 7517, RFC 7638, and the executed examples in this guide · Review when: key resolution, discovery snapshots, or custody contracts change -->
-
 # Rotating keys
 
 An overlap period lets you replace a sender's signing key while receivers continue accepting requests signed with either key. The pattern is the same whether you configure keys yourself or learn them from a published key set: accept both keys for an overlap period, move the sender to the new key, then stop accepting the old one.

@@ -7,9 +7,7 @@ export function renderParity(): string {
     const statuses = Object.entries(rules).flatMap(([reason, rule]) => rule.kind === 'constant' ? [] : [`${kind}/${reason}: ${rule.minimum}–${rule.maximum} (status-derived)`]);
     return [...(constants.length ? [`${kind}: ${constants.join(', ')}.`] : []), ...statuses];
   }).join(' · ');
-  return `<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: Elixir release 1.0.0 at ${ELIXIR_ERROR_PIN} · Review when: the shared error vocabulary changes -->
-
-# Error parity
+  return `# Error parity
 
 OBSERVED: extraction with \`REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts ${ELIXIR_ERROR_PIN} <output.json>\` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
 

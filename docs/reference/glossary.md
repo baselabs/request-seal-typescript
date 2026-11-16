@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: RFC 9421, RFC 9530, the public API in `src/index.ts`, and the guides and references it links · Review when: a public type, result field, or documented term changes -->
-
 # Glossary
 
 One term per concept, as the code and the other pages use it.

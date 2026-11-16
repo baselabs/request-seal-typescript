@@ -1,7 +1,4 @@
-<!-- Status: accepted · Kind: decision record · Updated: 2026-11-15 · Governed by: public API, compatibility contract, and cited decisions · Review when: the implementation or a governing decision changes -->
-
 # 0012 — Confine unwrapped content keys to a non-extractable capability
-Status: Accepted
 
 ## Context
 
@@ -19,11 +16,6 @@ caller code copy the key out of custody.
 3. Only the library can construct one (`src/custody/content_key.ts:34`), and
    `isUnwrappedKey` checks a private brand (`src/custody/content_key.ts:26`).
 4. `release` drops the key and invalidates the capability.
-
-## Alternatives
-
-1. **Return raw key bytes.** Simplest. The key leaves custody.
-2. Return a non-extractable CryptoKey. Key bytes remain hidden, but callers receive the runtime key object directly rather than the library’s branded, bounded and revocable decryption capability.
 
 ## Consequences
 

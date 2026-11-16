@@ -1,14 +1,4 @@
-<!-- Status: accepted · Kind: decision record · Updated: 2026-11-15 · Governed by: public API, compatibility contract, and cited decisions · Review when: the implementation or a governing decision changes -->
-
 # 0009 — Prove every test lane rejects a planted failure
-Status: Accepted
-
-## Context
-
-A test lane that exits zero proves nothing if its runner would also exit zero on a failing test.
-Runner flags, a wrong glob, a swallowed exit code or a runtime that skips TypeScript files can
-each turn a red suite green. This package runs on Node, Deno, Bun and three browser engines, each
-with its own runner.
 
 ## Decision
 
@@ -23,16 +13,6 @@ with its own runner.
 4. `test/red-proof.test.ts` checks the script itself: the planted test is accepted as a proof,
    and a missing test file is not.
 
-## Alternatives
-
-1. **Trust the runner's exit code.** No extra step. A misconfigured lane stays green silently.
-2. **Count executed tests.** Detects an empty run. It does not detect a runner that reports
-   failures but exits zero.
-3. **Mutation testing of the library.** Stronger evidence about the tests. It is slower by
-   orders of magnitude and does not check the lane wiring this proof checks.
-
 ## Consequences
 
-Every new lane needs its own proof step. The marker and the count patterns in
-`scripts/red-proof.sh` must follow each runner's output format, so a runner upgrade that changes
-its summary line fails the proof until the pattern is updated.
+The proof requires a nonzero exit, its intentional marker, and a positive failing-test count. Runner output changes must preserve those checks in `scripts/red-proof.sh`.

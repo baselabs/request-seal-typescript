@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: reference · Updated: 2026-11-11 · Governed by: RFC 7517, RFC 7638, the public discovery API, and the shared conformance corpus · Review when: discovery policy, body formats, or runtime compatibility changes -->
-
 # Discovery
 
 Core discovery validates caller-supplied snapshots. It starts no connection or

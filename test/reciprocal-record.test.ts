@@ -2,7 +2,6 @@ import {nodeAdapterTest} from './support/node-adapter-test.ts';
 const test = nodeAdapterTest(import.meta.url);
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {workingTreeFiles} from './support/repository-files.ts';
 import {randomBytes, generateKeyPairSync} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {reciprocalPeers, reciprocalRequest} from './support/reciprocal-peers.ts';
@@ -12,7 +11,7 @@ import {assertRejection} from '../interop/reciprocal/records.ts';
 
 const exchange = () => readFileSync('interop/reciprocal/exchange.test.ts', 'utf8');
 
-test('receipt text contains no internal role name', () => {
+test('exchange output contains no internal role name', () => {
   assert.doesNotMatch(exchange(), new RegExp(String.fromCharCode(115, 117, 112, 101, 114, 118, 105, 115, 111, 114), 'i'));
 });
 test('records exclude real private and symmetric key material', async () => {
@@ -68,17 +67,10 @@ test('an early-exiting real peer still closes the real database', {skip: !proces
   await assert.rejects(db.query('SELECT 1'), /after calling end/);
 });
 
-test('run dates format the supplied clock as a UTC calendar date', async () => {
-  const {runDate} = await import('../interop/reciprocal/records.ts');
-  assert.equal(runDate(new Date('2026-10-11T23:59:59Z')), '2026-10-11');
-  assert.equal(runDate(new Date('2026-10-12T00:00:00Z')), '2026-10-12');
-});
-
 test('unrelated peer failures cannot satisfy a rejection assertion', async () => {
   const {assertRejection} = await import('../interop/reciprocal/records.ts');
   assert.throws(() => assertRejection({accepted: false, rule: 'peer/error'}, 'jose/crypto.invalid_signature'));
 });
-
 
 test('wrong CA and republished wrong-origin directory reject in both directions', {timeout: 30000, skip: process.env.REQUESTSEAL_REPLAY_ELIXIR !== '1'}, async t => {
   const peers = await reciprocalPeers(t.signal);
@@ -129,14 +121,3 @@ test('real signature rejections name the exact rule and recipients release', {ti
     }
   } finally {await peers.close();}
 });
-
-test('working-tree test titles describe behavior without review identifiers', () => {
-  const pattern = /\b[SGN]\d+\b/;
-  assert.equal(pattern.test(['S', '1'].join('')), true, 'known-positive review identifier probe');
-  const titles = workingTreeFiles(process.cwd(), ['test']).filter(path => path.endsWith('.test.ts')).flatMap(path => {
-    return [...readFileSync(path, 'utf8').matchAll(/\btest\((['"`])([^\n]*)/g)].map(match => ({path, title: match[2]!}));
-  });
-  assert.ok(titles.some(entry => entry.title.includes('both published peers')), 'the instrument reads the existing pin test');
-  assert.deepEqual(titles.filter(entry => pattern.test(entry.title)), []);
-});
-

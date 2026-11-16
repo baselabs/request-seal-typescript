@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-11-11 · Governed by: AGENTS.md, the shared conformance corpus, and the executed examples in this guide · Review when: an advertised capability, test runner, or evidence source changes -->
-
 # Testing
 
 This guide covers two jobs: testing your own integration of RequestSeal, and running the checks in this repository. Both rest on one idea. A check proves something only if it can fail, so every test here uses real keys and real cryptography, asserts an exact outcome, and has a positive control beside each rejection.
@@ -134,15 +132,8 @@ Dependencies that are not part of the package live in separate workspaces under 
 
 ## Runtimes
 
-| Runtime | What the tests prove |
-| --- | --- |
-| Node 22.12.0, 22.23.1, 24.21.0, and 26.11.1 | The full suite, build, conformance corpus, and packed-package import checks. |
-| Deno 2.5.6 | The core suite and conformance on Deno's own WebCrypto. Fetch verification runs only here. |
-| Bun 1.3.14 | The core suite and conformance. On macOS arm64, Bun's WebCrypto rejected two valid ECDSA P-256 vectors; a declared limitation, scoped to the exact version and platform, reports them instead of weakening a check. |
-| Deno 2.9.7 | Only that discovery refuses OS trust roots when the system permission is denied. |
-| Chromium 156.0.8078.4, Firefox 157.0, WebKit 27.2 | The browser suite: core signing and verification, and Fetch signing. |
-
-The Node adapters run in real Node subprocesses even when the suite is started by Deno or Bun. HTTPS key discovery is Node only. Linux is the only CI platform; macOS and Linux are supported for development.
+Native suites cover Node, Deno, and Bun; browser suites cover portable core behavior and Fetch signing. Node adapters use real Node subprocesses, and HTTPS discovery is Node only.
+See the [runtime matrix](../reference/runtime-matrix.md) for exact versions, platforms, permissions, and limitations.
 
 ## Conformance corpus
 

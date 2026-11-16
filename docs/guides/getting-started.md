@@ -1,5 +1,3 @@
-<!-- Status: current · Kind: guide · Updated: 2026-10-14 · Governed by: RFC 9421, RFC 9530, and the executed examples in this guide · Review when: the public signing or verification API changes -->
-
 # Getting started
 
 You will sign an HTTP request, verify it under an explicit policy, and watch a tampered copy fail. Everything runs in one file with locally generated keys and no network.

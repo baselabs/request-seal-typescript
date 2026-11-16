@@ -11,7 +11,7 @@ import {ddl} from '../../src/replay/postgres.ts';
 import {pool} from '../replay/pg.mjs';
 import {algorithms as httpAlgorithms} from '../../src/crypto/algorithm.ts';
 import {JWS_ALGORITHMS, JWE_ALGORITHMS, ENCRYPTION} from '../../src/jose/support.ts';
-import {publicRecord, assertRejection, runDate, cleanupDatabase} from './records.ts';
+import {publicRecord, assertRejection, cleanupDatabase} from './records.ts';
 
 process.chdir(resolve(dirname(fileURLToPath(import.meta.url)), '../..'));
 const registry = httpAlgorithms(); assert.ok(registry.ok);
@@ -23,7 +23,6 @@ const webBotAlgorithms = [...http.filter(algorithm => algorithm !== 'hmac-sha256
 const families = ['rfc9421', 'jws', 'jwe', 'nested', 'web_bot_auth', 'replay'];
 const rounds = 32;
 const cache = resolve('interop/reciprocal/.cache');
-const receiptPath = process.env.REQUESTSEAL_RECIPROCAL_RECEIPT;
 const rows: {family: string; direction: string; rounds: number; cases: number; rejections: number; disagreements: number}[] = [];
 // Xorshift32 selects message inputs only. Keys and encryption entropy are fresh runtime randomness.
 function bytes(seed: number, length: number) {
@@ -148,7 +147,6 @@ test('fresh independently generated envelopes agree in both directions for every
     assert.equal((await db.query(`SELECT count(*) AS count FROM "${table}"`)).rows[0]?.count, '64');
     const receipt = '| Family | Direction | Rounds | Cases | Rejections | Disagreements |\n| --- | --- | ---: | ---: | ---: | ---: |\n' + rows.map(r => `| ${r.family} | ${r.direction} | ${r.rounds} | ${r.cases} | ${r.rejections} | ${r.disagreements} |`).join('\n');
     console.log(receipt);
-    if (receiptPath) await writeFile(resolve(receiptPath), '<!-- Status: verified · Kind: record · Updated: ' + runDate() + ' · Governed by: executed reciprocal exchange · Review when: peer or exchange changes -->\n\nOBSERVED: `npm run exchange --prefix interop/reciprocal` on Node ' + process.versions.node + ', Elixir 1.20.3 / OTP 29, published request_seal 1.0.0.\n\n' + receipt + '\n\nSeeds: xorshift32, 942100 + round for payloads; +7515 for nonces; 751600 for the replay namespace. Every selector runs all 32 rounds; all ten alg/enc pairs run per JWE and nested round. Keys, CEKs, and IVs use each runtime’s real random generator. The ignored `interop/reciprocal/.cache/exchange.jsonl` records public keys and public inputs/outputs for verification replay. Private keys, symmetric secrets, and CEKs are removed before serialization. Symmetric replay requires fresh caller-owned custody material.\n\nHosted CI execution is recorded separately.\n');
   } catch (error) {original = error; throw error;}
   finally {
     ts.end(); ex.end();
