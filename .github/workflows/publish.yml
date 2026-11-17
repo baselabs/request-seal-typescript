@@ -115,5 +115,5 @@ jobs:
       - name: Verify the inspected archive checksum
         working-directory: artifacts
         run: sha256sum --check SHA256SUMS
-      - name: Publish to npm with trusted publishing
-        run: npm publish ./artifacts/package.tgz --provenance --ignore-scripts --access public --registry=https://registry.npmjs.org/
+      - name: Stage the inspected archive with trusted publishing
+        run: npm stage publish ./artifacts/package.tgz --provenance

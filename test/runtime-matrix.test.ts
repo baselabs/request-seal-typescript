@@ -63,7 +63,10 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   assert.match(browser.devDependencies.playwright, /^\d+\.\d+\.\d+$/);
   assert.equal(pkg.devDependencies.playwright, undefined);
   assert.deepEqual(Object.keys(browser.devDependencies), ['playwright']);
-  assert.match(read('.github/workflows/release.yml'), /uses: \.\/\.github\/workflows\/ci.yml/);
+  const publish = read('.github/workflows/publish.yml');
+  assert.match(publish, /workflow_dispatch:/);
+  assert.match(publish, /npm stage publish \.\/artifacts\/package\.tgz --provenance/);
+  assert.doesNotMatch(publish, /uses: \.\/\.github\/workflows\/ci.yml/);
   assert.match(ci, /^  browsers:\n    runs-on: ubuntu-24\.04/m);
 });
 
@@ -103,6 +106,6 @@ test('the WebKit probe includes published RFC 8032 test 1', () => {
 test('browser dependency maintenance covers audit, bounded runtime, and the local cache', () => {
   assert.match(read('.github/dependabot.yml'), /"\/interop\/browser"/);
   const job = read('.github/workflows/ci.yml').split('  browsers:\n')[1]!;
-  assert.match(job, /timeout-minutes: 15/);
+  assert.match(job, /timeout-minutes: 5 # Run 43813493933/);
   assert.match(job, /npm audit --prefix interop\/browser --audit-level=high/);
 });

@@ -9,6 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    environment: github-pages
     if: contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)
     timeout-minutes: 5 # Run 43813493989: green build job 17s.
     runs-on: ubuntu-24.04

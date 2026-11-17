@@ -16,15 +16,15 @@ test('the reciprocal peer, corpus and public errors pin the same published relea
   assert.match(readFileSync('docs/reference/reciprocity.md', 'utf8'), /request_seal == 1\.0\.0/);
 });
 
-test('the reciprocal job requires the published peer and runs through release verification', () => {
+test('the reciprocal job requires the published peer before candidate qualification', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   assert.match(ci, /^  reciprocal:\n    name: reciprocal\n/m, 'CI exposes the reciprocal check');
   const job = ci.slice(ci.indexOf('  reciprocal:'));
   assert.match(job, /mix deps.get --check-locked/);
   assert.match(job, /npm run exchange/);
-  assert.match(job, /elixir-version: '1.20.3'/);
-  assert.match(job, /otp-version: '29.0.3'/);
-  assert.match(readFileSync('.github/workflows/release.yml', 'utf8'), /uses: \.\/\.github\/workflows\/ci.yml/);
+  assert.match(job, /version-file: \.tool-versions\n\s+version-type: strict/);
+  assert.match(ci, /needs: \[node, native, os-trust-denied, browsers, reciprocal\]/);
+  assert.match(readFileSync('.github/workflows/publish.yml', 'utf8'), /npm stage publish/);
 });
 
 test('both published peers and every CI setup use the same exact pins', () => {
@@ -39,7 +39,9 @@ test('both published peers and every CI setup use the same exact pins', () => {
     assert.match(pin, /"hexpm", "b2c9746349be720d7052d209b697a62829e1c2dd89467562633a2f60d9c56285"/);
   }
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
-  const setups = [...ci.matchAll(/uses: erlef\/setup-beam@[^\n]+\n\s+with:\n\s+otp-version: '([^']+)'\n\s+elixir-version: '([^']+)'/g)];
+  const setups = [...ci.matchAll(/uses: erlef\/setup-beam@[^\n]+\n\s+with:\n\s+version-file: \.tool-versions\n\s+version-type: strict/g)];
   assert.equal(setups.length, 3);
-  for (const match of setups) assert.deepEqual(match.slice(1), ['29.0.3', '1.20.3']);
+  assert.match(readFileSync('.tool-versions', 'utf8'), /^elixir 1\.20\.3-otp-29\nerlang 29\.0\.3$/m);
+  assert.equal((ci.match(/test "\$actual_elixir" = "\$expected_elixir"/g) ?? []).length, 3);
+  assert.equal((ci.match(/test "\$actual_otp" = "\$expected_otp"/g) ?? []).length, 3);
 });
