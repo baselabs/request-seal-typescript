@@ -1,13 +1,12 @@
 name: CI
 on:
   push:
-    branches: [main, 'kci/**']
-  pull_request:
-  workflow_call:
+    branches: ['kci/**']
 permissions:
   contents: read
 jobs:
   node:
+    timeout-minutes: 7 # Run 43813493933: slowest green lane 183s.
     name: Node ${{ matrix.node == '26.11.1' && '26' || matrix.node }}
     runs-on: ubuntu-24.04
     services:
@@ -28,6 +27,8 @@ jobs:
         node: ['22.12.0', '22.23.1', '24.21.0', '26.11.1']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
@@ -45,10 +46,18 @@ jobs:
       - run: node --experimental-strip-types --no-warnings --test interop/migration/claims.test.ts
       # The ubuntu-24.04 runner image supplies the required OpenSSH client tools.
       - run: command -v ssh-agent ssh-keygen ssh-add && ssh -V
-      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          otp-version: '29.0.3'
-          elixir-version: '1.20.3'
+          version-file: .tool-versions
+          version-type: strict
+      - name: Refuse different Elixir or OTP versions
+        run: |
+          expected_elixir="$(awk '$1 == "elixir" {sub(/-otp-.*/, "", $2); print $2}' .tool-versions)"
+          expected_otp="$(awk '$1 == "erlang" {print $2}' .tool-versions)"
+          actual_elixir="$(elixir -e 'IO.write(System.version())')"
+          actual_otp="$(erl -noshell -eval 'io:put_chars(element(2, file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])))), halt().')"
+          test "$actual_elixir" = "$expected_elixir" || { echo "::error::Elixir must be exactly $expected_elixir"; exit 1; }
+          test "$actual_otp" = "$expected_otp" || { echo "::error::OTP must be exactly $expected_otp"; exit 1; }
       - name: Reextract the pinned Elixir error vocabulary
         run: |
           git init "$RUNNER_TEMP/request-seal-reference"
@@ -69,6 +78,7 @@ jobs:
       - run: npm audit --audit-level=high
       - run: npm pack --dry-run
   native:
+    timeout-minutes: 8 # Run 43813493933: slowest green lane 219s.
     name: ${{ matrix.runtime }}
     runs-on: ubuntu-24.04
     services:
@@ -88,9 +98,15 @@ jobs:
         runtime: [deno, bun]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24.21.0'
+          node-version-file: .tool-versions
+      - name: Refuse a different Node version
+        run: |
+          expected="$(awk '$1 == "nodejs" {print $2}' .tool-versions)"
+          test "$(node --version)" = "v$expected" || { echo "::error::Node must be exactly $expected"; exit 1; }
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         if: matrix.runtime == 'deno'
         with:
@@ -103,10 +119,18 @@ jobs:
       - run: npm ci --prefix interop --ignore-scripts
       - run: npm ci --prefix interop/adapters --ignore-scripts
       - run: command -v ssh-agent ssh-keygen ssh-add && ssh -V
-      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          otp-version: '29.0.3'
-          elixir-version: '1.20.3'
+          version-file: .tool-versions
+          version-type: strict
+      - name: Refuse different Elixir or OTP versions
+        run: |
+          expected_elixir="$(awk '$1 == "elixir" {sub(/-otp-.*/, "", $2); print $2}' .tool-versions)"
+          expected_otp="$(awk '$1 == "erlang" {print $2}' .tool-versions)"
+          actual_elixir="$(elixir -e 'IO.write(System.version())')"
+          actual_otp="$(erl -noshell -eval 'io:put_chars(element(2, file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])))), halt().')"
+          test "$actual_elixir" = "$expected_elixir" || { echo "::error::Elixir must be exactly $expected_elixir"; exit 1; }
+          test "$actual_otp" = "$expected_otp" || { echo "::error::OTP must be exactly $expected_otp"; exit 1; }
       - name: Prove Deno rejects a failure
         if: matrix.runtime == 'deno'
         run: |
@@ -141,9 +165,11 @@ jobs:
   os-trust-denied:
     name: Deno denied OS roots
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 5 # Run 43813493933: green job 13s.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: '2.9.7'
@@ -153,12 +179,18 @@ jobs:
         run: deno test --no-check --allow-read --allow-env=REQUEST_SEAL_EXPECT_DENIED_ROOTS test/discovery-os-trust.test.ts
   browsers:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5 # Run 43813493933: green job 92s.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24.21.0'
+          node-version-file: .tool-versions
+      - name: Refuse a different Node version
+        run: |
+          expected="$(awk '$1 == "nodejs" {print $2}' .tool-versions)"
+          test "$(node --version)" = "v$expected" || { echo "::error::Node must be exactly $expected"; exit 1; }
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix interop/browser --ignore-scripts
       - run: npm audit --prefix interop/browser --audit-level=high
@@ -171,7 +203,7 @@ jobs:
         run: sh scripts/red-proof.sh npm run test:red --prefix interop/browser
   reciprocal:
     name: reciprocal
-    timeout-minutes: 20
+    timeout-minutes: 11 # Run 43813493933: green job 318s.
     runs-on: ubuntu-24.04
     services:
       # Trust authentication and the passwordless URL are for this ephemeral runner only.
@@ -188,21 +220,34 @@ jobs:
       REQUESTSEAL_REPLAY_ELIXIR: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24.21.0'
-      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+          node-version-file: .tool-versions
+      - name: Refuse a different Node version
+        run: |
+          expected="$(awk '$1 == "nodejs" {print $2}' .tool-versions)"
+          test "$(node --version)" = "v$expected" || { echo "::error::Node must be exactly $expected"; exit 1; }
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          otp-version: '29.0.3'
-          elixir-version: '1.20.3'
-      - run: elixir --version
+          version-file: .tool-versions
+          version-type: strict
+      - name: Refuse different Elixir or OTP versions
+        run: |
+          expected_elixir="$(awk '$1 == "elixir" {sub(/-otp-.*/, "", $2); print $2}' .tool-versions)"
+          expected_otp="$(awk '$1 == "erlang" {print $2}' .tool-versions)"
+          actual_elixir="$(elixir -e 'IO.write(System.version())')"
+          actual_otp="$(erl -noshell -eval 'io:put_chars(element(2, file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])))), halt().')"
+          test "$actual_elixir" = "$expected_elixir" || { echo "::error::Elixir must be exactly $expected_elixir"; exit 1; }
+          test "$actual_otp" = "$expected_otp" || { echo "::error::OTP must be exactly $expected_otp"; exit 1; }
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix interop --ignore-scripts
       - run: npm ci --prefix interop/reciprocal --ignore-scripts
       - run: mix local.hex --force && mix local.rebar --force
-      - run: mix deps.get --check-locked && mix compile --warnings-as-errors
+      - run: mix deps.get --check-locked && mix hex.audit && mix compile --warnings-as-errors
         working-directory: interop/elixir
-      - run: mix deps.get --check-locked && mix compile --warnings-as-errors
+      - run: mix deps.get --check-locked && mix hex.audit && mix compile --warnings-as-errors
         working-directory: interop/replay
       - run: npm run typecheck --prefix interop/reciprocal
       - run: node --experimental-strip-types --no-warnings --test test/peer-process.test.ts test/replay-reciprocal.test.ts test/reciprocal.test.ts test/reciprocal-driver.test.ts test/reciprocal-record.test.ts
@@ -217,3 +262,20 @@ jobs:
           name: reciprocal-exchange
           retention-days: 3
           path: interop/reciprocal/.cache/exchange.jsonl
+  qualified:
+    if: always()
+    needs: [node, native, os-trust-denied, browsers, reciprocal]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5 # no green run yet
+    steps:
+      - name: Require every qualification job to succeed
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          results = json.loads(os.environ['NEEDS_JSON'])
+          failed = {name: job['result'] for name, job in results.items() if job['result'] != 'success'}
+          if failed:
+              raise SystemExit(f'Qualification failed: {failed}')
+          PYTHON

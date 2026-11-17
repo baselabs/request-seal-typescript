@@ -1,0 +1,119 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish the inspected archive with provenance
+    if: contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5 # Run 43111107465: the former publication job took 63s.
+    environment: publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Refuse a ref outside the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          test "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH" || { echo "::error::Publication requires the default branch"; exit 1; }
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Node from the tool versions
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .tool-versions
+          package-manager-cache: false
+      - name: Refuse a different Node version
+        run: |
+          expected="$(awk '$1 == "nodejs" {print $2}' .tool-versions)"
+          test "$(node --version)" = "v$expected" || { echo "::error::Node must be exactly $expected"; exit 1; }
+      - name: Pin archive tooling
+        run: npm install --global npm@11.19.0 --ignore-scripts
+      - name: Install with the frozen lockfile
+        run: npm ci
+      - name: Refuse a published or tagged version
+        run: |
+          node --input-type=module <<'JAVASCRIPT'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {execFileSync, spawnSync} from 'node:child_process';
+          const {name, version} = JSON.parse(readFileSync('package.json', 'utf8'));
+          const result = spawnSync('npm', ['view', `${name}@${version}`, 'version', '--json', '--registry=https://registry.npmjs.org/'], {encoding: 'utf8'});
+          assert.notEqual(result.status, 0, `${name}@${version} is already published`);
+          assert.equal(JSON.parse(result.stdout).error?.code, 'E404', 'registry lookup failed without confirming an unpublished version');
+          const tags = execFileSync('git', ['ls-remote', '--tags', 'origin', `refs/tags/v${version}`, `refs/tags/v${version}^{}`], {encoding: 'utf8'});
+          assert.equal(tags.trim(), '', `v${version} is already tagged`);
+          JAVASCRIPT
+      - name: Build the library and documentation
+        run: |
+          npm run build
+          npm run docs
+      - name: Pack the package archive
+        run: |
+          mkdir -p artifacts
+          npm pack --json --ignore-scripts --pack-destination artifacts > artifacts/pack.json
+      - name: Inspect the exact package archive
+        run: |
+          python3 - <<'PYTHON'
+          import hashlib, json, tarfile
+          from pathlib import Path, PurePosixPath
+          source = json.loads(Path('package.json').read_text())
+          metadata = json.loads(Path('artifacts/pack.json').read_text())
+          archive = Path('artifacts') / metadata[0]['filename'] if isinstance(metadata, list) else Path(metadata['file'])
+          assert archive.resolve().parent == Path('artifacts').resolve(), 'archive must be in artifacts'
+          target = Path('artifacts/package.tgz')
+          archive.rename(target)
+          allowed = set(source['files']) | {'package.json', 'README.md', 'LICENSE', 'NOTICE'}
+          with tarfile.open(target, 'r:gz') as package:
+              members = package.getmembers()
+              paths = set()
+              for member in members:
+                  path = PurePosixPath(member.name)
+                  assert not path.is_absolute() and '..' not in path.parts, f'unsafe path: {path}'
+                  assert path.parts[0] == 'package', f'unexpected archive root: {path}'
+                  if member.isdir():
+                      continue
+                  assert member.isfile(), f'non-regular archive member: {path}'
+                  relative = str(path.relative_to('package'))
+                  assert relative in allowed or any(relative.startswith(entry.rstrip('/') + '/') for entry in allowed), f'unexpected packed file: {relative}'
+                  assert relative not in paths, f'duplicate packed file: {relative}'
+                  paths.add(relative)
+              packed = json.load(package.extractfile('package/package.json'))
+          assert (packed['name'], packed['version']) == (source['name'], source['version']), 'package identity differs'
+          assert packed.get('publishConfig', {}).get('access') == 'public', 'package must be public'
+          assert {'package.json', 'README.md', 'LICENSE', 'NOTICE'} <= paths, 'required package documents are missing'
+          def inspect(value):
+              if isinstance(value, dict):
+                  for child in value.values():
+                      inspect(child)
+              elif isinstance(value, list):
+                  for child in value:
+                      inspect(child)
+              elif isinstance(value, str) and value.startswith('./'):
+                  assert value[2:] in paths, f'missing exported file: {value}'
+          inspect(packed.get('exports', {}))
+          inspect(packed.get('imports', {}))
+          for field in ('main', 'types'):
+              assert packed[field].removeprefix('./') in paths, f'missing {field} entry point'
+          digest = hashlib.sha256(target.read_bytes()).hexdigest()
+          Path('artifacts/SHA256SUMS').write_text(f'{digest}  package.tgz\n')
+          print(f"Inspected {packed['name']}@{packed['version']}: {len(paths)} files; SHA-256 {digest}")
+          PYTHON
+      - name: Verify the inspected archive checksum
+        working-directory: artifacts
+        run: sha256sum --check SHA256SUMS
+      - name: Publish to npm with trusted publishing
+        run: npm publish ./artifacts/package.tgz --provenance --ignore-scripts --access public --registry=https://registry.npmjs.org/

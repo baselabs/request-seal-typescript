@@ -35,5 +35,12 @@ into null-prototype snapshots; reject unknown keys. Branding uses private WeakSe
 Public documentation explains technical usage and maintenance.
 
 The package allowlist governs publication. Corpus data and repository tools stay outside
-the tarball. Release tags run the full battery and stage with provenance through the
-repository's trusted publisher; human approval on npmjs.com makes the version live.
+the tarball. Qualification runs on `kci/**`; infra publishes the inspected archive with provenance
+through the repository's trusted publisher from the default branch.
+
+## CI/CD and releases
+
+Releases, deployments, and publications are done by the infra session (infra-1).
+The project lands on the default branch with `kimosabe-land --repo . --sha <full sha>`
+and stops there. Requirements live in the infra repository at `baselabs/docs/ci.md`,
+"What infra requires of every product".

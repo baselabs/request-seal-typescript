@@ -1,18 +1,7 @@
 name: Pages
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'README.md'
-      - 'docs/**'
-      - 'src/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'typedoc.json'
-      - 'tsconfig*.json'
-      - 'scripts/typedoc-*.mjs'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
+
 permissions:
   contents: read
 concurrency:
@@ -20,18 +9,34 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)
+    timeout-minutes: 5 # Run 43813493989: green build job 17s.
     runs-on: ubuntu-24.04
     steps:
+      - name: Refuse a ref outside the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          test "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH" || { echo "::error::Publication requires the default branch"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24.21.0'
+          node-version-file: .tool-versions
+          package-manager-cache: false
+      - name: Refuse a different Node version
+        run: |
+          expected="$(awk '$1 == "nodejs" {print $2}' .tool-versions)"
+          test "$(node --version)" = "v$expected" || { echo "::error::Node must be exactly $expected"; exit 1; }
       - run: npm ci --ignore-scripts
       - run: npm run docs
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site-dist
   deploy:
+    if: contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)
+    timeout-minutes: 5 # Run 43813493989: green deploy job 14s.
     needs: build
     runs-on: ubuntu-24.04
     permissions:
@@ -41,6 +46,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Refuse a ref outside the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          test "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH" || { echo "::error::Publication requires the default branch"; exit 1; }
       - name: Deploy API reference
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
