@@ -25,7 +25,7 @@ test('records exclude real private and symmetric key material', async () => {
   assert.ok(!wire.includes(secret)); assert.ok(!wire.includes(privateJwk.d!)); assert.ok(!wire.includes('PRIVATE KEY'));
   assert.ok(wire.includes(jwk.x!)); assert.ok(wire.includes('public input'));
   const job = readFileSync('.github/workflows/ci.yml', 'utf8').split('  reciprocal:')[1]!;
-  assert.match(job, /timeout-minutes: 20/); assert.match(job, /retention-days: 3/);
+  assert.match(job, /timeout-minutes: 11 /); assert.match(job, /retention-days: 3/);
 });
 test('reciprocal PostgreSQL documents runner-only trust authentication', () => {
   const job = readFileSync('.github/workflows/ci.yml', 'utf8').split('  reciprocal:')[1]!;
