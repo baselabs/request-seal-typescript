@@ -135,6 +135,6 @@ test('the WebKit probe includes published RFC 8032 test 1', () => {
 test('browser dependency maintenance covers audit, bounded runtime, and the local cache', () => {
   assert.match(read('.github/dependabot.yml'), /"\/interop\/browser"/);
   const job = read('.github/workflows/ci.yml').split('  browsers:\n')[1]!;
-  assert.match(job, /timeout-minutes: 5 # Run 43813493933/);
+  assert.match(job, /timeout-minutes: 5 # Run 44212181768/);
   assert.match(job, /npm audit --prefix interop\/browser --audit-level=high/);
 });
