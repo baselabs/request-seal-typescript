@@ -4,7 +4,7 @@
 
 - Resume approved npm publications by comparing registry archive digests and downloaded bytes with the inspected archive; refuse deprecated, unpublished, mismatched, or tagged versions and package names with no public release. Pending stages remain owner-approved and duplicate staging fails closed.
 - Retain release archives, checksums, package metadata, changelog, public read-back metadata, and available provenance together for the versioned GitHub release. Verify the published package in a separate keyless consumer job after upload and public read-back.
-- Declare exact compatibility runtimes and npm in `.tool-versions`, install the package manager declared by each manifest, refuse differing runtimes, remove the Bun setup cache, and measure job limits from hosted green runs.
+- Declare every exact runtime lane in `.tool-versions` using only tools asdf and mise install, read npm from the root `packageManager` and require every manifest to declare it, refuse differing runtimes, remove the Bun setup cache, and measure job limits from hosted green runs.
 
 ## 0.5.1 - 2026-11-17
 

@@ -52,8 +52,9 @@ Workflow changes go to infra for review with repository, branch, and full commit
 before landing. The default branch requires the exact `qualified` context, with
 no bypass and no classic branch protection.
 
-Every runtime lane and npm version comes from `.tool-versions` through the shared
-reader; installs are frozen and manifests declare npm. Qualification uses no workflow
+Every runtime lane comes from `.tool-versions` and npm from the root `packageManager`,
+both through the shared reader; `.tool-versions` names only tools asdf and mise
+install, installs are frozen and every manifest declares the same npm. Qualification uses no workflow
 cache and never installs this package from npm. Both Elixir peer projects retain
 locked fetching and both advisory feeds. Keep action SHAs and version comments exact.
 Measure timeouts on cold green jobs, use the five-minute floor and 90-minute cap,

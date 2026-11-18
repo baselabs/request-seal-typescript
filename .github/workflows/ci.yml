@@ -13,7 +13,7 @@ jobs:
       native: ${{ steps.versions.outputs.native }}
       node: ${{ steps.versions.outputs.nodejs }}
       npm: ${{ steps.versions.outputs.npm }}
-      deno_os_trust: ${{ steps.versions.outputs['deno-os-trust'] }}
+      deno_os_trust: ${{ steps.versions.outputs.deno_os_trust }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -212,20 +212,24 @@ jobs:
       - run: npm pack --dry-run
   os-trust-denied:
     needs: toolchains
-    name: Deno denied OS roots
+    name: Deno ${{ matrix.deno }} denied OS roots
     runs-on: ubuntu-24.04
     timeout-minutes: 5 # Run 44202576403: cold job 15s; no cache restored.
+    strategy:
+      fail-fast: false
+      matrix:
+        deno: ${{ fromJSON(needs.toolchains.outputs.deno_os_trust) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          deno-version: ${{ needs.toolchains.outputs.deno_os_trust }}
+          deno-version: ${{ matrix.deno }}
           cache: false
       - name: Refuse a different Deno version
         env:
-          EXPECTED_DENO: ${{ needs.toolchains.outputs.deno_os_trust }}
+          EXPECTED_DENO: ${{ matrix.deno }}
         run: test "$(deno --version | awk 'NR == 1 {print $2}')" = "$EXPECTED_DENO"
       - name: Refuse OS roots without system permission
         env:

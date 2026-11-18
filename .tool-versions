@@ -1,8 +1,5 @@
-nodejs 24.21.0
-nodejs-compat 22.12.0 22.23.1 26.11.1
-npm 11.19.0
-deno 2.5.6
-deno-os-trust 2.9.7
+nodejs 24.21.0 22.12.0 22.23.1 26.11.1
+deno 2.5.6 2.9.7
 bun 1.3.14
 elixir 1.20.3-otp-29
 erlang 29.0.3
