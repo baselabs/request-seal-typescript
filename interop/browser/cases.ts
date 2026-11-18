@@ -129,8 +129,8 @@ test('RSA-OAEP preserves leading-zero CEKs or returns its exact declared limitat
         const length = encryption === 'A128GCM' ? 16 : 32;
         const protectedPart = Seal.encodeBase64Url(new TextEncoder().encode(JSON.stringify({alg: algorithm, enc: encryption})));
         const policies = [
-          {algorithms: [algorithm], encryption: [encryption], timeout: 5000, key_resolver: () => Seal.ok({algorithm, key: owner})},
-          {algorithms: [algorithm], encryption: [encryption], timeout: 5000, key_resolver: () => Seal.ok({algorithm, unwrap: (ek: unknown, h: Seal.JoseProtectedHeader, c: Seal.Context) => manager!.unwrap(ek, h, c)})},
+          {algorithms: [algorithm], encryption: [encryption], timeout: 5000, max_plaintext: 1048576, key_resolver: () => Seal.ok({algorithm, key: owner})},
+          {algorithms: [algorithm], encryption: [encryption], timeout: 5000, max_plaintext: 1048576, key_resolver: () => Seal.ok({algorithm, unwrap: (ek: unknown, h: Seal.JoseProtectedHeader, c: Seal.Context) => manager!.unwrap(ek, h, c)})},
         ];
         for (const first of [0, 1]) {
           const cek = Uint8Array.from({length}, (_, i) => i + 1); cek[0] = first;

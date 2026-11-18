@@ -1,5 +1,5 @@
 /** The public package version. */
-export const VERSION = '0.5.0';
+export const VERSION = '0.5.1';
 /** The immutable public conformance corpus release and index digest. */
 export const CORPUS_PIN = Object.freeze({tag: 'v1.0.0', commit: '511fed142044ccea28bdcbb317c091cb2c8a515d', indexSha256: '34dcdcae8af03d45d7bf222d46cd368a683b365ae2f470756dd1d461c9ecd798'});
 // RequestSeal.StructuredFields ceilings at v1.0.0 (511fed1).
