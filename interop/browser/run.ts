@@ -31,7 +31,7 @@ async function main(): Promise<void> {
       let browser;
       try {browser = await engine.launch();} catch (error) {failed(name, 'launch', error); continue;}
       try {
-        assert.ok(Object.hasOwn(table[name] ?? {}, browser.version()), 'Browser release must match the declared CI matrix');
+        assert.ok(Object.hasOwn(table[name] ?? {}, browser.version()), `Browser release ${browser.version()} must match the declared CI matrix`);
         const modes = red ? [true] : [false, true];
         for (const planted of modes) {
           const context = await browser.newContext();
