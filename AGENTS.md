@@ -58,8 +58,7 @@ install, installs are frozen and every manifest declares the same npm. Qualifica
 cache and never installs this package from npm. Both Elixir peer projects retain
 locked fetching and both advisory feeds. Keep action SHAs and version comments exact.
 Measure timeouts on cold green jobs, use the five-minute floor and 90-minute cap,
-and replace `90 # no green run yet` after the first green run. Remeasure Bun after
-its first green run with the setup cache disabled.
+and replace `90 # no green run yet` after the first green run.
 
 Publication and Pages are default-branch dispatches only. Agents never dispatch,
 publish, deploy, tag, push mirrors, or handle registry keys. Infra obtains owner

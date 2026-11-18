@@ -7,7 +7,7 @@ permissions:
 jobs:
   toolchains:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # no green run yet
+    timeout-minutes: 5 # Run 44376795843: cold job 10s; no cache restored.
     outputs:
       nodes: ${{ steps.versions.outputs.nodes }}
       native: ${{ steps.versions.outputs.native }}
@@ -25,7 +25,7 @@ jobs:
         run: python3 -I -B scripts/tool-versions.py >> "$GITHUB_OUTPUT"
   node:
     needs: toolchains
-    timeout-minutes: 7 # Run 44226062526: slowest cold Node lane 203s; no cache restored.
+    timeout-minutes: 8 # Run 44376795843: slowest cold Node lane, 22.12.0 215s; no cache restored.
     name: Node ${{ matrix.node == '26.11.1' && '26' || matrix.node }}
     runs-on: ubuntu-24.04
     services:
@@ -108,7 +108,7 @@ jobs:
       - run: npm pack --dry-run
   native:
     needs: toolchains
-    timeout-minutes: 10 # Run 44221651870: cold Deno 261s; run 44215270545: cached Bun 245s + 30s cold allowance; remeasure first cold Bun green.
+    timeout-minutes: 9 # Run 44221651870: slowest cold lane, Deno 261s; run 44376795843: cold Bun 236s; no cache restored.
     name: ${{ matrix.runtime }}
     runs-on: ubuntu-24.04
     services:
