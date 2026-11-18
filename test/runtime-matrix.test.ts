@@ -16,7 +16,16 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   const denos = [...ci.matchAll(/deno-version: '([^']+)'/g)].map(m => m[1]!);
   const buns = [...ci.matchAll(/bun-version: '([^']+)'/g)].map(m => m[1]!);
   for (const version of [...denos, ...buns]) assert.match(version, /^\d+\.\d+\.\d+$/);
-  const browsers = /playwright install --with-deps ([a-z ]+)/.exec(ci)?.[1]?.trim().split(/ +/) ?? [];
+  const browserJob = ci.split('  browsers:\n')[1]!.split('\n  reciprocal:')[0]!;
+  const image = /image: mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble@sha256:[a-f0-9]{64}\b/.exec(browserJob);
+  assert.ok(image, 'browser CI uses a versioned, digest-pinned official Playwright image');
+  const browserLock = JSON.parse(read('interop/browser/package-lock.json'));
+  assert.equal(image[1], browserLock.packages['node_modules/playwright'].version, 'image and lockfile use the same Playwright');
+  assert.equal(/expected="([\d.]+)"/.exec(browserJob)?.[1], image[1], 'installed-version guard names the image version');
+  assert.match(browserJob, /options: --init --ipc=host/);
+  assert.match(browserJob, /HOME: \/root/);
+  assert.doesNotMatch(browserJob, /playwright install|install-deps/);
+  const browsers = /const engines: Record<string, BrowserType> = \{([a-z, ]+)\}/.exec(read('interop/browser/run.ts'))?.[1]?.split(',').map(s => s.trim()) ?? [];
   assert.deepEqual(browsers, ['chromium', 'firefox', 'webkit']);
 
   const policy = JSON.parse(read('tools/conformance/runtime-limits.json'));
@@ -61,6 +70,7 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   assert.equal(pkg.engines.node, '>=' + tokens[0]);
   const browser = JSON.parse(read('interop/browser/package.json'));
   assert.match(browser.devDependencies.playwright, /^\d+\.\d+\.\d+$/);
+  assert.equal(browser.devDependencies.playwright, image[1]);
   assert.equal(pkg.devDependencies.playwright, undefined);
   assert.deepEqual(Object.keys(browser.devDependencies), ['playwright']);
   const publish = read('.github/workflows/publish.yml');

@@ -9,6 +9,12 @@ a release commit before it lands; `publish.yml` stages the archive from the defa
 The Node 26 job remains named `Node 26`; all Node pins and installed-version
 assertions use exact patch versions.
 
+The browser job uses the official Playwright 1.64.1 Noble container pinned by
+digest, with all three engines and their OS packages already installed. It
+refuses an installed Playwright version that differs from the image. The job
+sets `HOME=/root` for Firefox and uses `--init --ipc=host` for browser processes.
+Node is still installed from `.tool-versions` and checked for an exact match.
+
 ## Tested runtime lanes
 
 | Runtime lane | Version | Declared runtime limitations |

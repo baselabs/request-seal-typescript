@@ -187,6 +187,11 @@ jobs:
   browsers:
     runs-on: ubuntu-24.04
     timeout-minutes: 5 # Run 43813493933: green job 92s.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      options: --init --ipc=host
+    env:
+      HOME: /root # Firefox requires the current user's home in a root container.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -202,8 +207,12 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix interop/browser --ignore-scripts
       - run: npm audit --prefix interop/browser --audit-level=high
-      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Refuse a different Playwright version
         working-directory: interop/browser
+        run: |
+          expected="1.64.1"
+          actual="$(node -p 'require("playwright/package.json").version')"
+          test "$actual" = "$expected" || { echo "::error::Installed Playwright $actual differs from container image Playwright $expected; update the lockfile and image together"; exit 1; }
       - run: npm run build
       - run: npm run build --prefix interop/browser
       - run: npm test --prefix interop/browser
