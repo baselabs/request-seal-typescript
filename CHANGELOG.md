@@ -1,11 +1,5 @@
 # Changelog
 
-## Unreleased
-
-- Move TypeDoc’s `minimatch` dependency from 10.2.6 to the first fixed version, 11.0.1.
-- Audit every locked interop package in CI, including both Mix projects with `mix_audit` as development and test tooling.
-- Update publication instructions for the owner-dispatched `publish.yml` workflow.
-
 ## 0.5.0 - 2026-11-11
 
 - Security: Web Bot Auth required replay could accept a captured request again after relabeling, removing or recombining its signatures (every release through 0.4.0; [GHSA-wqp2-3rvg-936p](https://github.com/baselabs/request-seal-typescript/security/advisories/GHSA-wqp2-3rvg-936p)). Affected: `WebBotAuth.verify` with a required replay policy. Not affected: generic `verify`, and `WebBotAuth.verify` with `replay: "not_required"`. What to do: upgrade; if you verify nested or multi-signature envelopes with required replay, switch them to `replay: "not_required"` and enforce single use in your application.
