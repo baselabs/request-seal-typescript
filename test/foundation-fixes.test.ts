@@ -108,7 +108,9 @@ test('OTP JSON edge fixture drives expectations', async () => {
 });
 test('native CI pins exact releases and required tests', () => {
   const ci = read('../.github/workflows/ci.yml');
-  assert.match(ci, /deno-version: ['"]?v?\d+\.\d+\.\d+/); assert.match(ci, /bun-version: ['"]?\d+\.\d+\.\d+/);
+  const versions = read('../.tool-versions');
+  assert.match(versions, /^deno \d+\.\d+\.\d+(?: \d+\.\d+\.\d+)+$/m); assert.match(versions, /^bun \d+\.\d+\.\d+$/m);
+  assert.match(ci, /deno-version: \$\{\{ matrix\.version \}\}/); assert.match(ci, /bun-version: \$\{\{ matrix\.version \}\}/);
   assert.doesNotMatch(ci, /setup-bun@[^\n]+# v2\s*\n/);
   assert.equal((ci.match(/test\/\*\.test\.ts/g) ?? []).length, 2);
 

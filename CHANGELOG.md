@@ -1,14 +1,11 @@
 # Changelog
 
-## Unreleased
-
-- Resume approved npm publications by comparing registry archive digests and downloaded bytes with the inspected archive; refuse deprecated, unpublished, mismatched, or tagged versions and package names with no public release. Pending stages remain owner-approved and duplicate staging fails closed.
-- Retain release archives, checksums, package metadata, changelog, public read-back metadata, and available provenance together for the versioned GitHub release. Verify the published package in a separate keyless consumer job after upload and public read-back.
-- Declare every exact runtime lane in `.tool-versions` using only tools asdf and mise install, read npm from the root `packageManager` and require every manifest to declare it, refuse differing runtimes, remove the Bun setup cache, and measure job limits from hosted green runs.
-
 ## 0.5.1 - 2026-11-17
 
 - Make RSA-OAEP custody key agreement checks deterministic by fixing only the health-check CEK's first octet to `0x01`; the remaining octets and real JWE CEKs stay random. Declare WebKit 27.2's Linux x64 libgcrypt defect that drops leading-zero CEK octets as `custody/rsa_oaep_leading_zero_cek`, observed as `jose/decryption_failed`. Browser checks cover both RSA hashes and AES sizes with fixed leading-zero and nonzero CEKs, and require native proof of truncation before accepting that error for a random ciphertext.
+- Resume approved npm publications by comparing registry archive digests and downloaded bytes with the inspected archive; refuse deprecated, unpublished, mismatched, or tagged versions and package names with no public release. Pending stages remain owner-approved and duplicate staging fails closed.
+- Retain release archives, checksums, package metadata, changelog, public read-back metadata, and available provenance together for the versioned GitHub release. Verify the published package in a separate keyless consumer job after upload and public read-back.
+- Declare every exact runtime lane in `.tool-versions` using only tools asdf and mise install, read npm from the root `packageManager` and require every manifest to declare it, refuse differing runtimes, remove the Bun setup cache, and measure job limits from hosted green runs.
 
 ## 0.5.0 - 2026-11-11
 

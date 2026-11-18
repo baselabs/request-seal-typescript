@@ -99,7 +99,7 @@ test('qualification has one verdict and no setup action writes or restores an ap
   assert.match(verdict, /^    if: always\(\)/);
   assert.doesNotMatch(verdict, /^    name:/m);
   assert.match(verdict, /needs: \[toolchains, node, native, os-trust-denied, browsers, reciprocal\]/);
-  assert.doesNotMatch(source, /actions\/cache@|actions\/cache\/save@|cache: true|no-cache: false|package-manager-cache: true/);
+  assert.doesNotMatch(source, /actions\/cache@|actions\/cache\/save@|^\s+cache: true|no-cache: false|package-manager-cache: true/m);
   assert.match(source, /bun-version: \$\{\{ matrix\.version \}\}\n\s+no-cache: true/);
   for (const file of ['ci.yml', 'publish.yml', 'pages.yml']) {
     const workflow = read('.github/workflows/' + file);
