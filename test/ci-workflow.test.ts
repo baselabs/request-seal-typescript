@@ -62,3 +62,18 @@ test('CI PostgreSQL service images use immutable Linux image digests', () => {
   assert.equal(images.length, 3, 'Node, native, and reciprocal jobs each have one PostgreSQL service');
   for (const image of images) assert.match(image!, /^postgres:18@sha256:[a-f0-9]{64}$/);
 });
+
+test('publication confirms the package exists before checking its version or staging', () => {
+  const source = read('.github/workflows/publish.yml');
+  const gate = source.split("node --input-type=module <<'JAVASCRIPT'\n")[1]!.split('          JAVASCRIPT')[0]!;
+  assert.match(gate, /const \{name\} = JSON\.parse\(readFileSync\('package\.json', 'utf8'\)\)/);
+  assert.match(gate, /fetch\(`https:\/\/registry\.npmjs\.org\/\$\{encodeURIComponent\(name\)\}`/);
+  assert.match(gate, /signal: AbortSignal\.timeout\(30_000\)/);
+  assert.match(gate, /catch \{\s+throw new Error\(`npm registry could not be read for \$\{name\}`\)/);
+  assert.match(gate, /assert\.notEqual\(packageResponse\.status, 404, `\$\{name\} has never been published to npm: this workflow publishes new versions of existing packages only\. A first publication is the owner's decision\.`\)/);
+  assert.match(gate, /assert\.equal\(packageResponse\.status, 200, `npm registry could not be read/);
+  const guardStep = source.indexOf('- name: Refuse a package name the registry has never had');
+  const versionStep = source.indexOf('- name: Refuse a published or tagged version');
+  assert.ok(guardStep >= 0 && guardStep < versionStep);
+  assert.ok(versionStep < source.indexOf('npm stage publish'));
+});

@@ -24,6 +24,9 @@ For a pin move, run the same command with the new tag and `--update-pin`. It ver
 
 `npm run conformance` runs the independently pinned smoke corpus and the released corpus under the same strict execution rules as CI. Every surface and item format must have an execution adapter. Executed plus not applicable plus runtime limited must equal listed, and the named known-positive case must match successfully. Unsupported surfaces, unsupported formats, integrity failures and disagreements fail the run. Keep the corpus outside the npm tarball. The complete CI matrix qualifies a `kci/**` commit before it lands on the default branch. The owner dispatches `publish.yml` there, in environment `publish`: it installs the exact `.tool-versions` runtime and frozen dependencies, refuses an existing version or tag, builds the library and docs, inspects and hashes the archive, and stages those bytes with provenance. Approval on npmjs.com completes publication. Infra reads the publication back and then tags the published commit; the workflow creates no tag and does not rerun qualification.
 
+The publication workflow publishes new versions of existing npm packages only and
+refuses a package name the registry has never had. A first publication is the owner's decision.
+
 The package uses ESM with declaration exports. Use a modern TypeScript module resolver (`nodenext` or `bundler`); `node10` resolution cannot resolve the package's subpath declaration exports.
 
 ## Runtime test compatibility

@@ -44,6 +44,21 @@ jobs:
         run: npm install --global npm@11.19.0 --ignore-scripts
       - name: Install with the frozen lockfile
         run: npm ci
+      - name: Refuse a package name the registry has never had
+        run: |
+          node --input-type=module <<'JAVASCRIPT'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const {name} = JSON.parse(readFileSync('package.json', 'utf8'));
+          let packageResponse;
+          try {
+            packageResponse = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {signal: AbortSignal.timeout(30_000)});
+          } catch {
+            throw new Error(`npm registry could not be read for ${name}`);
+          }
+          assert.notEqual(packageResponse.status, 404, `${name} has never been published to npm: this workflow publishes new versions of existing packages only. A first publication is the owner's decision.`);
+          assert.equal(packageResponse.status, 200, `npm registry could not be read for ${name} (HTTP ${packageResponse.status})`);
+          JAVASCRIPT
       - name: Refuse a published or tagged version
         run: |
           node --input-type=module <<'JAVASCRIPT'
