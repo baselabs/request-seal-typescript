@@ -186,7 +186,7 @@ jobs:
         run: deno test --no-check --allow-read --allow-env=REQUEST_SEAL_EXPECT_DENIED_ROOTS test/discovery-os-trust.test.ts
   browsers:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5 # Run 43813493933: green job 92s.
+    timeout-minutes: 5 # Run 44212181768: green job 62s in the pinned Playwright image.
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
       options: --init --ipc=host
@@ -286,7 +286,7 @@ jobs:
     if: always()
     needs: [node, native, os-trust-denied, browsers, reciprocal]
     runs-on: ubuntu-24.04
-    timeout-minutes: 5 # no green run yet
+    timeout-minutes: 5 # Run 44212181768: green job 3s.
     steps:
       - name: Require every qualification job to succeed
         env:
