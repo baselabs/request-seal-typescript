@@ -304,6 +304,8 @@ export async function local(
         );
         if (spec.unwrap) {
           const cek = subtle.random(new Uint8Array(32));
+          // WebKit's libgcrypt mpiData drops leading zeros on RSA-OAEP decrypt.
+          cek[0] = 1;
           const aes = await subtle.importKey(
             'raw',
             cek,

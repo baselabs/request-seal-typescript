@@ -97,6 +97,19 @@ test('browser policy validates the whole table and rejects unknown fields', () =
   assert.match(read('.gitignore'), /interop\/browser\/\.generated\//);
 });
 
+test('browser limitation descriptions agree with the registry', () => {
+  const table = JSON.parse(read('tools/conformance/runtime-limits.json'));
+  const docs = read('docs/reference/corpus-format.md');
+  const paragraph = docs.split('The browser suite reads the same file.')[1]!.split('\n\n')[0]!;
+  const entries = ['chromium', 'firefox', 'webkit'].flatMap(engine => Object.values(table[engine]).flat()) as {id: string; observed: string; items: number[]; platforms?: string[]}[];
+  const documented = [...paragraph.matchAll(/`([a-z_]+\/[A-Za-z0-9_.-]+)`/g)].map(match => match[1]);
+  assert.deepEqual(documented.sort(), [...new Set(entries.flatMap(entry => [entry.id, entry.observed]))].sort(), 'corpus guide names every browser limitation and exact outcome');
+  for (const entry of entries) {
+    assert.deepEqual(entry.items, [1]);
+    for (const platform of entry.platforms ?? []) assert.ok(paragraph.includes('`' + platform + '`'));
+  }
+});
+
 test('Firefox signing is supported and its body allocation bound is documented', () => {
   const table = JSON.parse(read('tools/conformance/runtime-limits.json'));
   assert.deepEqual(table.firefox['157.0'], []);

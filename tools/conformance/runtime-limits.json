@@ -77,6 +77,17 @@
           "linux-x64"
         ],
         "reason": "Observed with Playwright 1.64.1 on linux-x64: WebKit 27.2 importKey(\"pkcs8\") rejects every Ed25519 private key whose 32-byte seed begins with 0x00 (DataError; 100 of 100 controlled seeds, all 25 failures among 5,000 random keys). JWK import of the same keys succeeds. Local custody refuses the PKCS8 form as invalid_key."
+      },
+      {
+        "id": "custody/rsa_oaep_leading_zero_cek",
+        "items": [
+          1
+        ],
+        "observed": "jose/decryption_failed",
+        "platforms": [
+          "linux-x64"
+        ],
+        "reason": "Observed with Playwright 1.64.1 on linux-x64: WebKit 27.2's libgcrypt backend calls mpiData(valueSexp) in CryptoAlgorithmRSA_OAEPGCrypt.cpp gcryptDecrypt (line 109, revision aa697ddd0312b191de5fb13b580f19159d39c26f). GCryptUtilities.cpp mpiData (line 133) prints the recovered message as a minimal unsigned MPI, dropping every leading 0x00 octet. RSA-OAEP and RSA-OAEP-256 decrypt or unwrapKey therefore shorten leading-zero A128GCM/A256GCM CEKs, and JWE decryption returns decryption_failed. The encrypt side is unaffected: gcryptEncrypt uses mpiZeroPrefixedData(aSexp, keySizeInBytes) at line 72."
       }
     ]
   },

@@ -28,7 +28,7 @@ Node is still installed from `.tool-versions` and checked for an exact match.
 | Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
 | Chromium | 156.0.8078.80 | Browser Fetch verification returns `adapter/invalid_request`. |
 | Firefox | 157.0 | Browser Fetch verification returns `adapter/invalid_request`. |
-| WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. `custody/ed25519_pkcs8_leading_zero_seed` item 1 on linux-x64: `custody/invalid_key`. Browser Fetch verification returns `adapter/invalid_request`. |
+| WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. `custody/ed25519_pkcs8_leading_zero_seed` item 1 on linux-x64: `custody/invalid_key`. `custody/rsa_oaep_leading_zero_cek` item 1 on linux-x64: `jose/decryption_failed`. Browser Fetch verification returns `adapter/invalid_request`. |
 
 ## Node floor and engines
 
@@ -84,6 +84,7 @@ limitations fail rather than being skipped silently.
 | Deno 2.5.6 | All configured platforms | The same vetted-socket HTTPS discovery returns `discovery/invalid_response`; the real-peer limitation test executes it. |
 | WebKit 27.2 | macOS arm64 | `subtle.sign("Ed25519", key, new Uint8Array())` produces a signature that verifies false; custody's empty-message key health check returns `custody/invalid_key`. |
 | WebKit 27.2 | Linux x64 | `importKey("pkcs8")` rejects an Ed25519 private key whose seed begins with `0x00`; `Custody.local` given that PKCS8 form returns `custody/invalid_key`. The JWK form of the same key is accepted. |
+| WebKit 27.2 | Linux x64 | The libgcrypt backend's `gcryptDecrypt` uses `mpiData`, dropping leading `0x00` octets from RSA-OAEP and RSA-OAEP-256 plaintext. Leading-zero A128GCM/A256GCM CEKs therefore return `jose/decryption_failed`. RSA encryption is unaffected. |
 
 Firefox 157.0 has no `Request.body` accessor and materializes request bodies at
 construction. The adapter uses `clone().arrayBuffer()` when the body is undefined;
@@ -99,6 +100,15 @@ independent empty-message signature in [RFC 8032 test 1](https://www.rfc-editor.
 The [WebCrypto Ed25519 contract](https://w3c.github.io/webcrypto/#ed25519-operations)
 permits empty messages. Limitations remain scoped to their exact engine and platform.
 The harness uses published Ed25519 keys for repeatable custody and discovery checks.
+
+On Linux x64, the same backend shortens leading-zero RSA-OAEP CEKs during native
+decryption or unwrapping. Custody's key agreement check uses a random CEK with its
+first octet fixed to `0x01`; real JWE CEKs remain uniformly random, so affected
+ciphertexts fail closed without exposing or padding recovered CEK bytes in JavaScript.
+The browser suite probes fixed leading-zero and nonzero CEKs for both RSA hashes
+and both AES sizes. A random round-trip failure is accepted only when native
+RSA decryption proves that exact ciphertext recovered fewer CEK octets than required
+and the library returns the declared error.
 
 Fetch verification remains restricted to the measured runtime allowlist,
 currently `deno:2.5.6`. Browsers and unrecorded versions return

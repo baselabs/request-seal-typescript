@@ -8,8 +8,7 @@ const payload = () => crypto.getRandomValues(new Uint8Array(257));
 const hex = (text: string) => new Uint8Array(text.match(/../g)!.map(byte => parseInt(byte, 16)));
 // RFC 8410 Ed25519 PKCS8 framing before the 32-byte seed.
 const ed25519Pkcs8 = (seed: string) => hex('302e020100300506032b657004220420' + seed);
-// RFC 8032 test 1. Linux WebKit 27.2 Ed25519 generateKey intermittently throws
-// OperationError, so the page imports this published key instead of generating one.
+// RFC 8032 test 1 avoids Linux WebKit 27.2 generateKey failures: CryptoKeyOKPGCrypt.cpp uses mpiData on generated q/d.
 const rfc8032Test1 = {seed: '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60', publicKey: 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'};
 const keyPair = async (name: string, hash = 'SHA-256'): Promise<CryptoKeyPair> => name === 'Ed25519'
   ? {privateKey: await crypto.subtle.importKey('pkcs8', ed25519Pkcs8(rfc8032Test1.seed), 'Ed25519', true, ['sign']),
@@ -17,6 +16,16 @@ const keyPair = async (name: string, hash = 'SHA-256'): Promise<CryptoKeyPair> =
   : name === 'ECDSA'
     ? crypto.subtle.generateKey({name, namedCurve: hash === 'SHA-384' ? 'P-384' : 'P-256'}, true, ['sign', 'verify'])
     : crypto.subtle.generateKey({name, modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash}, true, name === 'RSA-OAEP' ? ['encrypt', 'decrypt'] : ['sign', 'verify']);
+
+async function assertRsaOaepLimit(result: Seal.Result<unknown>, wire: string, privateKey: CryptoKey, length: 16 | 32): Promise<void> {
+  const limit = limitation('custody/rsa_oaep_leading_zero_cek');
+  assert.ok(limit, 'RSA-OAEP failure needs a declared runtime limitation');
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.error.kind + '/' + result.error.reason, limit.observed);
+  const recovered = new Uint8Array(await crypto.subtle.decrypt({name: 'RSA-OAEP'}, privateKey, value(Seal.decodeBase64Url(wire.split('.')[1]))));
+  try {assert.ok(recovered.length < length, 'this ciphertext must prove the engine truncated its CEK');}
+  finally {recovered.fill(0);}
+}
 
 test('owned byte and JSON codecs preserve octets and reject noncanonical input', () => {
   for (const length of [0, 1, 2, 3, 255, 256, 257]) {
@@ -107,6 +116,51 @@ test('Ed25519 PKCS8 custody accepts a seed with a leading zero byte or its exact
   if (fromPkcs8.ok) await fromPkcs8.value.release();
 });
 
+test('RSA-OAEP preserves leading-zero CEKs or returns its exact declared limitation', async () => {
+  const limit = limitation('custody/rsa_oaep_leading_zero_cek'), bytes = payload();
+  for (const algorithm of ['RSA-OAEP', 'RSA-OAEP-256'] as const) {
+    const pair = await keyPair('RSA-OAEP', algorithm === 'RSA-OAEP' ? 'SHA-1' : 'SHA-256');
+    const material = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+    const owner = value(await Seal.Custody.local({jwe: algorithm}, material, {format: 'pkcs8'}));
+    let manager: Seal.KeyManagementHandle | undefined;
+    try {
+      manager = value(await Seal.KeyManagement.local(algorithm, material));
+      for (const encryption of ['A128GCM', 'A256GCM'] as const) {
+        const length = encryption === 'A128GCM' ? 16 : 32;
+        const protectedPart = Seal.encodeBase64Url(new TextEncoder().encode(JSON.stringify({alg: algorithm, enc: encryption})));
+        const policies = [
+          {algorithms: [algorithm], encryption: [encryption], timeout: 5000, key_resolver: () => Seal.ok({algorithm, key: owner})},
+          {algorithms: [algorithm], encryption: [encryption], timeout: 5000, key_resolver: () => Seal.ok({algorithm, unwrap: (ek: unknown, h: Seal.JoseProtectedHeader, c: Seal.Context) => manager!.unwrap(ek, h, c)})},
+        ];
+        for (const first of [0, 1]) {
+          const cek = Uint8Array.from({length}, (_, i) => i + 1); cek[0] = first;
+          const iv = crypto.getRandomValues(new Uint8Array(12));
+          const encryptedKey = new Uint8Array(await crypto.subtle.encrypt({name: 'RSA-OAEP'}, pair.publicKey, cek));
+          const aes = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+          const sealed = new Uint8Array(await crypto.subtle.encrypt({name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(protectedPart), tagLength: 128}, aes, bytes));
+          const parts = [protectedPart, Seal.encodeBase64Url(encryptedKey), Seal.encodeBase64Url(iv), Seal.encodeBase64Url(sealed.subarray(0, -16)), Seal.encodeBase64Url(sealed.subarray(-16))];
+          const wire = parts.join('.'), recovered = new Uint8Array(await crypto.subtle.decrypt({name: 'RSA-OAEP'}, pair.privateKey, encryptedKey));
+          // Probe the engine independently of both native-unwrap library paths.
+          assert.deepEqual(recovered, first === 0 && limit ? cek.subarray(1) : cek, 'engine RSA-OAEP recovery of a fixed CEK');
+          recovered.fill(0); cek.fill(0);
+          for (const [index, policy] of policies.entries()) {
+            const result = await Seal.JWE.decrypt(wire, policy);
+            if (first === 0 && algorithm === 'RSA-OAEP' && encryption === 'A128GCM' && index === 0) assertOutcome('custody/rsa_oaep_leading_zero_cek', result);
+            if (first === 0 && limit) assert.equal(!result.ok && result.error.kind + '/' + result.error.reason, limit.observed);
+            else assert.deepEqual(value(result).plaintext, bytes);
+            if (first !== 0) {
+              const tag = value(Seal.decodeBase64Url(parts[4])); tag[0]! ^= 1;
+              const changed = [...parts]; changed[4] = Seal.encodeBase64Url(tag);
+              const rejected = await Seal.JWE.decrypt(changed.join('.'), policy);
+              assert.equal(!rejected.ok && rejected.error.kind + '/' + rejected.error.reason, 'jose/decryption_failed');
+            }
+          }
+        }
+      }
+    } finally {material.fill(0); await owner.release(); await manager?.release();}
+  }
+});
+
 for (const algorithm of ['RSA-OAEP', 'RSA-OAEP-256', 'A128GCMKW', 'A256GCMKW', 'dir'] as const)
   for (const encryption of ['A128GCM', 'A256GCM'] as const)
     test(`JWE ${algorithm} ${encryption} authenticates round trips and refuses a changed tag`, async () => {
@@ -127,11 +181,13 @@ for (const algorithm of ['RSA-OAEP', 'RSA-OAEP-256', 'A128GCMKW', 'A256GCMKW', '
           key_resolver: () => Seal.ok(owner ? {algorithm, key: owner} : {algorithm, unwrap: (ek: unknown, h: Seal.JoseProtectedHeader, c: Seal.Context) => (direct ?? manager)!.unwrap(ek, h, c)})};
         for (const bytes of [new Uint8Array(), payload()]) {
           const wire = value(await Seal.JWE.encrypt([['alg', algorithm], ['enc', encryption]], bytes, recipient));
-          assert.deepEqual(value(await Seal.JWE.decrypt(wire, policy)).plaintext, bytes);
+          const result = await Seal.JWE.decrypt(wire, policy);
+          if (!result.ok && pair) await assertRsaOaepLimit(result, wire, pair.privateKey, encryption === 'A128GCM' ? 16 : 32);
+          else assert.deepEqual(value(result).plaintext, bytes);
           const parts = wire.split('.'), tag = value(Seal.decodeBase64Url(parts[4])); tag[0]! ^= 1;
           parts[4] = Seal.encodeBase64Url(tag);
           const rejected = await Seal.JWE.decrypt(parts.join('.'), policy);
-          assert.equal(!rejected.ok && rejected.error.reason, 'decryption_failed');
+          assert.equal(!rejected.ok && rejected.error.kind + '/' + rejected.error.reason, 'jose/decryption_failed');
         }
       } finally {await owner?.release(); await manager?.release(); await direct?.release();}
     });
@@ -149,9 +205,12 @@ test('nested JOSE releases the authenticated inner payload and rejects deeper ne
       jwe: {algorithms: ['RSA-OAEP-256'], encryption: ['A256GCM'], timeout: 5000, max_plaintext: 1048576, key_resolver: () => Seal.ok({algorithm: 'RSA-OAEP-256', key: recipient})},
       jws: {algorithms: ['HS256'], timeout: 5000, key_resolver: () => Seal.ok({algorithm: 'HS256', key: signer})},
     };
-    assert.deepEqual(value(await Seal.Nested.decrypt(outer, policy, {content_types: ['JWT']})).jws.payload, bytes);
+    const opened = await Seal.Nested.decrypt(outer, policy, {content_types: ['JWT']});
+    if (!opened.ok) await assertRsaOaepLimit(opened, outer, pair.privateKey, 32);
+    else assert.deepEqual(opened.value.jws.payload, bytes);
     const deeper = value(await Seal.JWE.encrypt(headers, outer, recipient));
     const rejected = await Seal.Nested.decrypt(deeper, policy, {content_types: ['JWT']});
-    assert.equal(!rejected.ok && rejected.error.reason, 'nesting_depth');
+    if (!rejected.ok && rejected.error.reason === 'decryption_failed') await assertRsaOaepLimit(rejected, deeper, pair.privateKey, 32);
+    else assert.equal(!rejected.ok && rejected.error.reason, 'nesting_depth');
   } finally {await signer.release(); await recipient.release();}
 });

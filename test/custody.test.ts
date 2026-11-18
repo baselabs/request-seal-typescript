@@ -51,6 +51,13 @@ test('custody exports a confined handle and local importer', () => {
     'Custody importer must be exported',
   );
 });
+test('RSA-OAEP custody health-check CEKs have a nonzero first octet and are erased', async () => {
+  const {spawnSync} = await import('node:child_process');
+  const prefix = Object.hasOwn(process.versions, 'deno') ? ['run', '--no-check', '--allow-read'] : Object.hasOwn(process.versions, 'bun') ? ['run'] : ['--experimental-strip-types', '--no-warnings'];
+  const child = spawnSync(process.execPath, [...prefix, 'test/support/rsa-oaep-health-check.ts'], {encoding: 'utf8', timeout: 10000});
+  assert.equal(child.status, 0, child.stdout + child.stderr);
+  assert.match(child.stdout, /PASS real RSA-OAEP health-check CEKs observed and erased/);
+});
 test('private JWK imports metadata agreement and RSA CRT rejection', async () => {
   const {Custody} = api as any;
   assert.ok(Custody);
