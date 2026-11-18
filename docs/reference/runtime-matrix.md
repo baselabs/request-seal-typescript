@@ -2,7 +2,7 @@
 
 CI runs on Linux (`ubuntu-24.04`). Development supports macOS and Linux;
 Windows developers use WSL2. The table below equals the CI runtime lanes: Node 22.12.0, 22.23.1, 24.21.0, and 26.11.1; Deno 2.5.6;
-Bun 1.3.14; the denied-roots-only check on Deno 2.9.7; Chromium 156.0.8078.4, Firefox 157.0, and WebKit 27.2 from
+Bun 1.3.14; the denied-roots-only check on Deno 2.9.7; Chromium 156.0.8078.80, Firefox 157.0, and WebKit 27.2 from
 Playwright 1.64.1. The separate `reciprocal` job runs on Node 24.21.0 with Erlang/OTP
 29.0.3 and Elixir 1.20.3. The complete matrix, including `browsers`, qualifies
 a release commit before it lands; `publish.yml` stages the archive from the default branch.
@@ -26,7 +26,7 @@ Node is still installed from `.tool-versions` and checked for an exact match.
 | Deno 2.5.6 | 2.5.6 | No `tls.getCACertificates`, so `cacerts: "os"` returns `discovery/transport_unavailable`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
 | Deno 2.9.7 | 2.9.7 | Denied OS roots check only; without `--allow-sys=ca`, source creation and fetch return `discovery/transport_unavailable`. Full-suite support is not asserted. |
 | Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
-| Chromium | 156.0.8078.4 | Browser Fetch verification returns `adapter/invalid_request`. |
+| Chromium | 156.0.8078.80 | Browser Fetch verification returns `adapter/invalid_request`. |
 | Firefox | 157.0 | Browser Fetch verification returns `adapter/invalid_request`. |
 | WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. `custody/ed25519_pkcs8_leading_zero_seed` item 1 on linux-x64: `custody/invalid_key`. Browser Fetch verification returns `adapter/invalid_request`. |
 

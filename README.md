@@ -412,6 +412,6 @@ Reference: [glossary](docs/reference/glossary.md), [error reasons](docs/referenc
 
 ## Compatibility
 
-The core runs on Node 22.12.0, 22.23.1, 24.21.0, and 26.11.1, Deno 2.5.6, and Bun 1.3.14. Fetch signs on those runtimes, but Fetch verification supports only Deno 2.5.6. HTTPS discovery requires Node; use caller-owned snapshots elsewhere. In browsers (Chromium 156.0.8078.4, Firefox 157.0, WebKit 27.2), the Fetch adapter signs only. Core `verify` checks a caller-built `Message` under an explicit policy without using the Fetch adapter. See the [runtime matrix](docs/reference/runtime-matrix.md) for exact tested versions, permissions, and limitations.
+The core runs on Node 22.12.0, 22.23.1, 24.21.0, and 26.11.1, Deno 2.5.6, and Bun 1.3.14. Fetch signs on those runtimes, but Fetch verification supports only Deno 2.5.6. HTTPS discovery requires Node; use caller-owned snapshots elsewhere. In browsers (Chromium 156.0.8078.80, Firefox 157.0, WebKit 27.2), the Fetch adapter signs only. Core `verify` checks a caller-built `Message` under an explicit policy without using the Fetch adapter. See the [runtime matrix](docs/reference/runtime-matrix.md) for exact tested versions, permissions, and limitations.
 
 The public error vocabulary, reciprocal peer, and released corpus are pinned to RequestSeal for Elixir 1.0.0. Every corpus surface and asserted item must execute under the same rules in development and release verification. See [the corpus pin](CONTRIBUTING.md) and [reciprocal interoperability](docs/reference/reciprocity.md).

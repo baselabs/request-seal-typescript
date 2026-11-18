@@ -12,7 +12,7 @@ The browser CI lane uses the official Playwright Noble image pinned by digest,
 with Chromium, Firefox, WebKit, and their OS packages preinstalled. The image
 version matches the exact locked Playwright dependency in `interop/browser`;
 an installed-version check refuses drift before running the harness against the built bundle.
-The engines are Chromium 156.0.8078.4, Firefox 157.0, and WebKit 27.2; see the
+The engines are Chromium 156.0.8078.80, Firefox 157.0, and WebKit 27.2; see the
 [runtime matrix](../reference/runtime-matrix.md).
 Their exact version/platform limitations use the shared strict runtime-limits table
 ([0006](0006-declared-runtime-limitations.md)).
