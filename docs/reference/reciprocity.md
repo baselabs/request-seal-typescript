@@ -127,4 +127,5 @@ The corpus and public error vocabulary pin release commit
 `7be50afc500fad4148cbb8368181796858396cd40bb44dd5ad3575bf95c26ea0`;
 its index SHA-256 is `34dcdcae8af03d45d7bf222d46cd368a683b365ae2f470756dd1d461c9ecd798`.
 CI runs the full exchange with locked peers and PostgreSQL and retains its sanitized JSONL artifact.
-The release workflow calls the same CI workflow before publishing; peer or registry failures fail verification.
+Peer or registry failures fail qualification before the release commit lands. The owner then
+dispatches `publish.yml` from the default branch; it stages the inspected archive without rerunning CI.

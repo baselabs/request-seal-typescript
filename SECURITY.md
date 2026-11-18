@@ -23,8 +23,11 @@ provenance; trusted publishing began with 0.2.0.
 
 ## Verifying a release
 
-Releases from 0.2.0 are staged from a version tag by this repository's release
-workflow through npm trusted publishing and carry a signed provenance statement.
+Releases from 0.2.0 carry npm trusted-publishing provenance. The owner now dispatches
+`publish.yml` from the default branch in environment `publish`. It installs the pinned
+runtime and locked dependencies, refuses an already published or tagged version, builds
+the library and docs, inspects and hashes the archive, and stages those exact bytes with
+provenance. Approval on npmjs.com completes publication; infra verifies it before tagging.
 Check an installed copy with:
 
 ```sh

@@ -4,7 +4,8 @@ CI runs on Linux (`ubuntu-24.04`). Development supports macOS and Linux;
 Windows developers use WSL2. The table below equals the CI runtime lanes: Node 22.12.0, 22.23.1, 24.21.0, and 26.11.1; Deno 2.5.6;
 Bun 1.3.14; the denied-roots-only check on Deno 2.9.7; Chromium 156.0.8078.4, Firefox 157.0, and WebKit 27.2 from
 Playwright 1.64.1. The separate `reciprocal` job runs on Node 24.21.0 with Erlang/OTP
-29.0.3 and Elixir 1.20.3. Releases call the same workflow, including `browsers`.
+29.0.3 and Elixir 1.20.3. The complete matrix, including `browsers`, qualifies
+a release commit before it lands; `publish.yml` stages the archive from the default branch.
 The Node 26 job remains named `Node 26`; all Node pins and installed-version
 assertions use exact patch versions.
 

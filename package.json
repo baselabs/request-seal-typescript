@@ -96,7 +96,8 @@
   },
   "overrides": {
     "typedoc": {
-      "typescript": "$typescript"
+      "typescript": "$typescript",
+      "minimatch": "11.0.1"
     }
   }
 }

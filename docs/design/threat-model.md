@@ -41,7 +41,7 @@ The caller controls accepted profiles, trusted origins and proxies, trust anchor
 | Error oracle and data leak | Stable, bounded public reasons; redacted default inspection; one uniform decryption error. | `test/errors.test.ts`, `test/error-branding.test.ts`, `test/jose-uniform.test.ts`. |
 | Cross-profile replay | The trusted profile is part of the replay facts, and callers include it in the commitment. No fallback between profiles. | `test/web-bot-auth-replay.test.ts`, `test/profile.test.ts`. |
 | Corpus compromise | Immutable provenance, independent expected values, a pinned index digest, and a consumer that never regenerates expectations. | `test/conformance.test.ts`, `test/conformance-vendor.test.ts`, `test/upstream-integrity.test.ts`, and `npm run conformance`. |
-| Supply-chain substitution | Zero runtime dependencies, exact development pins, locked dependencies, a package file allowlist, CI actions pinned by commit, release provenance through the trusted publisher with human approval. | `scripts/pack-check.ts`, `test/ci-workflow.test.ts`, and the release workflow. |
+| Supply-chain substitution | Zero runtime dependencies, exact development pins, locked dependencies, a package file allowlist, CI actions pinned by commit, release provenance through the trusted publisher with human approval. | `scripts/pack-check.ts`, `test/ci-workflow.test.ts`, and [`publish.yml`](../../.github/workflows/publish.yml). |
 
 ## Profile-specific hazards
 

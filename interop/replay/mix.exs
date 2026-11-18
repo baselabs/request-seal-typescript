@@ -9,7 +9,8 @@ defmodule RequestSealReplayInterop.MixProject do
       deps: [
         # Exact published conformance peer, matching the corpus and error vocabulary release.
         {:request_seal, "== 1.0.0"},
-        {:postgrex, "~> 0.22.4"}
+        {:postgrex, "~> 0.22.4"},
+        {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
       ]
     ]
   end

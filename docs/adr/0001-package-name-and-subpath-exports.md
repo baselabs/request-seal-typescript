@@ -13,7 +13,7 @@ Publish one package, `@request-seal/core`. The package root holds the portable c
 | `@request-seal/core/custody-ssh-agent` | OpenSSH agent custody |
 | `@request-seal/core/replay-postgres` | Replay store over a caller-owned query function |
 
-The root’s import graph excludes the Node-only subpaths, which are exposed through separate package exports. The package also declares sideEffects: false for bundlers. Releases are tagged, verified by the full battery and staged through the trusted publisher with provenance; npm approval makes a staged version live.
+The root’s import graph excludes the Node-only subpaths, which are exposed through separate package exports. The package also declares sideEffects: false for bundlers. Release commits pass the full CI battery before landing. The owner dispatches `publish.yml` from the default branch in environment `publish` to stage the inspected archive through the trusted publisher with provenance; npm approval makes it live, and infra verifies publication before tagging.
 
 ## Consequences
 

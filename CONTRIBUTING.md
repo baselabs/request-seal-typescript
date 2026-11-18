@@ -22,7 +22,7 @@ node --experimental-strip-types --no-warnings scripts/vendor-corpus.ts v1.0.0
 
 For a pin move, run the same command with the new tag and `--update-pin`. It verifies the release asset checksum, archive paths, inventory digests, release commit, and index digest, then replaces the corpus and updates `src/constants.ts` together. Review both in one change; never regenerate expectations.
 
-`npm run conformance` runs the independently pinned smoke corpus and the released corpus under the same strict execution rules as the release workflow. Every surface and item format must have an execution adapter. Executed plus not applicable plus runtime limited must equal listed, and the named known-positive case must match successfully. Unsupported surfaces, unsupported formats, integrity failures and disagreements fail the run. Keep the corpus outside the npm tarball. Releases run the complete CI matrix before staging a provenance-bearing package; approval on npmjs.com completes publication.
+`npm run conformance` runs the independently pinned smoke corpus and the released corpus under the same strict execution rules as CI. Every surface and item format must have an execution adapter. Executed plus not applicable plus runtime limited must equal listed, and the named known-positive case must match successfully. Unsupported surfaces, unsupported formats, integrity failures and disagreements fail the run. Keep the corpus outside the npm tarball. The complete CI matrix qualifies a `kci/**` commit before it lands on the default branch. The owner dispatches `publish.yml` there, in environment `publish`: it installs the exact `.tool-versions` runtime and frozen dependencies, refuses an existing version or tag, builds the library and docs, inspects and hashes the archive, and stages those bytes with provenance. Approval on npmjs.com completes publication. Infra reads the publication back and then tags the published commit; the workflow creates no tag and does not rerun qualification.
 
 The package uses ESM with declaration exports. Use a modern TypeScript module resolver (`nodenext` or `bundler`); `node10` resolution cannot resolve the package's subpath declaration exports.
 
@@ -56,5 +56,5 @@ existing PostgreSQL database. These Elixir requirements apply to the reciprocal
 check, not the TypeScript package. The error extraction check separately needs
 OTP 29 as described above. See [reciprocity](docs/reference/reciprocity.md) for
 isolated workspace installation, the exact published peer, the exchange protocol,
-and local commands. The CI check is named `reciprocal`; release verification runs
-it through the same reusable workflow. Registry failures fail this check.
+and local commands. The CI check is named `reciprocal`; it must pass before the
+release commit lands. Registry failures fail this check.

@@ -42,8 +42,11 @@ jobs:
           node -e 'const expected=process.env.EXPECTED_NODE; const actual=process.versions.node; if (actual!==expected) process.exit(1); console.log(actual)'
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix interop --ignore-scripts
+      - run: npm audit --prefix interop --audit-level=high
       - run: npm ci --prefix interop/adapters --ignore-scripts
+      - run: npm audit --prefix interop/adapters --audit-level=high
       - run: npm ci --prefix interop/migration --ignore-scripts
+      - run: npm audit --prefix interop/migration --audit-level=high
       - run: node --experimental-strip-types --no-warnings --test interop/migration/claims.test.ts
       # The ubuntu-24.04 runner image supplies the required OpenSSH client tools.
       - run: command -v ssh-agent ssh-keygen ssh-add && ssh -V
@@ -119,7 +122,9 @@ jobs:
           bun-version: '1.3.14'
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix interop --ignore-scripts
+      - run: npm audit --prefix interop --audit-level=high
       - run: npm ci --prefix interop/adapters --ignore-scripts
+      - run: npm audit --prefix interop/adapters --audit-level=high
       - run: command -v ssh-agent ssh-keygen ssh-add && ssh -V
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
@@ -247,11 +252,13 @@ jobs:
           test "$actual_otp" = "$expected_otp" || { echo "::error::OTP must be exactly $expected_otp"; exit 1; }
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix interop --ignore-scripts
+      - run: npm audit --prefix interop --audit-level=high
       - run: npm ci --prefix interop/reciprocal --ignore-scripts
+      - run: npm audit --prefix interop/reciprocal --audit-level=high
       - run: mix local.hex --force && mix local.rebar --force
-      - run: mix deps.get --check-locked && mix hex.audit && mix compile --warnings-as-errors
+      - run: mix deps.get --check-locked && mix hex.audit && mix deps.audit && mix compile --warnings-as-errors
         working-directory: interop/elixir
-      - run: mix deps.get --check-locked && mix hex.audit && mix compile --warnings-as-errors
+      - run: mix deps.get --check-locked && mix hex.audit && mix deps.audit && mix compile --warnings-as-errors
         working-directory: interop/replay
       - run: npm run typecheck --prefix interop/reciprocal
       - run: node --experimental-strip-types --no-warnings --test test/peer-process.test.ts test/replay-reciprocal.test.ts test/reciprocal.test.ts test/reciprocal-driver.test.ts test/reciprocal-record.test.ts
