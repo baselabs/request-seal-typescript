@@ -18,7 +18,7 @@ class Tracked extends Original {
     return super.fill(value, start, end);
   }
 }
-function value<T>(result: Result<T>): T {assert.ok(result.ok); return result.value;}
+function value<T>(result: Result<T>): T {assert.ok(result.ok, 'fixture key decodes'); return result.value;}
 function clear(): void {
   for (const entry of erased) entry.before.fill(0);
   erased.length = 0; allocated.clear();
@@ -30,20 +30,20 @@ async function main(): Promise<void> {
   try {
     const control = new Tracked(32).fill(7); control.fill(0);
     assert.equal(erased.length, 1, 'byte tracker observes an actual pre-erasure buffer');
-    assert.ok(erased[0]!.before.every(byte => byte === 7));
-    assert.ok(control.every(byte => byte === 0));
+    assert.ok(erased[0]!.before.every(byte => byte === 7), 'byte tracker copies contents before erasure');
+    assert.ok(control.every(byte => byte === 0), 'byte tracker leaves erasure native');
     clear();
     for (const algorithm of ['RSA-OAEP', 'RSA-OAEP-256'] as const) {
       for (const construct of [
         () => Custody.local({jwe: algorithm}, material, {format: 'pkcs8'}),
         () => KeyManagement.local(algorithm, material),
       ]) {
-        const result = await construct(); assert.ok(result.ok);
+        const result = await construct(); assert.ok(result.ok, algorithm + ' custody construction succeeds');
         const owner = result.value;
         try {
           assert.equal(erased.length, 1, 'each constructor executes the real custody CEK health check once');
           const entry = erased[0]!;
-          assert.equal(entry.before.length, 32);
+          assert.equal(entry.before.length, 32, 'health-check CEK is 32 octets');
           assert.equal(entry.before[0], 1, 'health-check CEK has a fixed nonzero first octet');
           assert.ok(entry.buffer.every(byte => byte === 0), 'the health-check CEK is erased after native import');
         } finally {await owner.release(); clear();}
@@ -52,4 +52,5 @@ async function main(): Promise<void> {
     console.log('PASS real RSA-OAEP health-check CEKs observed and erased');
   } finally {globalThis.Uint8Array = Original; material.fill(0); clear();}
 }
-main().catch(() => {console.error('RSA-OAEP health-check observation failed'); process.exitCode = 1;});
+// Every assertion above carries a fixed message, so reporting it exposes no key or CEK octets.
+main().catch((error: unknown) => {console.error('RSA-OAEP health-check observation failed: ' + (error instanceof Error ? error.message : 'non-Error rejection')); process.exitCode = 1;});
