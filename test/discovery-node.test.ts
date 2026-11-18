@@ -55,6 +55,21 @@ const config = (p: Peer, more: Record<string, unknown> = {}) =>
       ...more,
     }),
   );
+// Records every read of a real second clock, so lifetime oracles can use the
+// request and response instants that discovery itself observed.
+const recordingClock = () => {
+  const reads: number[] = [];
+  const clock = () => {
+    const now = Math.floor(Date.now() / 1000);
+    reads.push(now);
+    return now;
+  };
+  return { reads, clock };
+};
+// RFC 9111 Section 4.2.3 with no Age field: freshness less the larger of the
+// response delay and the apparent age (response instant less the Date field).
+const currentLifetime = (maxAge: number, requested: number, received: number, date: number) =>
+  received + maxAge - Math.max(received - requested, received - date, 0);
 test(
   "invalid DNS server endpoints reject before contacting the TLS publisher",
   { timeout: 15000 },
@@ -162,12 +177,15 @@ test(
       const s = config(p),
         original = new Uint8Array(p.ca);
       p.ca.fill(0);
-      const set = value(await NodeDiscovery.fetch(s));
+      const { reads, clock } = recordingClock();
+      const set = value(await NodeDiscovery.fetch(s, { clock }));
       assert.deepEqual(Object.keys(set.keys), [kid]);
       assert.equal(set.proof, "not_applicable");
-      // RFC 9111 Section 4.2.3: the lifetime is max-age less the apparent age,
-      // which is one second when the Date and the clock read straddle a second.
-      assert.equal(set.expiresAt - set.fetchedAt, 30 - Math.max(set.fetchedAt - sent, 0));
+      // Discovery reads its clock when it sends the request and when the response arrives.
+      assert.equal(reads.length, 2);
+      const [requested, received] = reads as [number, number];
+      assert.equal(set.fetchedAt, received);
+      assert.equal(set.expiresAt, currentLifetime(30, requested, received, sent));
       assert.equal(p.requests, 1);
       p.ca.set(original);
       assert.equal(value(await set.keys[kid]!.key.thumbprint()), kid);
@@ -587,9 +605,14 @@ test(
       });
       assert.ok((await NodeDiscovery.fetch(s)).ok);
       mode = "nested";
-      const set = value(await NodeDiscovery.fetch(s));
-      // The shorter JWKS lifetime governs, less its RFC 9111 apparent age.
-      assert.equal(set.expiresAt - set.fetchedAt, 10 - Math.max(set.fetchedAt - keysSent, 0));
+      const { reads, clock } = recordingClock();
+      const set = value(await NodeDiscovery.fetch(s, { clock }));
+      // Clock reads: client document request and response, then the nested
+      // JWKS request and response. The shorter JWKS lifetime governs.
+      assert.equal(reads.length, 4);
+      const [, received, keysRequested, keysReceived] = reads as [number, number, number, number];
+      assert.equal(set.fetchedAt, received);
+      assert.equal(set.expiresAt, currentLifetime(10, keysRequested, keysReceived, keysSent));
       assert.equal(set.keys[kid]!.sourceType, "cimd");
       assert.equal(set.keys[kid]!.location, `https://localhost:${p.port}/keys`);
       mode = "mismatch";

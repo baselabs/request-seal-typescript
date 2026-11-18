@@ -108,23 +108,32 @@ bytes. Core test passage cannot expand this transport allowlist. See
 
 ## Browser suite
 
-From the repository root on Linux:
+The declared browser releases are the ones in the digest-pinned Playwright image
+that the `browsers` job uses. A `npx playwright install` of the same Playwright
+version can report a different build (Chromium 156.0.8078.4 rather than
+156.0.8078.80), which the runner refuses before testing. Run the suite in that
+image, from the repository root on any Docker host:
 
 ```sh
-npm ci --ignore-scripts
-npm ci --prefix interop/browser --ignore-scripts
-cd interop/browser
-npx playwright install --with-deps chromium firefox webkit
-cd ../..
-npm run build
-npm run build --prefix interop/browser
-npm test --prefix interop/browser
-sh scripts/red-proof.sh npm run test:red --prefix interop/browser
+docker run --rm --init --ipc=host -e HOME=/root -v "$PWD:/src:ro" \
+  mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f \
+  sh -euc '
+    cp -R /src /work && cd /work
+    npm ci --ignore-scripts
+    npm ci --prefix interop/browser --ignore-scripts
+    npm run build
+    npm run build --prefix interop/browser
+    npm test --prefix interop/browser
+    sh scripts/red-proof.sh npm run test:red --prefix interop/browser
+  '
 ```
 
-On macOS, use `npx playwright install chromium firefox webkit` for installation.
-`PLAYWRIGHT_BROWSERS_PATH` can select an existing browser cache. A diagnostic
-can select one engine with
+The checkout is mounted read-only and copied inside the container, so the run
+leaves nothing behind. CI additionally installs the `.tool-versions` Node in the
+image; this command uses the image's own Node. CI qualifies `linux-x64`. On an
+arm64 host Docker selects the image's arm64 variant, where limitations recorded
+for `linux-x64` are not expected; add `--platform linux/amd64` to run the CI
+architecture under emulation. A diagnostic can select one engine with
 `npm test --prefix interop/browser -- --browser=firefox`; CI runs all three.
 
 Playwright is an exact private-workspace devDependency with its own lockfile;

@@ -25,6 +25,12 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   assert.match(browserJob, /options: --init --ipc=host/);
   assert.match(browserJob, /HOME: \/root/);
   assert.doesNotMatch(browserJob, /playwright install|install-deps/);
+  // The documented local browser run uses the same image, options and HOME, and no native install.
+  const localRun = read('docs/reference/runtime-matrix.md').split('## Browser suite\n')[1]!.split('\n## ')[0]!;
+  const localImage = /mcr\.microsoft\.com\/playwright:v\d+\.\d+\.\d+-noble@sha256:[a-f0-9]{64}\b/;
+  assert.equal(localImage.exec(localRun)?.[0], localImage.exec(browserJob)?.[0], 'local and CI browser runs use one image');
+  assert.match(localRun, /docker run --rm --init --ipc=host -e HOME=\/root /);
+  assert.doesNotMatch(localRun, /```sh[^`]*playwright install/);
   const browsers = /const engines: Record<string, BrowserType> = \{([a-z, ]+)\}/.exec(read('interop/browser/run.ts'))?.[1]?.split(',').map(s => s.trim()) ?? [];
   assert.deepEqual(browsers, ['chromium', 'firefox', 'webkit']);
 
