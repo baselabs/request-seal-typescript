@@ -4,7 +4,6 @@ import {readFileSync, mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync,
 import {spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
-import {isUnpublished} from '../scripts/registry-check.ts';
 const read = (p: string) => readFileSync(p, 'utf8');
 test('packed dist rejects an orphan after a source is removed', async () => {
   const {assertPackedSources} = await import('../scripts/pack-check.ts');

@@ -93,7 +93,7 @@ Some rules that keep tests honest:
 
 ## Run this repository's checks
 
-Use Node 22.12.0 or newer on macOS or Linux. Windows developers use WSL2. CI runs on Linux.
+Use Node 22.12.0 or newer and the declared npm 11.19.0 on macOS or Linux. Windows developers use WSL2. CI runs on Linux.
 
 ```sh
 npm ci --ignore-scripts
@@ -102,7 +102,7 @@ npm ci --prefix interop/adapters --ignore-scripts
 npm run check
 ```
 
-`npm run check` runs, in order: `typecheck`, `typecheck:web`, `build`, `test`, `self-checks`, `conformance`, and `pack:check`. The packaging check verifies the allowlist and loads exports and types from an unpacked tarball. TypeScript programs and byte-matched excerpts in repository Markdown run under their declared runtime: Node by default, or the exact `<!-- run: deno -->` or `<!-- run: bun -->` marker within two lines above the fence. API sketches are labeled `text` and need caller-supplied values.
+`npm run check` runs, in order: `typecheck`, `typecheck:web`, `build`, `test`, `self-checks`, `conformance`, and `pack:check`. The packaging check verifies the allowlist and loads exports and types from an unpacked local tarball. Qualification never installs `@request-seal/core` from npm; a separate publication job verifies a registry install only after upload and public read-back. CI reads its exact runtime lanes from `.tool-versions`, refuses installed-version differences, and uses no workflow cache. TypeScript programs and byte-matched excerpts in repository Markdown run under their declared runtime: Node by default, or the exact `<!-- run: deno -->` or `<!-- run: bun -->` marker within two lines above the fence. API sketches are labeled `text` and need caller-supplied values.
 
 CI also runs `npm run docs` (warnings fail) and `node --experimental-strip-types --no-warnings --test interop/migration/claims.test.ts` after installing its dependencies. Build the [API reference](https://baselabs.github.io/request-seal-typescript/) locally with `npm run docs`; output is in `site-dist/`. Deno programs receive only cache/home/PATH settings, read access to the repository, and network access to loopback and JSR; they receive no environment permission.
 

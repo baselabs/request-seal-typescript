@@ -8,5 +8,6 @@
     "exchange": "node --experimental-strip-types --no-warnings --test exchange.test.ts",
     "driver": "node --experimental-strip-types --no-warnings driver.ts"
   },
-  "devDependencies": {"@types/node": "26.6.4", "typescript": "7.0.2"}
+  "devDependencies": {"@types/node": "26.6.4", "typescript": "7.0.2"},
+  "packageManager": "npm@11.19.0"
 }

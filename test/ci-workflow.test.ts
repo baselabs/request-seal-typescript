@@ -63,17 +63,52 @@ test('CI PostgreSQL service images use immutable Linux image digests', () => {
   for (const image of images) assert.match(image!, /^postgres:18@sha256:[a-f0-9]{64}$/);
 });
 
-test('publication confirms the package exists before checking its version or staging', () => {
+test('publication checks the existing name and tag before build, then plans from the inspected archive', () => {
   const source = read('.github/workflows/publish.yml');
-  const gate = source.split("node --input-type=module <<'JAVASCRIPT'\n")[1]!.split('          JAVASCRIPT')[0]!;
-  assert.match(gate, /const \{name\} = JSON\.parse\(readFileSync\('package\.json', 'utf8'\)\)/);
-  assert.match(gate, /fetch\(`https:\/\/registry\.npmjs\.org\/\$\{encodeURIComponent\(name\)\}`/);
-  assert.match(gate, /signal: AbortSignal\.timeout\(30_000\)/);
-  assert.match(gate, /catch \{\s+throw new Error\(`npm registry could not be read for \$\{name\}`\)/);
-  assert.match(gate, /assert\.notEqual\(packageResponse\.status, 404, `\$\{name\} has never been published to npm: this workflow publishes new versions of existing packages only\. A first publication is the owner's decision\.`\)/);
-  assert.match(gate, /assert\.equal\(packageResponse\.status, 200, `npm registry could not be read/);
-  const guardStep = source.indexOf('- name: Refuse a package name the registry has never had');
-  const versionStep = source.indexOf('- name: Refuse a published or tagged version');
-  assert.ok(guardStep >= 0 && guardStep < versionStep);
-  assert.ok(versionStep < source.indexOf('npm stage publish'));
+  const order = ['scripts/registry-check.ts existing', 'Refuse an already-tagged version', 'Build the library and documentation', 'Inspect the exact package archive', 'scripts/registry-check.ts plan', 'npm stage publish', 'scripts/registry-check.ts read-back'];
+  const positions = order.map(text => source.indexOf(text));
+  assert.ok(positions.every(position => position >= 0));
+  assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
+  assert.match(source, /git.*ls-remote.*--tags.*refs\/tags\/v\$\{version\}/);
+  assert.match(source, /assert\.equal\(tags\.trim\(\), '', `v\$\{version\} is already tagged`\)/);
+  assert.match(source, /if: steps\.registry\.outputs\.action == 'stage'/);
+  assert.match(source, /npm stage publish \.\/artifacts\/package\.tgz --provenance --ignore-scripts/);
+  assert.match(source, /if: always\(\) && steps\.inspect\.outcome == 'success'/);
+  assert.match(source, /name: release-assets\n\s+path: artifacts\//);
+  assert.doesNotMatch(source, /NODE_AUTH_TOKEN|NPM_TOKEN|secrets\.|gh release|tags:/);
+});
+
+test('published installs depend on upload, use the same actor gate, and have no environment or key', () => {
+  const source = read('.github/workflows/publish.yml');
+  const upload = source.split('  publish:\n')[1]!.split('  published-package:\n')[0]!;
+  const consumer = source.split('  published-package:\n')[1]!;
+  const gate = (job: string) => /^    if: (.+)$/m.exec(job)![1];
+  assert.equal(gate(upload), gate(consumer));
+  assert.match(consumer, /needs: publish/);
+  assert.doesNotMatch(consumer, /environment:|secrets\.|id-token: write/);
+  assert.match(consumer, /PUBLISHED: \$\{\{ needs\.publish\.outputs\.published \}\}/);
+  assert.match(consumer, /test "\$PUBLISHED" = true/);
+  assert.match(consumer, /npm install --ignore-scripts --registry=https:\/\/registry\.npmjs\.org\/ "\$package_name@\$package_version"/);
+  assert.match(consumer, /npm audit signatures/);
+  assert.match(consumer, /trap 'rm -rf "\$consumer"' EXIT/);
+});
+
+test('qualification has one verdict and no setup action writes or restores an application cache', () => {
+  const source = read('.github/workflows/ci.yml');
+  const verdict = source.split('  qualified:\n')[1]!;
+  assert.match(verdict, /^    if: always\(\)/);
+  assert.doesNotMatch(verdict, /^    name:/m);
+  assert.match(verdict, /needs: \[toolchains, node, native, os-trust-denied, browsers, reciprocal\]/);
+  assert.doesNotMatch(source, /actions\/cache@|actions\/cache\/save@|cache: true|no-cache: false|package-manager-cache: true/);
+  assert.match(source, /bun-version: \$\{\{ matrix\.version \}\}\n\s+no-cache: true/);
+  for (const file of ['ci.yml', 'publish.yml', 'pages.yml']) {
+    const workflow = read('.github/workflows/' + file);
+    const actions = [...workflow.matchAll(/uses: (\S+)@([^\s]+)([^\n]*)/g)];
+    assert.ok(actions.length);
+    for (const [, name, pin, comment] of actions) {
+      assert.match(pin!, /^[a-f0-9]{40}$/);
+      if (!name!.startsWith('baselabs/')) assert.match(comment!, /^ # v\d+\.\d+\.\d+$/);
+    }
+    assert.equal((workflow.match(/uses: actions\/checkout@/g) ?? []).length, (workflow.match(/persist-credentials: false/g) ?? []).length);
+  }
 });

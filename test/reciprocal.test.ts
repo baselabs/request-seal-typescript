@@ -18,12 +18,12 @@ test('the reciprocal peer, corpus and public errors pin the same published relea
 
 test('the reciprocal job requires the published peer before candidate qualification', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
-  assert.match(ci, /^  reciprocal:\n    name: reciprocal\n/m, 'CI exposes the reciprocal check');
+  assert.match(ci, /^  reciprocal:\n    needs: toolchains\n    name: reciprocal\n/m, 'CI exposes the reciprocal check');
   const job = ci.slice(ci.indexOf('  reciprocal:'));
   assert.match(job, /mix deps.get --check-locked/);
   assert.match(job, /npm run exchange/);
   assert.match(job, /version-file: \.tool-versions\n\s+version-type: strict/);
-  assert.match(ci, /needs: \[node, native, os-trust-denied, browsers, reciprocal\]/);
+  assert.match(ci, /needs: \[toolchains, node, native, os-trust-denied, browsers, reciprocal\]/);
   assert.match(readFileSync('.github/workflows/publish.yml', 'utf8'), /npm stage publish/);
 });
 

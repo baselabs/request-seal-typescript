@@ -7,14 +7,20 @@ const read = (file: string) => readFileSync(new URL('../' + file, import.meta.ur
 
 test('documented runtime lanes equal the exact CI lanes and the package floor', () => {
   const ci = read('.github/workflows/ci.yml');
-  const tokens = /node: \[([^\]]+)\]/.exec(ci)?.[1]?.split(',').map(s => s.trim().replace(/^'|'$/g, ''));
+  const tools = new Map(read('.tool-versions').trim().split('\n').map(line => { const [key, ...values] = line.split(/\s+/); return [key!, values] as const; }));
+  const tokens = [...tools.get('nodejs-compat')!, ...tools.get('nodejs')!].sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+  assert.match(ci, /node: \$\{\{ fromJSON\(needs\.toolchains\.outputs\.nodes\) \}\}/);
   assert.ok(tokens);
   for (const token of tokens) assert.match(token, /^\d+\.\d+\.\d+$/, 'every Node lane must pin an exact version');
   assert.deepEqual(tokens, ['22.12.0', '22.23.1', '24.21.0', '26.11.1']);
   assert.match(ci, /name: Node \$\{\{ matrix\.node == '26\.11\.1' && '26' \|\| matrix\.node \}\}/);
   assert.match(ci, /if \(actual!==expected\) process\.exit\(1\)/);
-  const denos = [...ci.matchAll(/deno-version: '([^']+)'/g)].map(m => m[1]!);
-  const buns = [...ci.matchAll(/bun-version: '([^']+)'/g)].map(m => m[1]!);
+  const denos = [tools.get('deno')![0]!, tools.get('deno-os-trust')![0]!];
+  const buns = [tools.get('bun')![0]!];
+  assert.match(ci, /include: \$\{\{ fromJSON\(needs\.toolchains\.outputs\.native\) \}\}/);
+  assert.match(ci, /EXPECTED_RUNTIME: \$\{\{ matrix\.runtime \}\}/);
+  assert.match(ci, /EXPECTED_VERSION: \$\{\{ matrix\.version \}\}/);
+  assert.match(ci, /test "\$actual" = "\$EXPECTED_VERSION"/);
   for (const version of [...denos, ...buns]) assert.match(version, /^\d+\.\d+\.\d+$/);
   const browserJob = ci.split('  browsers:\n')[1]!.split('\n  reciprocal:')[0]!;
   const image = /image: mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble@sha256:[a-f0-9]{64}\b/.exec(browserJob);
@@ -121,7 +127,7 @@ test('Firefox signing is supported and its body allocation bound is documented',
 
 test('CI exercises denied OS roots on an exact newer Deno without sys permission', () => {
   const ci = read('.github/workflows/ci.yml');
-  assert.match(ci, /deno-version: '2\.9\.7'/);
+  assert.match(ci, /deno-version: \$\{\{ needs\.toolchains\.outputs\.deno_os_trust \}\}/);
   assert.match(ci, /REQUEST_SEAL_EXPECT_DENIED_ROOTS: .1.\n\s+run: deno test --no-check --allow-read --allow-env=REQUEST_SEAL_EXPECT_DENIED_ROOTS test\/discovery-os-trust\.test\.ts/);
 });
 

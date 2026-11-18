@@ -4,5 +4,6 @@
   "type": "module",
   "dependencies": {
     "http-message-signatures": "1.0.6"
-  }
+  },
+  "packageManager": "npm@11.19.0"
 }

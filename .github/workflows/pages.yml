@@ -11,7 +11,7 @@ jobs:
   build:
     environment: github-pages
     if: contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)
-    timeout-minutes: 5 # Run 43813493989: green build job 17s.
+    timeout-minutes: 5 # Run 43666140389: cold build job 20s; no cache restored.
     runs-on: ubuntu-24.04
     steps:
       - name: Refuse a ref outside the default branch
@@ -22,14 +22,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Read exact tool versions
+        id: versions
+        run: python3 -I -B scripts/tool-versions.py >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: .tool-versions
+          node-version: ${{ steps.versions.outputs.nodejs }}
           package-manager-cache: false
       - name: Refuse a different Node version
         run: |
-          expected="$(awk '$1 == "nodejs" {print $2}' .tool-versions)"
+          expected='${{ steps.versions.outputs.nodejs }}'
           test "$(node --version)" = "v$expected" || { echo "::error::Node must be exactly $expected"; exit 1; }
+      - name: Install the declared package manager
+        env:
+          EXPECTED_NPM: ${{ steps.versions.outputs.npm }}
+        run: |
+          npm install --global "npm@$EXPECTED_NPM" --ignore-scripts
+          test "$(npm --version)" = "$EXPECTED_NPM"
       - run: npm ci --ignore-scripts
       - run: npm run docs
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
@@ -37,7 +46,7 @@ jobs:
           path: site-dist
   deploy:
     if: contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)
-    timeout-minutes: 5 # Run 43813493989: green deploy job 14s.
+    timeout-minutes: 5 # Run 43813493989: cold deploy job 14s; no cache restored.
     needs: build
     runs-on: ubuntu-24.04
     permissions:

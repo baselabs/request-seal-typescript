@@ -44,3 +44,28 @@ Releases, deployments, and publications are done by the infra session (infra-1).
 The project lands on the default branch with `kimosabe-land --repo . --sha <full sha>`
 and stops there. Requirements live in the infra repository at `baselabs/docs/ci.md`,
 "What infra requires of every product".
+
+Public-repository builds and tests run only in GitHub-hosted qualification; agents
+run no project code on a workstation or a build box. Pure Python source checks that
+compile nothing may run with `python3 -I -B`. Only the landing command watches a run.
+Workflow changes go to infra for review with repository, branch, and full commit
+before landing. The default branch requires the exact `qualified` context, with
+no bypass and no classic branch protection.
+
+Every runtime lane and npm version comes from `.tool-versions` through the shared
+reader; installs are frozen and manifests declare npm. Qualification uses no workflow
+cache and never installs this package from npm. Both Elixir peer projects retain
+locked fetching and both advisory feeds. Keep action SHAs and version comments exact.
+Measure timeouts on cold green jobs, use the five-minute floor and 90-minute cap,
+and replace `90 # no green run yet` after the first green run. Remeasure Bun after
+its first green run with the setup cache disabled.
+
+Publication and Pages are default-branch dispatches only. Agents never dispatch,
+publish, deploy, tag, push mirrors, or handle registry keys. Infra obtains owner
+approval, dispatches, performs read-back and tagging, then creates the GitHub release
+for `v<version>` from `release-assets`. The workflow stages only the inspected archive
+with provenance; it reuses an identical public version, refuses different, deprecated,
+unpublished, or tagged versions, and never creates a package name. Pending-stage
+retries fail closed because npm OIDC tokens cannot inspect stages. The registry-install
+job depends on upload and read-back, has the same actor gate, no environment, and no key.
+See [the release procedure](docs/releasing.md) and [verification](SECURITY.md#verifying-a-release).

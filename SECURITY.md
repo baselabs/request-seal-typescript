@@ -23,12 +23,40 @@ provenance; trusted publishing began with 0.2.0.
 
 ## Verifying a release
 
-Releases from 0.2.0 carry npm trusted-publishing provenance. The owner now dispatches
-`publish.yml` from the default branch in environment `publish`. It installs the pinned
-runtime and locked dependencies, refuses an already published or tagged version, builds
-the library and docs, inspects and hashes the archive, and stages those exact bytes with
-provenance. Approval on npmjs.com completes publication; infra verifies it before tagging.
-Check an installed copy with:
+Releases from 0.2.0 carry npm trusted-publishing provenance. Publication builds and
+inspects the archive before staging it with provenance. The owner approves the stage
+on npmjs.com; a second dispatch of the same commit verifies public registry digests and
+downloaded bytes without uploading again. Different, deprecated, unpublished, or already
+tagged versions refuse. A pending stage cannot be inspected with a trusted-publisher
+token, so a duplicate request fails closed until approval. See the [release
+procedure](docs/releasing.md).
+
+Get the verification files from the [GitHub release for
+`v<version>`](https://github.com/baselabs/request-seal-typescript/releases), choosing
+the release that matches the package version. Its assets include the inspected
+`package.tgz`, `SHA256SUMS`, `pack.json`, `CHANGELOG.md`, `registry.json`, and npm
+provenance when available. The following example downloads the two archive-verification
+files for 0.5.1; select the version you intend to install:
+
+```sh
+version=0.5.1
+verification_dir="$(mktemp -d)"
+trap 'rm -rf "$verification_dir"' EXIT
+cd "$verification_dir"
+gh release download "v$version" --repo baselabs/request-seal-typescript --pattern package.tgz --pattern SHA256SUMS
+shasum -a 256 --check SHA256SUMS
+npm view "@request-seal/core@$version" dist --json
+```
+
+Compare the archive with npm's `dist.integrity` (SHA-512 in base64) and `dist.shasum`
+(SHA-1 in hex). These commands calculate them without extracting or executing it:
+
+```sh
+openssl dgst -sha512 -binary package.tgz | openssl base64 -A
+shasum -a 1 package.tgz
+```
+
+Check the registry's signatures and provenance from your installed consumer project:
 
 ```sh
 npm audit signatures

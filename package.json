@@ -98,5 +98,6 @@
     "typedoc": {
       "typescript": "$typescript"
     }
-  }
+  },
+  "packageManager": "npm@11.19.0"
 }

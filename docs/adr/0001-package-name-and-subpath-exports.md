@@ -13,7 +13,7 @@ Publish one package, `@request-seal/core`. The package root holds the portable c
 | `@request-seal/core/custody-ssh-agent` | OpenSSH agent custody |
 | `@request-seal/core/replay-postgres` | Replay store over a caller-owned query function |
 
-The root’s import graph excludes the Node-only subpaths, which are exposed through separate package exports. The package also declares sideEffects: false for bundlers. Release commits pass the full CI battery before landing. The owner dispatches `publish.yml` from the default branch in environment `publish` to stage the inspected archive through the trusted publisher with provenance; npm approval makes it live, and infra verifies publication before tagging.
+The root’s import graph excludes the Node-only subpaths, which are exposed through separate package exports. The package also declares sideEffects: false for bundlers. Release commits pass the full CI battery before landing. The owner dispatches `publish.yml` from the default branch in environment `publish` to stage the inspected archive through the trusted publisher with provenance; npm approval makes it live. A subsequent dispatch of the same commit skips upload only when the public archive digests match the newly inspected archive, then reads back the actual bytes. Deprecated, unpublished, mismatched, or tagged versions refuse. Pending stages reserve the version and cannot be inspected with trusted-publisher tokens, so duplicate staging fails closed until approval. A keyless dependent job verifies the public install and provenance. The release maintainer verifies publication before tagging and attaches all retained release files to the GitHub release for `v<version>`. See [the release procedure](../releasing.md).
 
 ## Consequences
 
