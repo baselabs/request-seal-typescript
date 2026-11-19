@@ -38,6 +38,15 @@ The package allowlist governs publication. Corpus data and repository tools stay
 the tarball. Qualification runs on `kci/**`; infra publishes the inspected archive with provenance
 through the repository's trusted publisher from the default branch.
 
+## Build and test
+
+Public-repository builds and tests run only in GitHub-hosted qualification on a `kci/`
+ref; agents run no project code on a workstation or a build box. Qualification runs
+`npm run check`, `npm run docs` and the planted-failure proof on each Node lane, plus
+the Deno, Bun and browser lanes, and a change reaches the default branch only through
+`kimosabe-land --repo . --sha <full sha>`. Pure Python source checks that compile
+nothing may run with `python3 -I -B`. Only the landing command watches a run.
+
 ## CI/CD and releases
 
 Releases, deployments, and publications are done by the infra session (infra-1).
@@ -45,9 +54,6 @@ The project lands on the default branch with `kimosabe-land --repo . --sha <full
 and stops there. Requirements live in the infra repository at `baselabs/docs/ci.md`,
 "What infra requires of every product".
 
-Public-repository builds and tests run only in GitHub-hosted qualification; agents
-run no project code on a workstation or a build box. Pure Python source checks that
-compile nothing may run with `python3 -I -B`. Only the landing command watches a run.
 Workflow changes go to infra for review with repository, branch, and full commit
 before landing. The default branch requires the exact `qualified` context, with
 no bypass and no classic branch protection.
