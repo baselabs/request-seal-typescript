@@ -52,7 +52,7 @@ function renderDeclaration(source: ts.SourceFile): string {
         return f.updatePropertySignature(visited, visited.modifiers, f.createIdentifier(visited.name.text),
           visited.questionToken, visited.type);
       }
-      if (ts.isTypeLiteralNode(visited)) return f.updateTypeLiteralNode(visited, sort(visited.members));
+      if (ts.isTypeLiteralNode(visited)) return f.updateTypeLiteralNode(visited, f.createNodeArray(sort(visited.members)));
       if (ts.isClassDeclaration(visited)) {
         const marker = (member: ts.ClassElement) => member.name && ts.isPrivateIdentifier(member.name);
         return f.updateClassDeclaration(visited, visited.modifiers, visited.name, visited.typeParameters,
