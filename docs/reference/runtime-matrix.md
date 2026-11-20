@@ -167,3 +167,16 @@ selected limitation must execute with its exact reason; an improvement, changed 
 The planted assertion comes from the shared native planted-failure file and
 must produce one failure with its intentional marker. `test:red` exits nonzero;
 the proof wrapper succeeds only after observing all three engine failures.
+
+## Delivery phase evidence
+
+Both send adapters classify successful received statuses as answered except 502
+and 504. A verify-stage failure is unknown. Refused means every attempt of the
+call sent no request bytes; a later failure after a redirect or retry is unknown,
+even when that later attempt's DNS or connection failed before sending.
+Fetch transport errors on Deno, Bun and browsers are unknown: these runtimes
+provide no portable phase evidence. On Node, Fetch inspects undici's cause inside
+its boundary and retains only the classification of proven DNS and connect-phase
+errors. Node HTTP recognizes a system error's `getaddrinfo` or `connect` syscall;
+a reset or timeout without phase evidence is unknown. Classification never
+schedules a retry. See [adapters](adapters.md#delivery-classification).

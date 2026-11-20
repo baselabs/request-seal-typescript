@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add delivery classification for Fetch and Node HTTP: received statuses other than 502/504 are answered, only calls proven to have sent no request bytes are refused, and verification and later-attempt failures remain unknown without retaining runtime diagnostics.
+- Add signature-base parsing and component inspection with shared construction bounds, canonical reconstruction and duplicate identities. Parsing returns `malformed` from its separately pinned public Elixir source; the released base vocabulary and corpus retain their existing pins.
+
 ## 0.5.1 - 2026-11-17
 
 - Make RSA-OAEP custody key agreement checks deterministic by fixing only the health-check CEK's first octet to `0x01`; the remaining octets and real JWE CEKs stay random. Declare WebKit 27.2's Linux x64 libgcrypt defect that drops leading-zero CEK octets as `custody/rsa_oaep_leading_zero_cek`, observed as `jose/decryption_failed`. Browser checks cover both RSA hashes and AES sizes with fixed leading-zero and nonzero CEKs, and require native proof of truncation before accepting that error for a random ciphertext.

@@ -1,3 +1,4 @@
+import { classifyDelivery, recordDelivery, responseOutcome, transportOutcome, type DeliveryState } from '../delivery.ts';
 import {
   isMessage,
   Message,
@@ -585,6 +586,17 @@ export async function signedFetch(
   signing: unknown,
   options: unknown = {},
 ): Promise<Result<SignedExchange>> {
+  const delivery: DeliveryState = { outcome: 'refused', transports: 0 };
+  const result = await signedFetchOperation(input, init, signing, options, delivery);
+  return recordDelivery('fetch', result, delivery);
+}
+/** Classify an actual signedFetch result; this never schedules or authorizes a retry. */
+export function classify(result: unknown): 'answered' | 'refused' | 'unknown' {
+  return classifyDelivery('fetch', result);
+}
+async function signedFetchOperation(
+  input: unknown, init: unknown, signing: unknown, options: unknown, delivery: DeliveryState,
+): Promise<Result<SignedExchange>> {
   let attempt = 0;
   try {
     const a = S.redirectOptions(
@@ -707,15 +719,16 @@ export async function signedFetch(
         "signing_failed",
         attempt,
       );
+      delivery.outcome = 'unknown';
       const received = await run(c, async () => {
         try {
-          return ok(
-            await fetchCall(signed.request, {
-              redirect: "manual",
-              signal: c.signal,
-            }),
-          );
-        } catch {
+          delivery.transports++;
+          const response = await fetchCall(signed.request, { redirect: "manual", signal: c.signal });
+          delivery.outcome = responseOutcome(response.status);
+          return ok(response);
+        } catch (error) {
+          delivery.outcome = c.signal.aborted ? 'unknown' :
+            transportOutcome(error, runtime !== 'node:unknown' && runtime.startsWith('node:'));
           return err(
             S.failure("fetch", "sign", "invalid_request", null, attempt),
           );
@@ -724,6 +737,7 @@ export async function signedFetch(
       if (!received.ok) return received;
       let response = received.value;
       if (a.verify !== undefined) {
+        delivery.outcome = 'unknown';
         const v = S.take(a.verify, ["policy", "label"], "fetch", "verify");
         const r = await verifyResponse(response, v.policy, {
           label: v.label,
@@ -741,11 +755,13 @@ export async function signedFetch(
           );
         }
         response = r.value.response;
+        delivery.outcome = responseOutcome(response.status);
       }
       if (
         [301, 302, 303, 307, 308].includes(response.status) &&
         redirects < maxRedirects
       ) {
+        delivery.outcome = 'unknown';
         const location = response.headers.get("location");
         S.need(location !== null, "fetch", "sign", "invalid_request", attempt);
         const next = S.redirectLocation(
@@ -787,6 +803,7 @@ export async function signedFetch(
         continue;
       }
       if (response.status >= 500 && retries < maxRetries) {
+        delivery.outcome = 'unknown';
         await response.body?.cancel();
         retries++;
         continue;

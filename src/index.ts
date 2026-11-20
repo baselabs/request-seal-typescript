@@ -19,7 +19,7 @@ export {isUnwrappedKey,type UnwrappedKey} from './custody/content_key.ts';
 export {StructuredFields, parse as parseStructuredField, serialize as serializeStructuredField, parseField, createSchema, isStructuredFieldsValue, isStructuredFieldsSchema} from './structured-fields/index.ts';
 export type {Bare, Parameters, Item, InnerList, Member, List, Dictionary, Value, FieldType, Revision, Schema, Options as StructuredFieldsOptions} from './structured-fields/index.ts';
 export {Message, FieldOccurrence, Body, TransportFacts, createMessage, validateMessage, isMessage, isFieldOccurrence, isBody, isTransportFacts} from './message/index.ts';
-export {SignatureBase, build as buildSignatureBase} from './signature-base/index.ts';
+export {SignatureBase, build as buildSignatureBase, parseSignatureBase, components as signatureBaseComponents, type SignatureBaseParts, type ParsedSignatureBase} from './signature-base/index.ts';
 export {Policy,createPolicy,isPolicy} from './policy.ts';
 export type {Freshness,ContentPolicy,ReplayPolicy,KeyResolver,ResolvedKey,Verifier} from './policy.ts';
 export {Digest,DigestState,digest,parseDigest,serializeDigest,checkDigest,isDigestState} from './digest.ts';

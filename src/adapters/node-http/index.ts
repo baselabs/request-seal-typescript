@@ -1,3 +1,4 @@
+import { classifyDelivery, recordDelivery, responseOutcome, transportOutcome, type DeliveryState } from '../delivery.ts';
 import {
   IncomingMessage,
   request as httpRequest,
@@ -1137,7 +1138,9 @@ async function send(
   a: Readonly<Record<string, unknown>>,
   c: Context,
   attempt: number,
+  delivery: DeliveryState,
 ): Promise<Result<ClientResponse>> {
+  delivery.outcome = 'unknown';
   return run(
     c,
     () =>
@@ -1166,10 +1169,12 @@ async function send(
           agent: false as const,
           ...(a.ca instanceof Uint8Array ? { ca: Buffer.from(a.ca) } : {}),
         };
+        delivery.transports++;
         const req = (url.protocol === "https:" ? httpsRequest : httpRequest)(
           url,
           opts,
           async (res) => {
+            delivery.outcome = responseOutcome(res.statusCode ?? 0);
             try {
               const bytes = S.unwrap(
                 await read(res, S.maximum(a, "node-http", "verify"), c),
@@ -1230,18 +1235,13 @@ async function send(
         c.signal.addEventListener("abort", abort, { once: true });
         req.once(
           "error",
-          () =>
-            done(
-              err(
-                S.failure(
-                  "node-http",
-                  "sign",
-                  "invalid_request",
-                  null,
-                  attempt,
-                ),
-              ),
-            ),
+          (error) => {
+            // Do not override an already received status if reading its body fails.
+            if (!settled && delivery.outcome !== 'answered') {
+              delivery.outcome = transportOutcome(error, true);
+            }
+            done(err(S.failure("node-http", "sign", "invalid_request", null, attempt)));
+          },
         );
         req.end(body);
       }),
@@ -1253,6 +1253,17 @@ export async function signedRequest(
   input: unknown,
   signer: unknown,
   ctx?: Context,
+): Promise<Result<ClientResponse>> {
+  const delivery: DeliveryState = { outcome: 'refused', transports: 0 };
+  const result = await signedRequestOperation(options, input, signer, ctx, delivery);
+  return recordDelivery('node-http', result, delivery);
+}
+/** Classify an actual signedRequest result; this never schedules or authorizes a retry. */
+export function classify(result: unknown): 'answered' | 'refused' | 'unknown' {
+  return classifyDelivery('node-http', result);
+}
+async function signedRequestOperation(
+  options: unknown, input: unknown, signer: unknown, ctx: Context | undefined, delivery: DeliveryState,
 ): Promise<Result<ClientResponse>> {
   let attempt = 0;
   try {
@@ -1396,9 +1407,11 @@ export async function signedRequest(
         transportOptions,
         c,
         attempt,
+        delivery,
       );
       if (!response.ok) return response;
       if (a.verify !== undefined) {
+        delivery.outcome = 'unknown';
         const v = S.take(a.verify, ["policy", "label"], "node-http", "verify");
         S.need(isPolicy(v.policy), "node-http", "verify", "invalid_options");
         const verified = await verifyResponse(
@@ -1416,9 +1429,11 @@ export async function signedRequest(
             attempt,
           );
         }
+        delivery.outcome = responseOutcome(response.value.status);
       }
       const status = response.value.status;
       if ([301, 302, 303, 307, 308].includes(status) && hops < redirects) {
+        delivery.outcome = 'unknown';
         const location = response.value.message.fields.find(
           (f) => f.name.toLowerCase() === "location",
         );
@@ -1462,6 +1477,7 @@ export async function signedRequest(
         continue;
       }
       if (status >= 500 && retry < retries) {
+        delivery.outcome = 'unknown';
         retry++;
         continue;
       }

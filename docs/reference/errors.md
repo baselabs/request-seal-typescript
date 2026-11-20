@@ -107,7 +107,8 @@ Returned by Structured Fields parsing and serialization.
 
 ## signature_base
 
-Returned by `SignatureBase.build`, and as `detail` of core errors from signing and verification.
+Returned by `SignatureBase.build`, `SignatureBase.components` and `SignatureBase.parse`,
+and as `detail` of core errors from signing and verification.
 
 | Reason | Meaning | What to do |
 | --- | --- | --- |
@@ -123,6 +124,7 @@ Returned by `SignatureBase.build`, and as `detail` of core errors from signing a
 | `signature_base/invalid_signature_parameters` | The signature parameters are malformed. | Fix the parameters. |
 | `signature_base/invalid_structured_field` | A field covered with `sf` or `key` is not valid under its schema. | Reject, or fix the schema. |
 | `signature_base/limit` | The base would exceed a size or count bound. | Cover less. |
+| `signature_base/malformed` | A serialized base is not canonical, ordered, printable ASCII with exactly matching component identifiers and a final signature-params line. | Reject the serialized base; structural inspection does not authenticate it. |
 | `signature_base/missing_dictionary_key` | A `key` parameter names a member the dictionary lacks. | Reject the request. |
 | `signature_base/missing_field` | A covered field is absent. | Reject, or cover only present fields. |
 | `signature_base/missing_query_parameter` | `@query-param` names a parameter the query lacks. | Reject the request. |

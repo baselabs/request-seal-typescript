@@ -36,8 +36,15 @@ async function main(): Promise<void> {
         for (const planted of modes) {
           const context = await browser.newContext();
           try {
-          // Own tests may contact only their loopback page server.
-          await context.route('**/*', route => new URL(route.request().url()).origin === new URL(server.url).origin ? route.continue() : route.abort());
+          // Real delivery probes also use a closed loopback port and RFC 6761's
+          // reserved .invalid name. Continue these requests to the real runtime;
+          // aborting them here would replace the transport failure under test.
+          await context.route('**/*', route => {
+            const url = new URL(route.request().url());
+            const allowed = url.origin === new URL(server.url).origin || url.origin === server.closedOrigin || server.deliveryOrigins.has(url.origin) ||
+              url.origin === 'http://delivery-canary.invalid';
+            return allowed ? route.continue() : route.abort();
+          });
           const page = await context.newPage();
           let result: Summary | undefined;
           let files: string[] | undefined;

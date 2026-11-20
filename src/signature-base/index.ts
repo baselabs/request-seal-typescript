@@ -7,6 +7,7 @@ import {
   type InnerList,
   type Value,
   type Parameters,
+  type Item,
 } from '../structured-fields/index.ts';
 import {
   validateMessage,
@@ -67,6 +68,9 @@ const text = (b: Uint8Array) => {
     out.push(String.fromCharCode(...b.subarray(i, i + 8192)));
   return out.join('');
 };
+const typedArrayLength = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(Uint8Array.prototype), 'length',
+)!.get!;
 function canonical(value: Value, schema: Schema, reason: Reason<'signature_base'>): string {
   return text(sf(serialize(value, { schema }), reason));
 }
@@ -113,12 +117,36 @@ function trim(b: Uint8Array): Uint8Array {
   while (end > start && (b[end - 1] === 32 || b[end - 1] === 9)) end--;
   return b.subarray(start, end);
 }
-/** Ordered identifiers and parameters are serialized exactly once for each output line. */
-export function build(
+/** Ordered canonical component identifiers and their untrusted printable values. */
+export type SignatureBaseParts = Readonly<{
+  components: readonly (readonly [string, string])[];
+  signatureParams: string;
+}>;
+/** A structurally valid signature base, including its parsed parameterized inner list. */
+export type ParsedSignatureBase = SignatureBaseParts & Readonly<{ innerList: InnerList }>;
+function identity(component: Item): string {
+  return JSON.stringify([
+    component.value,
+    [...component.parameters].sort(([x], [y]) => x < y ? -1 : x > y ? 1 : 0),
+  ]);
+}
+function rebuild(parts: SignatureBaseParts): string {
+  return parts.components.map(([id, value]) => id + ': ' + value + '\n').join('') +
+    '"@signature-params": ' + parts.signatureParams;
+}
+/** Build RFC 9421 bytes using the same derivation and bounds as components. */
+export function build(input: unknown, parameters: unknown, options: unknown = {}): Result<Uint8Array> {
+  const parts = components(input, parameters, options);
+  if (!parts.ok) return parts;
+  const bytes = byteString(rebuild(parts.value));
+  return bytes.ok ? ok(bytes.value) : err(signatureBaseError('non_ascii'));
+}
+/** Inspect build's ordered values and canonical parameters without authenticating them. */
+export function components(
   input: unknown,
   parameters: unknown,
   options: unknown = {},
-): Result<Uint8Array> {
+): Result<SignatureBaseParts> {
   try {
     ensure(isMessage(input), 'invalid_message');
     const validated = validateMessage(input);
@@ -313,12 +341,11 @@ export function build(
       }
       return canonical(parsed, schema, 'invalid_structured_field');
     }
-    const output: string[] = [];
+    const output: (readonly [string, string])[] = [];
     let size = 0;
     const emit = (line: string) => {
       size += line.length;
       ensure(size <= maxBytes, 'limit');
-      output.push(line);
     };
     for (const component of p.value) {
       ensure(
@@ -350,14 +377,9 @@ export function build(
         !(params.has('bs') && (params.has('sf') || params.has('key'))),
         'incompatible_parameters',
       );
-      const identity = JSON.stringify([
-        name,
-        [...component.parameters]
-          .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
-          .map(([key, bare]) => [key, bare.kind, bare.value]),
-      ]);
-      ensure(!seen.has(identity), 'duplicate_component');
-      seen.add(identity);
+      const key = identity(component);
+      ensure(!seen.has(key), 'duplicate_component');
+      seen.add(key);
       let source = m;
       if (params.has('req')) {
         ensure(m.kind === 'response', 'wrong_message_kind');
@@ -372,11 +394,11 @@ export function build(
         'invalid_signature_parameters',
       );
       emit(identifier + ': ' + v + '\n');
+      output.push(Object.freeze([identifier, v] as const));
     }
-    emit('"@signature-params": ' + canonical(snapshot, signatureSchema, 'invalid_signature_parameters'));
-    const bytes = byteString(output.join(''));
-    ensure(bytes.ok, 'non_ascii');
-    return ok(bytes.value);
+    const signatureParams = canonical(snapshot, signatureSchema, 'invalid_signature_parameters');
+    emit('"@signature-params": ' + signatureParams);
+    return ok(Object.freeze({ components: Object.freeze(output), signatureParams }));
   } catch (e) {
     return err(
       isRequestSealError(e) && e.kind === 'signature_base'
@@ -385,7 +407,60 @@ export function build(
     );
   }
 }
-/** RFC 9421 signature-base construction operations. */
+/**
+ * Inspect canonical RFC 9421 Section 2.5 bytes (ByteString or Uint8Array), at most 1 MiB.
+ * This checks structure and exact reconstruction, not authenticity or component semantics.
+ * Invalid input returns malformed; only an oversized input returns limit.
+ * Refusal reasons match the separately pinned public Elixir parse contract.
+ */
+export function parseSignatureBase(input: unknown): Result<ParsedSignatureBase> {
+  try {
+    ensure(typeof input === 'string' || input instanceof Uint8Array, 'malformed');
+    const length: number = typeof input === 'string' ? input.length : typedArrayLength.call(input);
+    if (length > SIGNATURE_BASE_MAX_BYTES) return err(signatureBaseError('limit'));
+    const copied = byteString(input);
+    ensure(copied.ok, 'malformed');
+    const source = text(copied.value);
+    ensure(/^[\x0a\x20-\x7e]*$/.test(source), 'malformed');
+    const lines = source.split('\n');
+    const final = lines.pop()!;
+    const prefix = '"@signature-params": ';
+    ensure(final.startsWith(prefix), 'malformed');
+    const signatureParams = final.slice(prefix.length);
+    const parsed = parse('list', signatureParams, { schema: signatureSchema });
+    ensure(parsed.ok && parsed.value.kind === 'list' && parsed.value.value.length === 1 &&
+      parsed.value.value[0]?.kind === 'inner_list', 'malformed');
+    const innerList = parsed.value.value[0];
+    ensure(canonical(parsed.value, signatureSchema, 'malformed') === signatureParams,
+      'malformed');
+    ensure(lines.length === innerList.value.length, 'malformed');
+    const seen = new Set<string>();
+    const pairs: (readonly [string, string])[] = [];
+    for (let i = 0; i < innerList.value.length; i++) {
+      const item = innerList.value[i]!;
+      ensure(item.value.kind === 'string' && item.value.value !== '@signature-params',
+        'malformed');
+      const key = identity(item);
+      ensure(!seen.has(key), 'malformed');
+      seen.add(key);
+      const id = canonical(item, { ...signatureSchema, type: 'item' }, 'malformed');
+      const line = lines[i]!;
+      ensure(line.startsWith(id + ': '), 'malformed');
+      const value = line.slice(id.length + 2);
+      ensure(/^[\x20-\x7e]*$/.test(value), 'malformed');
+      pairs.push(Object.freeze([id, value] as const));
+    }
+    const parts = Object.freeze({ components: Object.freeze(pairs), signatureParams, innerList });
+    ensure(rebuild(parts) === source, 'malformed');
+    return ok(parts);
+  } catch { return err(signatureBaseError('malformed')); }
+}
+/** RFC 9421 signature-base construction and structural inspection operations. */
 export const SignatureBase = Object.freeze({
-  /** Build RFC 9421 signature-base bytes from a lossless message. */
-  build });
+  /** Build signature-base bytes from a lossless message. */
+  build,
+  /** Inspect the same derived values and parameters as build. */
+  components,
+  /** Parse canonical bytes without authenticating their source. */
+  parse: parseSignatureBase,
+});

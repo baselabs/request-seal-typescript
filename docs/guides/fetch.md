@@ -120,3 +120,30 @@ Retained body readers accept fewer than 16,384 producer chunks, including empty
 chunks, as well as enforcing the byte bound and Context deadline. Empty chunks
 are discarded. Reaching the work ceiling returns `limit` before another pull;
 a stalled producer is canceled through the operation's Context.
+
+## Delivery classification
+
+`classify(result)` inspects the actual Result returned by `signedFetch`.
+A successful send with a received status is `"answered"`, except for 502 and 504,
+which are `"unknown"`. Failed response verification and every verify-stage failure
+are `"unknown"`: an unverified response does not prove that the origin answered.
+Other post-send failures, open-connection resets, socket timeouts, TLS alerts
+without phase evidence, and unrecognized values are also `"unknown"`.
+
+`"refused"` means no attempt of the entire call sent an HTTP request byte. It
+covers a first pre-send attach/sign refusal or a first transport failure with
+proof that no bytes were sent. After a redirect or retry follows an earlier
+response, a later sign/attach refusal or DNS/connect failure is `"unknown"`, even
+when that later attempt sent no bytes. The earlier attempt may have delivered the
+request, and the final error carries no verified earlier answer. Structural copies
+lose the private delivery evidence. Classification never drives a retry or grants
+authorization; existing explicit retry options remain caller choices.
+
+Only the three-value classification is retained privately. Runtime error codes,
+messages, stack traces and addresses are absent from public Results. Node system
+errors must identify `getaddrinfo` or `connect` in `syscall`; an undici connect
+timeout also proves that phase. An error code without phase evidence does not.
+Fetch transport failures on Deno, Bun and browsers are always `"unknown"`, because
+these runtimes provide no portable Fetch phase evidence. The Node HTTP client
+sends HTTP/1.1 only; its HTTP/2 server support supplies no client REFUSED_STREAM
+or GOAWAY evidence.

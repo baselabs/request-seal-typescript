@@ -140,3 +140,23 @@ creation-time timer to release listeners even if never run. A
 settled Context remains reusable until that deadline; reuse after internal
 release reattaches its caller and parent listeners. A run that ends at its
 deadline abandons its callback; callbacks should honor `context.signal`.
+
+## Signature-base inspection
+
+`signatureBaseComponents(message, parameters, options)` uses `buildSignatureBase`'s
+same derivation, option snapshots, errors and resource accounting. It returns ordered
+`components` pairs of canonical identifier and value strings, and `signatureParams`.
+`parseSignatureBase(bytes)` accepts a ByteString or Uint8Array up to 1,048,576 bytes,
+requires printable ASCII component values, LF line separators, canonical final
+parameters, unique component identities (value plus sorted parameters), and exact
+byte-for-byte reconstruction. It returns the same fields plus the parsed `innerList`.
+Empty coverage and empty values are valid; unknown component semantics are not
+interpreted. These inspection helpers authenticate nothing. `SignatureBase.components`
+and `SignatureBase.parse` expose the same operations.
+
+Malformed inputs return `signature_base/malformed`, including parser work limits
+inside a base whose total size is within 1 MiB. Only an input larger than that
+ceiling returns `signature_base/limit`. The additive `malformed` rule is tied to
+the public Elixir source pin recorded in [error parity](error-parity.md), separately
+from the older base vocabulary and corpus pins. No corpus files are changed by
+these inspection helpers.

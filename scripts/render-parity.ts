@@ -1,4 +1,5 @@
 import {PARITY_HEADER} from './parity-header.ts';
+import {additions, withErrorAdditions} from './error-additions.ts';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { ERROR_PARITY, ELIXIR_ERROR_PIN, ERROR_RETRYABLE } from '../src/errors/parity.ts';
 export function renderParity(): string {
@@ -11,7 +12,7 @@ export function renderParity(): string {
 
 OBSERVED: extraction with \`REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts ${ELIXIR_ERROR_PIN} <output.json>\` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
 
-The error vocabulary is pinned to v1.0.0 (release commit ${ELIXIR_ERROR_PIN}); the shared corpus is vendored from the same release's verified assets.
+The base error vocabulary is pinned to v1.0.0 (release commit ${ELIXIR_ERROR_PIN}); the shared corpus is vendored from that release's verified assets. The additive \`signature_base/malformed\` rule is pinned separately to public commit [${additions.commit}](https://github.com/baselabs/request_seal/blob/${additions.commit}/lib/request_seal/signature_base/error.ex). Its declaration and parse call sites are preserved byte for byte with their Git blob identities in \`test/fixtures/elixir-error-additions.json\`. Both regeneration paths validate those source bytes and retain the addition; a later base pin that already contains the same rule does not duplicate it.
 
 Extension-profile reasons are defined by extension packages and arrive with the profile row. The core layer union does not include \`profile\`.
 
@@ -27,7 +28,7 @@ Results are frozen on construction. \`deepFreeze\` returns a Result containing a
 }
 if (process.argv[1]?.endsWith('/render-parity.ts')) {
   if (process.argv[2] === '--update-table' && process.argv.length === 4) {
-    const fixture = JSON.parse(readFileSync(process.argv[3]!, 'utf8'));
+    const fixture = withErrorAdditions(JSON.parse(readFileSync(process.argv[3]!, 'utf8')));
     const source = readFileSync('src/errors/parity.ts', 'utf8');
     const entriesStart = source.indexOf('const entries = ');
     const end = source.indexOf(' as const;', entriesStart) + ' as const;'.length;

@@ -438,3 +438,119 @@ test('multi_signature published single-label bases run where derivable', async (
   t.diagnostic(`multi_signature single-label bases=${count}`);
   assert.equal(count, 10);
 });
+
+
+test('inspection round-trips every published Section 2.5 and Appendix B base', async () => {
+  const { SignatureBase, parseSignatureBase, signatureBaseComponents, buildSignatureBase } = await import('../src/index.ts');
+  assert.equal(SignatureBase.parse, parseSignatureBase);
+  assert.equal(SignatureBase.components, signatureBaseComponents);
+  for (const v of json('rfc9421', 'rfc9421.json')) {
+    const parsed = parseSignatureBase(v.base);
+    assert.ok(parsed.ok, v.section);
+    const parts = signatureBaseComponents(published(v.message), v.parameters);
+    assert.ok(parts.ok, v.section);
+    const { innerList, ...rest } = parsed.value;
+    assert.equal(innerList.kind, 'inner_list');
+    assert.deepEqual(rest, parts.value);
+    const bytes = buildSignatureBase(published(v.message), innerList);
+    assert.ok(bytes.ok);
+    assert.equal(text(bytes.value), v.base);
+    assert.equal(parts.value.components.map(([id, value]) => id + ': ' + value + '\n').join('') +
+      '"@signature-params": ' + parts.value.signatureParams, v.base);
+    assert.ok(Object.isFrozen(rest.components));
+    for (const pair of rest.components) assert.ok(Object.isFrozen(pair));
+    const fromBytes = parseSignatureBase(new TextEncoder().encode(v.base));
+    assert.deepEqual(fromBytes, parsed);
+  }
+});
+
+test('inspection accepts empty values and does not authenticate or derive their source', async () => {
+  const { parseSignatureBase } = await import('../src/index.ts');
+  for (const base of ['"@signature-params": ()',
+    '"@query-param";name="a": untrusted\n"example-dict";sf: \n"@signature-params": ("@query-param";name="a" "example-dict";sf)',
+    '"extension";x=:AQ==:: arbitrary\n"@signature-params": ("extension";x=:AQ==:)']) {
+    assert.ok(parseSignatureBase(base).ok, base);
+  }
+});
+
+test('inspection rejects departures from the ordered canonical grammar with a tied-out safe reason', async () => {
+  const { parseSignatureBase, ERROR_PARITY } = await import('../src/index.ts');
+  const reason = 'malformed'; // Declared by the additive public source pin.
+  assert.ok(ERROR_PARITY.some(e => e.kind === 'signature_base' && e.reason === reason));
+  const good = '"@method": GET\n"@signature-params": ("@method")';
+  const invalid: unknown[] = [null, undefined, 42, [], {}, new Uint8Array([255]), '',
+    '"@method": GET', good + '\n', good.replace('\n', '\r\n'),
+    good.replace('GET', 'é'), good.replace('GET', 'G\tET'),
+    good.replace('("@method")', '( "@method" )'), good.replace('("@method")', '("@path")'),
+    good + '\nextra: line', '"@method": GET\n' + good,
+    '"@path": /\n"@method": GET\n"@signature-params": ("@method" "@path")',
+    '"@signature-params": (42)', '"@signature-params": ();a=01',
+    '"@signature-params": ();a=1;a=1',
+    '"@signature-params": ()\n"@signature-params": ("@signature-params")',
+    '"@method": GET\n"@method": GET\n"@signature-params": ("@method" "@method")',
+    '"@query-param";name="a";x: 1\n"@query-param";x;name="a": 1\n"@signature-params": ("@query-param";name="a";x "@query-param";x;name="a")',
+    good.replace('GET', 'PARSE-CANARY\u0000'), new Proxy({}, {get() {throw new Error('PARSE-CANARY');}})];
+  for (const input of invalid) {
+    const r = parseSignatureBase(input);
+    assert.ok(!r.ok);
+    assert.deepEqual(r.error, {kind: 'signature_base', reason});
+    assert.doesNotMatch(JSON.stringify(r.error), /PARSE-CANARY|stack/);
+  }
+});
+
+test('inspection has the exact one MiB input ceiling', async () => {
+  const { parseSignatureBase, SIGNATURE_BASE_MAX_BYTES } = await import('../src/index.ts');
+  const suffix = '\n"@signature-params": ("x")', prefix = '"x": ';
+  const base = prefix + 'a'.repeat(SIGNATURE_BASE_MAX_BYTES - prefix.length - suffix.length) + suffix;
+  assert.ok(parseSignatureBase(base).ok);
+  assert.ok(parseSignatureBase(new TextEncoder().encode(base)).ok);
+  for (const input of [base + 'a', new TextEncoder().encode(base + 'a')]) {
+    const r = parseSignatureBase(input);
+    assert.ok(!r.ok);
+    assert.deepEqual(r.error, {kind: 'signature_base', reason: 'limit'});
+  }
+  const disguised = new Uint8Array(SIGNATURE_BASE_MAX_BYTES + 1);
+  Object.defineProperty(disguised, 'length', {get() {assert.fail('must use the intrinsic byte length');}});
+  const rejected = parseSignatureBase(disguised);
+  assert.ok(!rejected.ok);
+  assert.deepEqual(rejected.error, {kind: 'signature_base', reason: 'limit'});
+});
+
+test('inspection maps Structured Fields work refusals within the byte ceiling to malformed', async () => {
+  const { parseSignatureBase, STRUCTURED_FIELDS_LIMITS } = await import('../src/index.ts');
+  const base = (count: number) => {
+    const ids = Array.from({length: count}, (_, index) => JSON.stringify('x' + index));
+    return ids.map(id => id + ': value\n').join('') + '"@signature-params": (' + ids.join(' ') + ')';
+  };
+  assert.ok(parseSignatureBase(base(STRUCTURED_FIELDS_LIMITS.maxInnerItems)).ok);
+  for (const input of [base(STRUCTURED_FIELDS_LIMITS.maxInnerItems + 1),
+    '"@signature-params": ();pad="' + 'x'.repeat(STRUCTURED_FIELDS_LIMITS.maxValueBytes + 1) + '"']) {
+    const result = parseSignatureBase(input);
+    assert.ok(!result.ok);
+    assert.deepEqual(result.error, {kind: 'signature_base', reason: 'malformed'});
+  }
+});
+
+test('components shares construction options, resource accounting and error precedence', async () => {
+  const { signatureBaseComponents, buildSignatureBase } = await import('../src/index.ts');
+  const m = request({fields: fields([['x', 'a=1, b=2']])});
+  const schema = {revision: 'rfc8941', type: 'dictionary', itemTypes: ['integer'], innerLists: true};
+  const params = '("x";sf "x";key="b")', options = {fieldSchemas: {x: schema}};
+  const base = buildSignatureBase(m, params, options);
+  assert.ok(base.ok);
+  for (const [message, parameters, opts] of [
+    [null, params, {}], [m, '(', {}], [m, params, {}], [m, params, {unknown: true}],
+    [m, params, {...options, maxComponents: 1}], [m, params, {...options, maxBytes: base.value.length - 1}],
+    [m, '("x";sf;req "x";req;sf)', options],
+  ] as const) {
+    const built = buildSignatureBase(message, parameters, opts);
+    assert.ok(!built.ok);
+    assert.deepEqual(signatureBaseComponents(message, parameters, opts), built);
+  }
+  let reads = 0;
+  assert.ok(signatureBaseComponents(m, params, {get fieldSchemas() {reads++; return options.fieldSchemas;}}).ok);
+  assert.equal(reads, 1);
+  const parts = signatureBaseComponents(m, params, {...options, maxBytes: base.value.length});
+  assert.ok(parts.ok);
+  assert.deepEqual(parts.value.components, [['"x";sf', 'a=1, b=2'], ['"x";key="b"', '2']]);
+});
