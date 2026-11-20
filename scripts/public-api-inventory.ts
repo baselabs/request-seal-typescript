@@ -80,7 +80,7 @@ function declarationText(declaration: ts.Declaration, checker: ts.TypeChecker): 
   const source = declaration.getSourceFile(), start = declaration.getStart(source);
   const edits: {start: number; end: number; text: string}[] = [];
   const visit = (node: ts.Node): void => {
-    if (ts.isTypeQueryNode(node)) {
+    if (ts.isTypeQueryNode(node) || ts.isImportTypeNode(node) && node.isTypeOf) {
       const signatures = checker.getTypeAtLocation(node).getCallSignatures();
       if (signatures.length) {
         const texts = signatures.map(signature => checker.signatureToString(signature, node,

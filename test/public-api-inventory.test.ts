@@ -12,6 +12,9 @@ test('every package entry point has exactly the inventoried declaration signatur
   const actual = declarationInventory();
   assert.doesNotMatch(actual['.']!['WebBotAuthPolicy']!, /const WebBotAuthPolicy/, 'type-only exports must not acquire a runtime value');
   assert.match(actual['.']!['Discovery']!, /type KeyResolver/, 'the facade retains its distinct supporting resolver signature');
+  for (const signature of [actual['.']!['WebBotAuth']!, actual['./discovery-node']!['Discovery']!,
+    actual['./discovery-node']!['DiscoverySource']!])
+    assert.doesNotMatch(signature, /typeof import\(/, 'imported facade callables must retain their resolved signatures');
   const changes = inventoryChanges(expected, actual);
   assert.deepEqual(changes, [], 'Public API drift (review inventory updates beside API changes):\n' + changes.join('\n'));
 });
