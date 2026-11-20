@@ -52,7 +52,16 @@
     ]
   },
   "firefox": {
-    "157.0": []
+    "157.0": [
+      {
+        "id": "fetch/manual_redirect",
+        "items": [
+          1
+        ],
+        "observed": "fetch/opaqueredirect",
+        "reason": "Browser Fetch with redirect manual exposes an opaqueredirect response with status 0, empty headers and no body, even for a same-origin 303. signedFetch returns the response exchange and classify returns unknown; the hidden Location cannot be followed or checked against allowedOrigins. Fetch defines this filtering at https://fetch.spec.whatwg.org/#concept-filtered-response-opaque-redirect. Native lanes exercise visible redirects and later-attempt transport failures."
+      }
+    ]
   },
   "webkit": {
     "27.2": [
@@ -88,10 +97,38 @@
           "linux-x64"
         ],
         "reason": "Observed with Playwright 1.64.1 on linux-x64: WebKit 27.2's libgcrypt backend calls mpiData(valueSexp) in CryptoAlgorithmRSA_OAEPGCrypt.cpp gcryptDecrypt (line 109, revision aa697ddd0312b191de5fb13b580f19159d39c26f). GCryptUtilities.cpp mpiData (line 133) prints the recovered message as a minimal unsigned MPI, dropping every leading 0x00 octet. RSA-OAEP and RSA-OAEP-256 decrypt or unwrapKey therefore shorten leading-zero A128GCM/A256GCM CEKs, and JWE decryption returns decryption_failed. The encrypt side is unaffected: gcryptEncrypt uses mpiZeroPrefixedData(aSexp, keySizeInBytes) at line 72."
+      },
+      {
+        "id": "fetch/manual_redirect",
+        "items": [
+          1
+        ],
+        "observed": "fetch/opaqueredirect",
+        "reason": "Browser Fetch with redirect manual exposes an opaqueredirect response with status 0, empty headers and no body, even for a same-origin 303. signedFetch returns the response exchange and classify returns unknown; the hidden Location cannot be followed or checked against allowedOrigins. Fetch defines this filtering at https://fetch.spec.whatwg.org/#concept-filtered-response-opaque-redirect. Native lanes exercise visible redirects and later-attempt transport failures."
+      },
+      {
+        "id": "fetch/cors_diagnostics",
+        "items": [
+          1
+        ],
+        "observed": "browser/access_control_diagnostic",
+        "platforms": [
+          "linux-x64"
+        ],
+        "reason": "WebKit 27.2 through Playwright 1.64.1 reports Fetch access-control diagnostics as pageerror for the real closed-loopback-port and reserved .invalid probes, although their fetch failures are handled. The harness requires both exact probe diagnostics and corresponding requestfailed events, records this observation once, and treats every other page error as fatal. Library results remain bounded and classify as unknown."
       }
     ]
   },
   "chromium": {
-    "156.0.8078.80": []
+    "156.0.8078.80": [
+      {
+        "id": "fetch/manual_redirect",
+        "items": [
+          1
+        ],
+        "observed": "fetch/opaqueredirect",
+        "reason": "Browser Fetch with redirect manual exposes an opaqueredirect response with status 0, empty headers and no body, even for a same-origin 303. signedFetch returns the response exchange and classify returns unknown; the hidden Location cannot be followed or checked against allowedOrigins. Fetch defines this filtering at https://fetch.spec.whatwg.org/#concept-filtered-response-opaque-redirect. Native lanes exercise visible redirects and later-attempt transport failures."
+      }
+    ]
   }
 }

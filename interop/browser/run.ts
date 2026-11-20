@@ -49,10 +49,25 @@ async function main(): Promise<void> {
           let result: Summary | undefined;
           let files: string[] | undefined;
           const limits: readonly RuntimeLimit[] = (table[name]?.[browser.version()] ?? []).filter((entry: {platforms?: string[]}) => !entry.platforms || entry.platforms.includes(platform));
+          // This WebKit diagnostic is emitted to Playwright rather than the page.
+          const corsDiagnostics = !planted && name === 'webkit' && limits.find(entry => entry.id === 'fetch/cors_diagnostics');
+          const pageLimits = limits.filter(entry => entry.id !== 'fetch/cors_diagnostics');
+          const probeUrls = [server.closedOrigin + '/', 'http://delivery-canary.invalid/'];
+          // Playwright's WebKit _onConsoleMessage splits the native message at
+          // http:; the resulting Error.message starts at /host (v1.64.1 wkPage.ts).
+          const accessControlProbes = new Map(probeUrls.map(url =>
+            [url.slice('http:/'.length) + ' due to access control checks.', url] as const));
+          const failedProbes = new Set<string>(), accessControlMessages: string[] = [];
           const observed: {id: string; observed: string}[] = [];
           const records: {name: string; passed: boolean; message?: string}[] = [];
           const fatal: string[] = [];
-          page.on('pageerror', error => fatal.push(error.message));
+          page.on('requestfailed', request => {
+            if (probeUrls.includes(request.url())) failedProbes.add(request.url());
+          });
+          page.on('pageerror', error => {
+            if (corsDiagnostics && accessControlProbes.has(error.message)) accessControlMessages.push(error.message);
+            else fatal.push(error.message);
+          });
           page.on('console', message => {
             const line = message.text();
             try {
@@ -66,8 +81,17 @@ async function main(): Promise<void> {
             if (line.startsWith('REQUEST_SEAL_FATAL ')) fatal.push(line);
             } catch (error) {fatal.push(error instanceof Error ? error.message : 'Invalid console record');}
           });
-          await page.goto(server.url + '?' + new URLSearchParams(planted ? {red: '1'} : {limits: JSON.stringify(limits)}));
+          await page.goto(server.url + '?' + new URLSearchParams(planted ? {red: '1'} : {limits: JSON.stringify(pageLimits)}));
           await page.waitForFunction("document.documentElement.dataset.complete === 'true'", undefined, {timeout: 180000});
+          if (corsDiagnostics) {
+            assert.deepEqual(accessControlMessages.sort(), [...accessControlProbes.keys()].sort(), 'Both real network probes must produce the declared WebKit diagnostics');
+            for (const url of probeUrls) assert.ok(failedProbes.has(url), 'A diagnostic must correspond to an actual failed request: ' + url);
+            assert.deepEqual(corsDiagnostics.items, [1]);
+            const record = {id: 'fetch/cors_diagnostics', observed: 'browser/access_control_diagnostic'};
+            assert.equal(corsDiagnostics.observed, record.observed);
+            observed.push(record);
+            output(`${name}: REQUEST_SEAL_LIMIT ${JSON.stringify(record)}`);
+          }
           assert.deepEqual(fatal, []);
           assert.ok(result, `${name}: browser page must report executed test counts`);
           assert.equal(records.length, result.total, 'Console results must tie out with summary');

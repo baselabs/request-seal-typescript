@@ -26,9 +26,9 @@ Node is still installed from `.tool-versions` and checked for an exact match.
 | Deno 2.5.6 | 2.5.6 | No `tls.getCACertificates`, so `cacerts: "os"` returns `discovery/transport_unavailable`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. |
 | Deno 2.9.7 | 2.9.7 | Denied OS roots check only; without `--allow-sys=ca`, source creation and fetch return `discovery/transport_unavailable`. Full-suite support is not asserted. |
 | Bun 1.3.14 | 1.3.14 | `crypto/ecdsa_secp256r1_sha256_p1363_test` items 261, 262 on darwin-arm64: `crypto/invalid_signature`. `test_file/discovery-node.test.ts` item 1: `discovery/invalid_response`. `test_file/discovery-fixes.test.ts` item 1: `discovery/invalid_response`. Fetch verification returns `adapter/invalid_request` outside the measured allowlist. |
-| Chromium | 156.0.8078.80 | Browser Fetch verification returns `adapter/invalid_request`. |
-| Firefox | 157.0 | Browser Fetch verification returns `adapter/invalid_request`. |
-| WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. `custody/ed25519_pkcs8_leading_zero_seed` item 1 on linux-x64: `custody/invalid_key`. `custody/rsa_oaep_leading_zero_cek` item 1 on linux-x64: `jose/decryption_failed`. Browser Fetch verification returns `adapter/invalid_request`. |
+| Chromium | 156.0.8078.80 | `fetch/manual_redirect` item 1: `fetch/opaqueredirect`. Browser Fetch verification returns `adapter/invalid_request`. |
+| Firefox | 157.0 | `fetch/manual_redirect` item 1: `fetch/opaqueredirect`. Browser Fetch verification returns `adapter/invalid_request`. |
+| WebKit | 27.2 | `custody/ed25519_empty_message` item 1 on darwin-arm64: `custody/invalid_key`. `custody/ed25519_pkcs8_leading_zero_seed` item 1 on linux-x64: `custody/invalid_key`. `custody/rsa_oaep_leading_zero_cek` item 1 on linux-x64: `jose/decryption_failed`. `fetch/manual_redirect` item 1: `fetch/opaqueredirect`. `fetch/cors_diagnostics` item 1 on linux-x64: `browser/access_control_diagnostic`. Browser Fetch verification returns `adapter/invalid_request`. |
 
 ## Node floor and engines
 
@@ -77,14 +77,24 @@ published corpus verdicts and requires exact outcomes. Its entire schema is
 validated before any release is selected. Unlisted divergence and stale
 limitations fail rather than being skipped silently.
 
-| Engine/version | Platform | Operation and exact library outcome |
+| Engine/version | Platform | Operation and exact observed outcome |
 | --- | --- | --- |
 | Bun 1.3.14 | macOS arm64 | Published Wycheproof P-256 signatures 261 and 262 return `crypto/invalid_signature`; Linux is outside this exception. |
 | Bun 1.3.14 | All configured platforms | Vetted existing TLS socket passed to HTTPS discovery returns `discovery/invalid_response`; the two discovery transport files declare this prerequisite and the real-peer limitation test executes it. |
 | Deno 2.5.6 | All configured platforms | The same vetted-socket HTTPS discovery returns `discovery/invalid_response`; the real-peer limitation test executes it. |
+| Chromium 156.0.8078.80, Firefox 157.0, WebKit 27.2 | All configured platforms | A manual redirect returns a successful exchange containing `opaqueredirect`, status 0 and no readable Location; classification is `unknown`, and no second signed hop runs. |
+| WebKit 27.2 | Linux x64 | Expected closed-port and reserved-name Fetch failures also emit access-control page diagnostics. The harness requires the exact two diagnostics and their real failed requests; every other page error remains fatal. |
 | WebKit 27.2 | macOS arm64 | `subtle.sign("Ed25519", key, new Uint8Array())` produces a signature that verifies false; custody's empty-message key health check returns `custody/invalid_key`. |
 | WebKit 27.2 | Linux x64 | `importKey("pkcs8")` rejects an Ed25519 private key whose seed begins with `0x00`; `Custody.local` given that PKCS8 form returns `custody/invalid_key`. The JWK form of the same key is accepted. |
 | WebKit 27.2 | Linux x64 | The libgcrypt backend's `gcryptDecrypt` uses `mpiData`, dropping leading `0x00` octets from RSA-OAEP and RSA-OAEP-256 plaintext. Leading-zero A128GCM/A256GCM CEKs therefore return `jose/decryption_failed`. RSA encryption is unaffected. |
+
+The [Fetch standard](https://fetch.spec.whatwg.org/#concept-filtered-response-opaque-redirect)
+requires manual redirects to hide their status and headers. A browser peer can
+confirm receiving the first POST, while the returned filtered response proves
+no origin status to the caller. Enabling redirects or allowing a `.invalid` target
+does not expose Location or initiate that second hop. Direct DNS, closed-port
+and open-connection-reset probes remain real transport failures classified as
+`unknown`. WebKit diagnostics are scoped separately from library results.
 
 Firefox 157.0 has no `Request.body` accessor and materializes request bodies at
 construction. The adapter uses `clone().arrayBuffer()` when the body is undefined;

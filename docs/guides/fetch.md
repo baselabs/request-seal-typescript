@@ -50,6 +50,14 @@ server.closeAllConnections();
 
 `signedFetch` sets `redirect` to manual and `Accept-Encoding` to `identity`, because a decoded body is not the body that was signed. A caller-supplied `Host`, or an `Accept-Encoding` other than `identity`, returns `invalid_options` before anything is sent. The body is read once and retained within `maxBytes` (1 MiB, which is both the default and the maximum) so each attempt can sign the same bytes.
 
+Browsers expose a manual redirect as an `opaqueredirect` response with status 0
+and no readable Location, including redirects from the same origin. The call
+returns that response in a successful exchange; `classify(result)` is `unknown`.
+The adapter cannot inspect or follow the hidden target, so `maxRedirects` and
+`allowedOrigins` cause no second signed hop there. Native runtimes that expose
+the redirect status and Location enforce those options. See the
+[runtime matrix](../reference/runtime-matrix.md).
+
 ### Fields the runtime controls
 
 A runtime sets some fields itself, so a signature that covers them could never verify. Signing refuses `host`, `content-length`, `accept-encoding`, `connection`, `transfer-encoding`, `trailer`, `keep-alive`, `proxy-connection`, `te`, and `upgrade`. Node also refuses `sec-fetch-mode`, which undici overrides. Cover `@authority` instead of `host`, and `content-digest` instead of `content-length`.

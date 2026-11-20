@@ -237,15 +237,24 @@ with `s = 2^128` and `s = n - 2^128` on `darwin-arm64`. The October 10, 2026
 ubuntu-24.04 CI failure log reports that both items verify on `linux-x64`, so
 this entry applies only to `darwin-arm64`.
 
-The browser suite reads the same file. WebKit 27.2 has three entries whose IDs name
-browser cases rather than corpus manifests: `custody/ed25519_empty_message` on
-`darwin-arm64` and `custody/ed25519_pkcs8_leading_zero_seed` on `linux-x64`, both
-observed as `custody/invalid_key`; `custody/rsa_oaep_leading_zero_cek` on `linux-x64`
-is observed as `jose/decryption_failed`. Each uses item 1. The RSA case exercises
-both RSA-OAEP hashes with A128GCM and A256GCM, proving native leading-zero CEK
-truncation and the exact rejection alongside nonzero controls. Random RSA
-round-trip failures require the same native proof for the failing ciphertext.
-Each selected limitation is recorded exactly once. The [runtime matrix](runtime-matrix.md) lists them.
+The browser suite reads the same file. All three browser engines declare
+`fetch/manual_redirect`, observed as `fetch/opaqueredirect`: manual redirects
+hide status and Location, so the adapter returns the filtered response and its
+delivery classification remains unknown. WebKit 27.2 also has three custody
+entries whose IDs name browser cases rather than corpus manifests:
+`custody/ed25519_empty_message` on `darwin-arm64` and
+`custody/ed25519_pkcs8_leading_zero_seed` on `linux-x64`, both observed as
+`custody/invalid_key`; `custody/rsa_oaep_leading_zero_cek` on `linux-x64` is
+observed as `jose/decryption_failed`. The RSA case exercises both RSA-OAEP hashes
+with A128GCM and A256GCM, proving native leading-zero CEK truncation and the exact
+rejection alongside nonzero controls. Random RSA round-trip failures require
+the same native proof for the failing ciphertext. WebKit's
+`fetch/cors_diagnostics` on `linux-x64` is observed by the runner as
+`browser/access_control_diagnostic`: the two real failed network probes must
+produce their exact access-control diagnostics and request failures; other page
+errors remain fatal. The page consumes its declarations, and the runner consumes
+its own diagnostic declaration. Each uses item 1 and is recorded exactly once.
+The [runtime matrix](runtime-matrix.md) lists them.
 
 Each item still runs actual cryptography. An entry scoped to another platform
 does not exempt an outcome or trigger a stale check: the item must agree with

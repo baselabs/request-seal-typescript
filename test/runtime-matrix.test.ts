@@ -119,7 +119,7 @@ test('browser limitation descriptions agree with the registry', () => {
 
 test('Firefox signing is supported and its body allocation bound is documented', () => {
   const table = JSON.parse(read('tools/conformance/runtime-limits.json'));
-  assert.deepEqual(table.firefox['157.0'], []);
+  assert.deepEqual(table.firefox['157.0'].map((entry: {id: string}) => entry.id), ['fetch/manual_redirect']);
   const docs = read('docs/reference/runtime-matrix.md');
   assert.match(docs, /clone\(\)\.arrayBuffer\(\)/);
   assert.match(docs, /maxBytes bounds accepted bytes, not the peak allocation/);

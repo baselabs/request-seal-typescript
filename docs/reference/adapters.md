@@ -252,6 +252,12 @@ removal, fresh signing per retry/hop, and optional `{policy, label}` verificatio
 match the Node exchange contract. The caller's body is retained within maxBytes.
 With `verify` selected, a runtime outside `FETCH_VERIFICATION_RUNTIMES` returns
 `invalid_request` before delivery.
+Browser Fetch returns an opaque manual-redirect response with status 0 and no
+readable Location, even for a same-origin redirect. `signedFetch` returns that
+response in a successful exchange and `classify` returns `unknown`. The hidden
+target cannot be checked against `allowedOrigins` or followed under `maxRedirects`;
+no second signed hop runs. Native runtimes that expose the actual redirect status
+and Location exercise the redirect policy. See the [runtime matrix](runtime-matrix.md).
 The returned value contains the response and the exact signed request. Each
 attempt after the first generates fresh nonce entropy when the spec requires
 a nonce. Caller signal and Context compose once for the exchange; unused

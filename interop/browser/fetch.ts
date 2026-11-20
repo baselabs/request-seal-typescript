@@ -1,5 +1,6 @@
 import test from './harness.ts';
 import assert from './assert.ts';
+import {assertObservation} from './limits.ts';
 import * as Seal from '../../dist/index.js';
 import {signRequest, verifyRequest, verifyResponse, signedFetch, classify} from '../../dist/adapters/fetch/index.js';
 function value<T>(r: Seal.Result<T>): T { if (!r.ok) assert.fail(`${r.error.kind}/${r.error.reason}`); return r.value; }
@@ -112,7 +113,7 @@ test('browser delivery classification uses real statuses and transport peers', a
   } finally {await owner.release();}
 });
 
-for (const allowed of [false, true]) test(`browser POST 303 ${allowed ? 'followed by DNS failure' : 'to a disallowed origin'} remains unknown`, async () => {
+for (const allowed of [false, true]) test(`browser POST 303 ${allowed ? 'to an allowed .invalid target' : 'to a disallowed origin'} is opaque and remains unknown`, async () => {
   const owner = value(await Seal.Custody.local('hmac-sha256', {hmac: crypto.getRandomValues(new Uint8Array(32))}));
   try {
     const before = await (await fetch(origin + '/__delivery/redirect-count')).json() as {requests: number};
@@ -120,14 +121,16 @@ for (const allowed of [false, true]) test(`browser POST 303 ${allowed ? 'followe
       {spec: {label: 'sig', components: '("@method")', algorithm: 'hmac-sha256', expiresIn: 60}, signer: owner},
       {context: value(Seal.withDeadline({timeoutMs: 10000})), maxRedirects: 1,
         ...(allowed ? {allowedOrigins: ['http://delivery-canary.invalid']} : {})});
-    assert.equal(result.ok, false); assert.equal(classify(result), 'unknown');
-    if (!result.ok) {
-      assert.equal(result.error.kind, 'adapter');
-      if (result.error.kind === 'adapter') {
-        assert.equal(result.error.attempt, allowed ? 2 : 1);
-        if (!allowed) assert.equal(result.error.reason, 'cross_origin_redirect');
-      }
-    }
+    // Fetch's manual redirect response hides both the 303 status and Location,
+    // even for a same-origin peer. No second signed hop can be constructed.
+    const exchange = value(result);
+    assert.equal(classify(result), 'unknown');
+    assert.equal(exchange.response.type, 'opaqueredirect');
+    assert.equal(exchange.response.status, 0);
+    assert.equal(exchange.response.headers.get('location'), null);
+    assert.equal(exchange.response.body, null);
+    assert.equal(exchange.request.request.url, origin + '/__delivery/redirect');
+    if (!allowed) assertObservation('fetch/manual_redirect', 'fetch/' + exchange.response.type);
     const after = await (await fetch(origin + '/__delivery/redirect-count')).json() as {requests: number; method: string};
     assert.equal(after.requests, before.requests + 1); assert.equal(after.method, 'POST');
   } finally {await owner.release();}

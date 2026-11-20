@@ -5,6 +5,7 @@
 - Let release-documentation qualification check the latest versioned entry after an optional Unreleased section, preserving version and bullet-format validation.
 - Read signature-base input lengths through the shared TypedArray intrinsic when Uint8Array allocations are instrumented, preserving the pre-copy byte ceiling and private-buffer zeroing checks.
 - Resolve imported callable signatures in the public API inventory, including nested policy, discovery snapshot and source facades, and align their baseline with built declarations.
+- Qualify browser delivery against opaque manual redirects (`unknown`, without a second hop) and declare WebKit's access-control diagnostics for real failed network probes. Unexpected page errors still fail qualification.
 - Add exact public export/signature inventory checks across all package entry points.
 - Put the Profile extension interface under the compatibility promise and freeze the reserved namespace set with corpus-backed tests.
 - Document stable exports, results, reasons, bounds, wire bytes, profiles and telemetry, with explicit 0.x compatibility boundaries and release/deprecation rules.
