@@ -68,8 +68,9 @@ const text = (b: Uint8Array) => {
     out.push(String.fromCharCode(...b.subarray(i, i + 8192)));
   return out.join('');
 };
+// The shared TypedArray getter also works when Uint8Array allocations are instrumented.
 const typedArrayLength = Object.getOwnPropertyDescriptor(
-  Object.getPrototypeOf(Uint8Array.prototype), 'length',
+  Object.getPrototypeOf(Uint16Array.prototype), 'length',
 )!.get!;
 function canonical(value: Value, schema: Schema, reason: Reason<'signature_base'>): string {
   return text(sf(serialize(value, { schema }), reason));

@@ -19,7 +19,13 @@ function count(needle: Uint8Array): number {
 async function main() {
   globalThis.Uint8Array = Tracked as Uint8ArrayConstructor;
   try {
-    const {Custody} = await import('../../src/index.ts');
+    const {Custody, parseSignatureBase, SIGNATURE_BASE_MAX_BYTES} = await import('../../src/index.ts');
+    const oversized = new Tracked(SIGNATURE_BASE_MAX_BYTES + 1);
+    Object.defineProperty(oversized, 'length', {get() {assert.fail('parser must read the intrinsic length');}});
+    const rejected = parseSignatureBase(oversized);
+    assert.ok(!rejected.ok);
+    assert.deepEqual(rejected.error, {kind: 'signature_base', reason: 'limit'});
+    made.length = 0;
     const {decodeKey, readDer, writePem} = await import('../../src/custody/der.ts');
     const value = <T>(r: import('../../src/result.ts').Result<T>): T => {assert.ok(r.ok); return r.value;};
     function publicOnly(jwk: object) {
