@@ -134,4 +134,6 @@ test('every workflow step fails on a failure anywhere in a pipe', () => {
   assert.equal((ci.match(/bash scripts\/red-proof\.sh /g) ?? []).length, 4);
   const script = read('scripts/red-proof.sh');
   assert.match(script, /^#!\/usr\/bin\/env bash\n(?:#[^\n]*\n)*set -euo pipefail\n/);
+  // The red-proof test spawns the script with bash; Deno refuses any program its lane does not allow.
+  assert.match(ci, /^\s+deno test [^\n]*--allow-run=(?:[^\s,]+,)*bash[,\s]/m);
 });
