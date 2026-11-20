@@ -1,7 +1,6 @@
 import {PARITY_HEADER} from './parity-header.ts';
-import {withErrorAdditions} from './error-additions.ts';
 import { readFileSync, writeFileSync } from 'node:fs';
-const fixture = withErrorAdditions(JSON.parse(readFileSync('test/fixtures/elixir-reasons-511fed1.json', 'utf8')));
+const fixture = JSON.parse(readFileSync('test/fixtures/elixir-reasons-511fed1.json', 'utf8'));
 const retryable = Object.fromEntries(fixture.modules.map((m: {kind: string; retryable: {rules: unknown}}) => [m.kind, m.retryable.rules]));
 const current = readFileSync('src/errors/parity.ts', 'utf8');
 const parityStart = current.indexOf('export const ERROR_PARITY');

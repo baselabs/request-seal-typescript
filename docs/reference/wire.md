@@ -154,9 +154,10 @@ Empty coverage and empty values are valid; unknown component semantics are not
 interpreted. These inspection helpers authenticate nothing. `SignatureBase.components`
 and `SignatureBase.parse` expose the same operations.
 
-Malformed inputs return `signature_base/malformed`, including parser work limits
-inside a base whose total size is within 1 MiB. Only an input larger than that
-ceiling returns `signature_base/limit`. The additive `malformed` rule is tied to
-the public Elixir source pin recorded in [error parity](error-parity.md), separately
-from the older base vocabulary and corpus pins. No corpus files are changed by
-these inspection helpers.
+Parse refusals return `signature_base/invalid_signature_parameters`, including
+parser work limits inside a base whose total size is within 1 MiB. Only an input
+larger than that ceiling returns `signature_base/limit`. Public Elixir 2.0 returns
+`signature_base/malformed` for those parse refusals. This package will switch to
+`malformed` when the whole error vocabulary re-pins to the Elixir 2.0.0 release
+with the corpus under [RSC-corpus-repin-2.0](../ROADMAP.md), as explained in
+[error parity](error-parity.md). Component inspection retains build's errors.

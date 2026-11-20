@@ -33,12 +33,6 @@ The package uses ESM with declaration exports. Use a modern TypeScript module re
 
 ## Runtime test compatibility
 
-Additive error rules for implemented operations can precede a full vocabulary repin.
-Their public source bytes and Git identities live in `test/fixtures/elixir-error-additions.json`;
-`scripts/error-additions.ts` validates that evidence and both parity regeneration
-paths retain the rules. The released base extraction remains an exact tie-out to
-`ELIXIR_ERROR_PIN`. A newer base containing an identical rule needs no duplicate.
-
 The fixed public API inventory is `test/fixtures/public-api-inventory.json`.
 Every Node qualification lane compares the built declarations at all typed package
 exports with it, including resolved facade call signatures and merged type/value

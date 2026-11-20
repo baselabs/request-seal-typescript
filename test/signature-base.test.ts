@@ -474,9 +474,12 @@ test('inspection accepts empty values and does not authenticate or derive their 
 });
 
 test('inspection rejects departures from the ordered canonical grammar with a tied-out safe reason', async () => {
-  const { parseSignatureBase, ERROR_PARITY } = await import('../src/index.ts');
-  const reason = 'malformed'; // Declared by the additive public source pin.
+  const { parseSignatureBase, signatureBaseComponents, ERROR_PARITY } = await import('../src/index.ts');
+  const reason = 'invalid_signature_parameters'; // Tied out to the v1.0.0 extraction.
   assert.ok(ERROR_PARITY.some(e => e.kind === 'signature_base' && e.reason === reason));
+  const invalidParameters = signatureBaseComponents(request(), '(');
+  assert.ok(!invalidParameters.ok);
+  assert.deepEqual(invalidParameters.error, {kind: 'signature_base', reason});
   const good = '"@method": GET\n"@signature-params": ("@method")';
   const invalid: unknown[] = [null, undefined, 42, [], {}, new Uint8Array([255]), '',
     '"@method": GET', good + '\n', good.replace('\n', '\r\n'),
@@ -516,7 +519,7 @@ test('inspection has the exact one MiB input ceiling', async () => {
   assert.deepEqual(rejected.error, {kind: 'signature_base', reason: 'limit'});
 });
 
-test('inspection maps Structured Fields work refusals within the byte ceiling to malformed', async () => {
+test('inspection maps Structured Fields work refusals within the byte ceiling to invalid_signature_parameters', async () => {
   const { parseSignatureBase, STRUCTURED_FIELDS_LIMITS } = await import('../src/index.ts');
   const base = (count: number) => {
     const ids = Array.from({length: count}, (_, index) => JSON.stringify('x' + index));
@@ -527,7 +530,7 @@ test('inspection maps Structured Fields work refusals within the byte ceiling to
     '"@signature-params": ();pad="' + 'x'.repeat(STRUCTURED_FIELDS_LIMITS.maxValueBytes + 1) + '"']) {
     const result = parseSignatureBase(input);
     assert.ok(!result.ok);
-    assert.deepEqual(result.error, {kind: 'signature_base', reason: 'malformed'});
+    assert.deepEqual(result.error, {kind: 'signature_base', reason: 'invalid_signature_parameters'});
   }
 });
 

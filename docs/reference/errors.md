@@ -112,6 +112,16 @@ Returned by Structured Fields parsing and serialization.
 Returned by `SignatureBase.build`, `SignatureBase.components` and `SignatureBase.parse`,
 and as `detail` of core errors from signing and verification.
 
+`SignatureBase.parse` returns `signature_base/limit` for input above 1,048,576
+bytes. Every other parse refusal, including Structured Fields work limits within
+that byte ceiling, returns the v1.0.0-tied `signature_base/invalid_signature_parameters`.
+Public Elixir 2.0 returns `signature_base/malformed` for those parse refusals.
+Under [ADR 0005](../adr/0005-shared-corpus-and-separate-pins.md), the vocabulary can
+lead or lag the corpus. This package will switch to `malformed` when the whole
+error vocabulary re-pins to the Elixir 2.0.0 release with the corpus under
+[RSC-corpus-repin-2.0](../ROADMAP.md). See [error parity](error-parity.md).
+`SignatureBase.components` retains build's errors.
+
 | Reason | Meaning | What to do |
 | --- | --- | --- |
 | `signature_base/ambiguous_query_parameter` | `@query-param` names a parameter that appears more than once. | Reject the ambiguous parameter; agree on unique parameters or cover the complete raw query through a suitable adapter. |
@@ -123,10 +133,9 @@ and as `detail` of core errors from signing and verification.
 | `signature_base/invalid_message` | The value is not a branded Message. | Pass a Message. |
 | `signature_base/invalid_options` | Build options are malformed. | Fix the options. |
 | `signature_base/invalid_query_encoding` | The query cannot be decoded as form data. | Do not cover `@query-param` for that request. |
-| `signature_base/invalid_signature_parameters` | The signature parameters are malformed. | Fix the parameters. |
+| `signature_base/invalid_signature_parameters` | The signature parameters are malformed, or a serialized base fails structural inspection within the byte ceiling. | Fix the parameters, or reject the serialized base; inspection does not authenticate it. |
 | `signature_base/invalid_structured_field` | A field covered with `sf` or `key` is not valid under its schema. | Reject, or fix the schema. |
 | `signature_base/limit` | The base would exceed a size or count bound. | Cover less. |
-| `signature_base/malformed` | A serialized base is not canonical, ordered, printable ASCII with exactly matching component identifiers and a final signature-params line. | Reject the serialized base; structural inspection does not authenticate it. |
 | `signature_base/missing_dictionary_key` | A `key` parameter names a member the dictionary lacks. | Reject the request. |
 | `signature_base/missing_field` | A covered field is absent. | Reject, or cover only present fields. |
 | `signature_base/missing_query_parameter` | `@query-param` names a parameter the query lacks. | Reject the request. |

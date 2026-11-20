@@ -2,7 +2,9 @@
 
 OBSERVED: extraction with `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 511fed142044ccea28bdcbb317c091cb2c8a515d <output.json>` reads pinned constructors and call sites through Git. Core and JOSE pairs follow helper arguments, defaults, guards, and variable bindings. Parameterized helper layers resolve only from bindings at actual call sites. The internal JOSE worker is called with the crypto layer, so JOSE deadline errors exist only on that layer. Structured Fields and Digest have open Elixir reason types: their reasons come from call sites; moduledoc lists only cross-check the extraction.
 
-The base error vocabulary is pinned to v1.0.0 (release commit 511fed142044ccea28bdcbb317c091cb2c8a515d); the shared corpus is vendored from that release's verified assets. The additive `signature_base/malformed` rule is pinned separately to public commit [0ce86730c7c70e92efdabc9a3b4867b90fc67053](https://github.com/baselabs/request_seal/blob/0ce86730c7c70e92efdabc9a3b4867b90fc67053/lib/request_seal/signature_base/error.ex). Its declaration and parse call sites are preserved byte for byte with their Git blob identities in `test/fixtures/elixir-error-additions.json`. Both regeneration paths validate those source bytes and retain the addition; a later base pin that already contains the same rule does not duplicate it.
+The error vocabulary is pinned to v1.0.0 (release commit 511fed142044ccea28bdcbb317c091cb2c8a515d); the shared corpus is vendored from the same release's verified assets.
+
+Under [ADR 0005](../adr/0005-shared-corpus-and-separate-pins.md), the error vocabulary can lead or lag the corpus. Signature-base parsing follows public Elixir 2.0's validation, but this package returns the v1.0.0-tied `signature_base/invalid_signature_parameters` for every parse refusal except input above 1,048,576 bytes (`signature_base/limit`). Public Elixir 2.0 returns `signature_base/malformed` for those parse refusals. This package will switch to `malformed` when the whole error vocabulary re-pins to the Elixir 2.0.0 release with the corpus under [RSC-corpus-repin-2.0](../ROADMAP.md).
 
 Extension-profile reasons are defined by extension packages and arrive with the profile row. The core layer union does not include `profile`.
 
@@ -106,7 +108,6 @@ Results are frozen on construction. `deepFreeze` returns a Result containing a s
 | signature_base |  | invalid_signature_parameters | signature_base/invalid_signature_parameters |
 | signature_base |  | invalid_structured_field | signature_base/invalid_structured_field |
 | signature_base |  | limit | signature_base/limit |
-| signature_base |  | malformed | signature_base/malformed |
 | signature_base |  | missing_dictionary_key | signature_base/missing_dictionary_key |
 | signature_base |  | missing_field | signature_base/missing_field |
 | signature_base |  | missing_query_parameter | signature_base/missing_query_parameter |

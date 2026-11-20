@@ -7,7 +7,7 @@
 - Document stable exports, results, reasons, bounds, wire bytes, profiles and telemetry, with explicit 0.x compatibility boundaries and release/deprecation rules.
 - Explain selected verified agent labels, held-key thumbprints and application record matching.
 - Add delivery classification for Fetch and Node HTTP: received statuses other than 502/504 are answered, only calls proven to have sent no request bytes are refused, and verification and later-attempt failures remain unknown without retaining runtime diagnostics.
-- Add signature-base parsing and component inspection with shared construction bounds, canonical reconstruction and duplicate identities. Parsing returns `malformed` from its separately pinned public Elixir source; the released base vocabulary and corpus retain their existing pins.
+- Add signature-base parsing and component inspection with shared construction bounds, canonical reconstruction and duplicate identities. Parse refusals use the v1.0.0-tied `signature_base/invalid_signature_parameters`; input above 1,048,576 bytes returns `signature_base/limit`. Public Elixir 2.0 returns `malformed` for those parse refusals. This package will switch to `malformed` when the whole error vocabulary re-pins to the Elixir 2.0.0 release with the corpus under RSC-corpus-repin-2.0, following ADR 0005's separate-pin policy.
 
 ## 0.5.1 - 2026-11-17
 

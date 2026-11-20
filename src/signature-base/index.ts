@@ -410,50 +410,50 @@ export function components(
 /**
  * Inspect canonical RFC 9421 Section 2.5 bytes (ByteString or Uint8Array), at most 1 MiB.
  * This checks structure and exact reconstruction, not authenticity or component semantics.
- * Invalid input returns malformed; only an oversized input returns limit.
- * Refusal reasons match the separately pinned public Elixir parse contract.
+ * Invalid input returns invalid_signature_parameters; only oversized input returns limit.
+ * The vocabulary remains pinned to Elixir v1.0.0; Elixir 2.0 calls these refusals malformed.
  */
 export function parseSignatureBase(input: unknown): Result<ParsedSignatureBase> {
   try {
-    ensure(typeof input === 'string' || input instanceof Uint8Array, 'malformed');
+    ensure(typeof input === 'string' || input instanceof Uint8Array, 'invalid_signature_parameters');
     const length: number = typeof input === 'string' ? input.length : typedArrayLength.call(input);
     if (length > SIGNATURE_BASE_MAX_BYTES) return err(signatureBaseError('limit'));
     const copied = byteString(input);
-    ensure(copied.ok, 'malformed');
+    ensure(copied.ok, 'invalid_signature_parameters');
     const source = text(copied.value);
-    ensure(/^[\x0a\x20-\x7e]*$/.test(source), 'malformed');
+    ensure(/^[\x0a\x20-\x7e]*$/.test(source), 'invalid_signature_parameters');
     const lines = source.split('\n');
     const final = lines.pop()!;
     const prefix = '"@signature-params": ';
-    ensure(final.startsWith(prefix), 'malformed');
+    ensure(final.startsWith(prefix), 'invalid_signature_parameters');
     const signatureParams = final.slice(prefix.length);
     const parsed = parse('list', signatureParams, { schema: signatureSchema });
     ensure(parsed.ok && parsed.value.kind === 'list' && parsed.value.value.length === 1 &&
-      parsed.value.value[0]?.kind === 'inner_list', 'malformed');
+      parsed.value.value[0]?.kind === 'inner_list', 'invalid_signature_parameters');
     const innerList = parsed.value.value[0];
-    ensure(canonical(parsed.value, signatureSchema, 'malformed') === signatureParams,
-      'malformed');
-    ensure(lines.length === innerList.value.length, 'malformed');
+    ensure(canonical(parsed.value, signatureSchema, 'invalid_signature_parameters') === signatureParams,
+      'invalid_signature_parameters');
+    ensure(lines.length === innerList.value.length, 'invalid_signature_parameters');
     const seen = new Set<string>();
     const pairs: (readonly [string, string])[] = [];
     for (let i = 0; i < innerList.value.length; i++) {
       const item = innerList.value[i]!;
       ensure(item.value.kind === 'string' && item.value.value !== '@signature-params',
-        'malformed');
+        'invalid_signature_parameters');
       const key = identity(item);
-      ensure(!seen.has(key), 'malformed');
+      ensure(!seen.has(key), 'invalid_signature_parameters');
       seen.add(key);
-      const id = canonical(item, { ...signatureSchema, type: 'item' }, 'malformed');
+      const id = canonical(item, { ...signatureSchema, type: 'item' }, 'invalid_signature_parameters');
       const line = lines[i]!;
-      ensure(line.startsWith(id + ': '), 'malformed');
+      ensure(line.startsWith(id + ': '), 'invalid_signature_parameters');
       const value = line.slice(id.length + 2);
-      ensure(/^[\x20-\x7e]*$/.test(value), 'malformed');
+      ensure(/^[\x20-\x7e]*$/.test(value), 'invalid_signature_parameters');
       pairs.push(Object.freeze([id, value] as const));
     }
     const parts = Object.freeze({ components: Object.freeze(pairs), signatureParams, innerList });
-    ensure(rebuild(parts) === source, 'malformed');
+    ensure(rebuild(parts) === source, 'invalid_signature_parameters');
     return ok(parts);
-  } catch { return err(signatureBaseError('malformed')); }
+  } catch { return err(signatureBaseError('invalid_signature_parameters')); }
 }
 /** RFC 9421 signature-base construction and structural inspection operations. */
 export const SignatureBase = Object.freeze({

@@ -9,7 +9,7 @@ test('both parity regeneration paths produce identical bytes and are idempotent'
   const root = await mkdtemp(join(tmpdir(), 'rs-parity-'));
   try {
     for (const dir of ['scripts', 'src/errors', 'test/fixtures']) await mkdir(join(root, dir), {recursive: true});
-    const files = ['scripts/generate-parity.ts', 'scripts/render-parity.ts', 'src/errors/parity.ts', 'test/fixtures/elixir-reasons-511fed1.json', 'test/fixtures/elixir-error-additions.json'];
+    const files = ['scripts/generate-parity.ts', 'scripts/render-parity.ts', 'src/errors/parity.ts', 'test/fixtures/elixir-reasons-511fed1.json'];
     for (const file of files) await copyFile(file, join(root, file));
     // Copy any shared script dependencies along with the two entry points.
     const {readdir} = await import('node:fs/promises');

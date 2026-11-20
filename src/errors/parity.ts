@@ -1,5 +1,5 @@
 // Derived from pinned Elixir constructors and call sites; regenerate with scripts/generate-parity.ts or scripts/render-parity.ts --update-table.
-/** The immutable base reference release; additive source pins are documented in error parity. */
+/** The immutable reference release used for the error vocabulary. */
 export const ELIXIR_ERROR_PIN = '511fed142044ccea28bdcbb317c091cb2c8a515d';
 const entries = [
   {
@@ -524,11 +524,6 @@ const entries = [
     "kind": "signature_base",
     "reason": "limit",
     "rule_id": "signature_base/limit"
-  },
-  {
-    "kind": "signature_base",
-    "reason": "malformed",
-    "rule_id": "signature_base/malformed"
   },
   {
     "kind": "signature_base",
@@ -1551,10 +1546,6 @@ const retryableRules = {
       "value": false
     },
     "limit": {
-      "kind": "constant",
-      "value": false
-    },
-    "malformed": {
       "kind": "constant",
       "value": false
     },
