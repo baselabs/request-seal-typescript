@@ -1,6 +1,6 @@
 import nodeTest from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer, type Server } from 'node:http';
+import { createServer, type Server, type ServerResponse } from 'node:http';
 import { once } from 'node:events';
 import { connect } from 'node:net';
 import { Custody, Policy, ok, withDeadline, type Result, type KeyHandle } from '../src/index.ts';
@@ -86,15 +86,22 @@ for (const name of ['fetch', 'node-http'] as const) {
       }
     } finally {await key.release();}
   });
-  test(`${name} delivery keeps an open-connection reset and stalled peer unknown`, async () => {
+  // A hang fails this test by name instead of exhausting the lane's job limit.
+  test(`${name} delivery keeps an open-connection reset and stalled peer unknown`, {timeout: 30_000}, async () => {
     let received = 0;
-    await withPeer(createServer(req => {received++; if (req.url === '/reset') req.socket.destroy();}), async (url, key) => {
-      for (const path of ['/reset', '/stall']) {
-        const result = await send(url + path, key, {context: value(withDeadline({timeoutMs: 2000}))});
-        assert.ok(!result.ok); assert.equal(classify(result), 'unknown');
-        assert.doesNotMatch(JSON.stringify(result), /stack|ECONN|socket hang up/);
+    const stalled: ServerResponse[] = [];
+    await withPeer(createServer((req, res) => {received++; if (req.url === '/reset') req.socket.destroy(); else stalled.push(res);}), async (url, key) => {
+      try {
+        for (const path of ['/reset', '/stall']) {
+          const result = await send(url + path, key, {context: value(withDeadline({timeoutMs: 2000}))});
+          assert.ok(!result.ok); assert.equal(classify(result), 'unknown');
+          assert.doesNotMatch(JSON.stringify(result), /stack|ECONN|socket hang up/);
+        }
+        assert.equal(received, 2, 'both failures followed real request bytes');
+      } finally {
+        // Deno's node:http close waits for in-flight requests; the stalled one ends only after the client gave up.
+        for (const res of stalled) res.end();
       }
-      assert.equal(received, 2, 'both failures followed real request bytes');
     });
   });
   test(`${name} delivery keeps failed response verification unknown`, async () => {
