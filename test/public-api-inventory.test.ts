@@ -3,11 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { declarationInventory, inventoryChanges, type ApiInventory } from '../scripts/public-api-inventory.ts';
 
-test('every package entry point has exactly the inventoried declaration signatures', t => {
-  if (process.versions.bun || (globalThis as {Deno?: unknown}).Deno) {
-    t.skip('Native lanes run source tests; every Node lane checks declarations after build');
-    return;
-  }
+// Native lanes run source tests; every Node lane checks declarations after build.
+const native = Boolean(process.versions.bun || (globalThis as {Deno?: unknown}).Deno);
+test('every package entry point has exactly the inventoried declaration signatures', {skip: native}, () => {
   const expected = JSON.parse(readFileSync(new URL('./fixtures/public-api-inventory.json', import.meta.url), 'utf8')) as ApiInventory;
   const actual = declarationInventory();
   assert.doesNotMatch(actual['.']!['WebBotAuthPolicy']!, /const WebBotAuthPolicy/, 'type-only exports must not acquire a runtime value');

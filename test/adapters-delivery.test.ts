@@ -2,6 +2,7 @@ import nodeTest from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import { once } from 'node:events';
+import { connect } from 'node:net';
 import { Custody, Policy, ok, withDeadline, type Result, type KeyHandle } from '../src/index.ts';
 import { nodeAdapterTest } from './support/node-adapter-test.ts';
 import * as fetchAdapter from '../src/adapters/fetch/index.ts';
@@ -16,6 +17,20 @@ async function close(server: Server): Promise<void> {
   if (!server.listening) {server.closeAllConnections(); return;}
   const done = new Promise<void>((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
   server.closeAllConnections(); await done;
+}
+// Waits until a new connection to the port is refused, so a later attempt cannot reach the peer
+// on any runtime, whatever its listener's close timing.
+async function refusedAt(port: number): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const code = await new Promise<string>(resolve => {
+      const socket = connect(port, '127.0.0.1');
+      socket.once('connect', () => {socket.destroy(); resolve('open');});
+      socket.once('error', (error: NodeJS.ErrnoException) => resolve(error.code ?? 'error'));
+    });
+    if (code === 'ECONNREFUSED') return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  assert.fail('the closed listener still accepts connections');
 }
 async function withPeer(server: Server, check: (url: string, key: KeyHandle) => Promise<void>): Promise<void> {
   const key = value(await Custody.local('hmac-sha256', {hmac: crypto.getRandomValues(new Uint8Array(32))}));
@@ -122,9 +137,12 @@ for (const name of ['fetch', 'node-http'] as const) {
   });
   test(`${name} delivery keeps a 503 retry with a refused second connection unknown`, async () => {
     let received = 0;
-    const server = createServer((req, res) => {
-      received++; req.resume(); server.close();
-      res.writeHead(503, {connection: 'close'}).end();
+    const server = createServer(async (req, res) => {
+      received++; req.resume();
+      const {port} = server.address() as {port: number};
+      server.close(); await refusedAt(port);
+      // The answering connection ends with the response, so no attempt can reuse it.
+      res.writeHead(503, {connection: 'close'}).end(() => req.socket.destroy());
     });
     await withPeer(server, async (url, key) => {
       const result = await send(url, key, {maxRetries: 1});

@@ -128,7 +128,10 @@ for (const allowed of [false, true]) test(`browser POST 303 ${allowed ? 'to an a
     assert.equal(exchange.response.type, 'opaqueredirect');
     assert.equal(exchange.response.status, 0);
     assert.equal(exchange.response.headers.get('location'), null);
-    assert.equal(exchange.response.body, null);
+    // Fetch defines an opaque-redirect body as null; WebKit returns an empty stream. Either way no
+    // response bytes are exposed.
+    const body = exchange.response.body === null ? null : new Uint8Array(await exchange.response.arrayBuffer());
+    assert.ok(body === null || body.byteLength === 0, 'an opaque redirect exposes no response bytes');
     assert.equal(exchange.request.request.url, origin + '/__delivery/redirect');
     if (!allowed) assertObservation('fetch/manual_redirect', 'fetch/' + exchange.response.type);
     const after = await (await fetch(origin + '/__delivery/redirect-count')).json() as {requests: number; method: string};
