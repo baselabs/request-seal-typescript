@@ -1,9 +1,11 @@
 # Extension profiles
 
 `Profile` shares HTTP signature parsing, coverage, freshness, cryptography, content,
-and replay with independently maintained extension packages. This surface is unstable;
-pin `@request-seal/core` exactly. Extensions enforce their source-specific predicates
-and select their profile name as a constant in their code.
+and replay with independently maintained extension packages. The profile extension
+interface is stable within a major under the [compatibility contract](compatibility.md);
+before 1.0, that promise holds within each 0.x minor line. Extensions enforce
+their source-specific predicates and select their profile name as a constant
+in their code.
 
 The program below plays both sides: it signs a request, then verifies it the way an
 extension package would, with its own constant stamp.

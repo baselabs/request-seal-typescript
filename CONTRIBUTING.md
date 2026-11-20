@@ -33,6 +33,21 @@ The package uses ESM with declaration exports. Use a modern TypeScript module re
 
 ## Runtime test compatibility
 
+Additive error rules for implemented operations can precede a full vocabulary repin.
+Their public source bytes and Git identities live in `test/fixtures/elixir-error-additions.json`;
+`scripts/error-additions.ts` validates that evidence and both parity regeneration
+paths retain the rules. The released base extraction remains an exact tie-out to
+`ELIXIR_ERROR_PIN`. A newer base containing an identical rule needs no duplicate.
+
+The fixed public API inventory is `test/fixtures/public-api-inventory.json`.
+Every Node qualification lane compares the built declarations at all typed package
+exports with it, including resolved facade call signatures and merged type/value
+names. Additions, removals and signature changes fail with a named diff. After an
+intentional API change, regenerate it on the hosted qualification runner with
+`node --experimental-strip-types --no-warnings scripts/public-api-inventory.ts --write`
+after the build; review the inventory edit beside the source change. Tests never
+rewrite the baseline. The `package.json` metadata subpath has no declared API.
+
 Register independent `node:test` tests at module scope; Bun 1.3.14 does not support
 nested imported `test()` calls or `TestContext.test()` (`t.test()`).
 Keep runtime-only skips explicit and print their reasons.

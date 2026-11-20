@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add exact public export/signature inventory checks across all package entry points.
+- Put the Profile extension interface under the compatibility promise and freeze the reserved namespace set with corpus-backed tests.
+- Document stable exports, results, reasons, bounds, wire bytes, profiles and telemetry, with explicit 0.x compatibility boundaries and release/deprecation rules.
+- Explain selected verified agent labels, held-key thumbprints and application record matching.
 - Add delivery classification for Fetch and Node HTTP: received statuses other than 502/504 are answered, only calls proven to have sent no request bytes are refused, and verification and later-attempt failures remain unknown without retaining runtime diagnostics.
 - Add signature-base parsing and component inspection with shared construction bounds, canonical reconstruction and duplicate identities. Parsing returns `malformed` from its separately pinned public Elixir source; the released base vocabulary and corpus retain their existing pins.
 

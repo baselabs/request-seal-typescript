@@ -1,5 +1,7 @@
 # Telemetry
 
+Stability and additive changes follow the [compatibility contract](compatibility.md).
+
 `Telemetry.attach(subscriber)` observes verification, replay, and custody operations with bounded, low-cardinality events. Handlers own storage and aggregation; the library keeps no history. The surface is opt-in, has zero dependencies, and never changes what an operation returns — a subscriber that throws is silently skipped, and the operation it observes still completes.
 
 ```ts

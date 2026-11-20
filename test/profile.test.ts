@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { inspect } from "node:util";
 import fc from "fast-check";
 import * as api from "../src/index.ts";
@@ -376,4 +376,25 @@ test("extension docs describe whole-stamp replay binding and public type widenin
   assert.match(changelog, /Verification\.profile.*ReplayFacts\.profile/s);
   assert.match(changelog, /exhaustive narrowing/);
   assert.match(changelog, /Render Deno inspection of Verifications/);
+});
+
+
+test('reserved extension packages are exactly the five core names in the pinned corpus', async () => {
+  const expected = ['request-seal', 'request_seal', 'rfc9421', 'web-bot-auth', 'web_bot_auth'].sort();
+  const corpus = new URL('../conformance/cases/profile/', import.meta.url);
+  const names = readdirSync(corpus).filter(name => /^reserved-.*\.json$/.test(name)).map(name => {
+    const item = JSON.parse(readFileSync(new URL(name, corpus), 'utf8')) as {inputs: {name: [string, string]}};
+    return item.inputs.name[0];
+  });
+  assert.deepEqual(names.sort(), expected);
+  const near = ['requestseal', 'request_seals', 'request_seal_extension', 'rfc94210', 'rfc_9421',
+    'webbotauth', 'web_bot_auth_extension', 'web-bot-auth-extension', 'test_pkg'];
+  const rejected: string[] = [];
+  for (const name of [...expected, ...near]) {
+    const result = await check({name: [name, 'synthetic']});
+    if (!result.ok) {rejection(result, 'invalid_profile', 'input'); rejected.push(name);}
+    else assert.equal(result.value.authorization, 'not_evaluated');
+  }
+  assert.deepEqual(rejected.sort(), expected);
+  for (const name of expected) value(await check({name: ['test_pkg', name]}));
 });

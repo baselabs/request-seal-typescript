@@ -179,7 +179,7 @@ async function verifyLabel(message: unknown, policy: unknown, selectedLabel: unk
       {input: selectedInput, signature: signatures.get(selectedLabel)! as Item}, profile);
   } catch (e) { return err(protectedError(e)); }
 }
-/** Unstable extension boundary. Pin the package exactly and keep profile names constant. */
+/** Stable profile extension interface within a major (within each minor line before 1.0). */
 export const Profile = Object.freeze({
   /** Check the brand and shape of a signature-input inner list. */
   validSignatureInput,

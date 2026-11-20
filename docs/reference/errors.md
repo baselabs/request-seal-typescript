@@ -1,5 +1,7 @@
 # Error reasons
 
+Stability and additive changes follow the [compatibility contract](compatibility.md).
+
 Every failure is a `Result` whose `error` has a stable `kind` and `reason`, and for `core` and `jose` a `layer`. This page says what each reason means and what to do about it. Branch on these values, never on message text. The [error vocabulary](error-parity.md) is the generated list with its pin, and the [README](../../README.md#reason-to-http-status-recommendation) recommends an HTTP status for each. A test checks that this page lists every reason in the vocabulary.
 
 Adapter errors can carry the underlying error in `error.source`; the [adapter section](#adapter) says when. A few reasons are part of the vocabulary shared with RequestSeal for Elixir and are never returned by this package; they are marked "Not returned here."

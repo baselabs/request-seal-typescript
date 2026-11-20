@@ -232,3 +232,17 @@ The [README](../../README.md#reason-to-http-status-recommendation) maps each of 
 - [Key discovery](key-discovery.md) shows how to fetch and cache an agent's directory over HTTPS.
 - [Replay protection](replay-protection.md) adds one-time use of each nonce.
 - [Node HTTP](node-http.md) verifies live Node requests.
+
+## Match verified identities to application records
+
+An agent identity belongs to the selected, verified signature label and the key
+that verified it: select `envelope.signatures[label]` and read that verification's
+`principal`. An unrelated label or a raw `Signature-Agent` field establishes no
+identity. A raw [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638.html) key thumbprint
+identifies a key; successful verification proves possession of that key only,
+not which agent label it signed under. A held-key principal therefore contains
+only its `thumbprint`, even when the request advertises an agent URL. Match a
+verified agent principal's `identifier` to your configured agent records, or a
+held-key principal's `thumbprint` to your registered key records. A missing record
+is an application rejection. Neither lookup grants authorization; the verification
+still says `authorization: "not_evaluated"`.

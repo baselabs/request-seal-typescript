@@ -1,5 +1,8 @@
 # RequestSeal for TypeScript
 
+See the [compatibility contract](docs/reference/compatibility.md) for the 0.x policy,
+stable interfaces, release boundaries, and security fixes.
+
 RequestSeal signs and verifies HTTP messages ([RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html)) and compact JOSE tokens in TypeScript. You choose trusted keys, required coverage, freshness, body integrity, and replay rules. Verification reports what those checks establish; your application decides access. The package uses WebCrypto, has no runtime dependencies, and runs on Node, Deno, and Bun.
 
 ## Install
