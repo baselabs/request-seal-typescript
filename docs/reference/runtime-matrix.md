@@ -137,14 +137,14 @@ image, from the repository root on any Docker host:
 ```sh
 docker run --rm --init --ipc=host -e HOME=/root -v "$PWD:/src:ro" \
   mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f \
-  sh -euc '
+  bash -euo pipefail -c '
     cp -R /src /work && cd /work
     npm ci --ignore-scripts
     npm ci --prefix interop/browser --ignore-scripts
     npm run build
     npm run build --prefix interop/browser
     npm test --prefix interop/browser
-    sh scripts/red-proof.sh npm run test:red --prefix interop/browser
+    bash scripts/red-proof.sh npm run test:red --prefix interop/browser
   '
 ```
 

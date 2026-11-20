@@ -122,6 +122,14 @@ test('every workflow step fails on a failure anywhere in a pipe', () => {
     assert.doesNotMatch(source, /^\s+shell: (?!bash$)/m, name);
     assert.doesNotMatch(source, /(^|[\s;&|])sh scripts\//m, name);
   }
+  // Documented commands run the same way: dash, the Playwright image's /bin/sh, has no pipefail.
+  const tracked = spawnSync('git', ['ls-files', '-z', '--', '*.md'], {encoding: 'utf8'});
+  assert.equal(tracked.status, 0, tracked.stderr);
+  const documents = tracked.stdout.split('\0').filter(Boolean);
+  assert.ok(documents.includes('docs/reference/runtime-matrix.md'));
+  for (const document of documents)
+    assert.doesNotMatch(read(document), /(^|[\s;&|'"])sh (-[a-z]+ )*(scripts\/|-[a-z]*c\b)/m, document);
+  assert.match(read('docs/reference/runtime-matrix.md'), /bash -euo pipefail -c '[^']*\n\s+bash scripts\/red-proof\.sh npm run test:red --prefix interop\/browser\n/);
   const ci = read('.github/workflows/ci.yml');
   assert.equal((ci.match(/bash scripts\/red-proof\.sh /g) ?? []).length, 4);
   const script = read('scripts/red-proof.sh');
