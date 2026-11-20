@@ -4,6 +4,9 @@ on:
 
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: pages
   cancel-in-progress: false

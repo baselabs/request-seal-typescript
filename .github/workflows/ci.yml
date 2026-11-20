@@ -4,6 +4,9 @@ on:
     branches: ['kci/**']
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 jobs:
   toolchains:
     runs-on: ubuntu-24.04
@@ -98,7 +101,7 @@ jobs:
           REQUEST_SEAL_REPO: ${{ runner.temp }}/request-seal-reference
       - name: Prove the test runner rejects a failure
         run: |
-          sh scripts/red-proof.sh npm run test:red
+          bash scripts/red-proof.sh npm run test:red
       - run: npm run check
         env:
           REQUESTSEAL_REPLAY_PG_URL: postgresql://postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/requestseal_replay
@@ -182,11 +185,11 @@ jobs:
       - name: Prove Deno rejects a failure
         if: matrix.runtime == 'deno'
         run: |
-          sh scripts/red-proof.sh deno test --allow-read test/red/planted.test.ts
+          bash scripts/red-proof.sh deno test --allow-read test/red/planted.test.ts
       - name: Prove Bun rejects a failure
         if: matrix.runtime == 'bun'
         run: |
-          sh scripts/red-proof.sh bun test test/red/planted.test.ts
+          bash scripts/red-proof.sh bun test test/red/planted.test.ts
       - run: npm run typecheck && npm run typecheck:web
       - run: npm run build
       - name: Deno core tests and conformance
@@ -275,7 +278,7 @@ jobs:
       - run: npm run build --prefix interop/browser
       - run: npm test --prefix interop/browser
       - name: Prove every browser rejects a failure
-        run: sh scripts/red-proof.sh npm run test:red --prefix interop/browser
+        run: bash scripts/red-proof.sh npm run test:red --prefix interop/browser
   reciprocal:
     needs: toolchains
     name: reciprocal

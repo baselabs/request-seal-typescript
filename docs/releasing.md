@@ -23,7 +23,11 @@ prerequisite; publication does not rerun or query qualification.
 4. The owner approves the staged version on npmjs.com. Approval is a separate act;
    staging is not public publication. The dependent registry-install job refuses
    to report success until public read-back completes.
-5. Dispatch the same qualified commit again after approval. If npm serves this
+5. Dispatch the same qualified commit again after approval, once npm shows the
+   approved version: wait until `npm view @request-seal/core@<version> version`
+   prints it. Planning reads npm's public state, so a dispatch before then stages
+   the version again and npm refuses it with HTTP 409; nothing changes, and the
+   next dispatch after npm shows the version continues. If npm serves this
    version with the inspected archive's SHA-512 integrity and/or SHA-1 shasum,
    the upload is skipped. Read-back also downloads the public tarball and compares
    its bytes. A differing digest, differing downloaded bytes, deprecation, recorded

@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # A runner failure counts only when it executed the planted assertion.
-set -eu
+set -euo pipefail
 output=$(mktemp "${TMPDIR:-/tmp}/request-seal-red-proof-XXXXXX")
 trap 'rm -f "$output"' EXIT HUP INT TERM
 if "$@" >"$output" 2>&1; then

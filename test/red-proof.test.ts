@@ -9,7 +9,7 @@ const tests = deno ? ['test', '--no-check', '--allow-read'] : bun ? ['test'] : [
 const evaluate = deno ? ['eval', '--no-check'] : ['-e'];
 const check = (args: string[]) => {
   const env = {...process.env}; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('sh', [process.env.REQUEST_SEAL_RED_PROOF_SCRIPT ?? 'scripts/red-proof.sh', process.execPath, ...args], {encoding: 'utf8', env, timeout: 10_000});
+  return spawnSync('bash', [process.env.REQUEST_SEAL_RED_PROOF_SCRIPT ?? 'scripts/red-proof.sh', process.execPath, ...args], {encoding: 'utf8', env, timeout: 10_000});
 };
 test('red proof accepts only the actual planted assertion with a failing-test count', {timeout: 60_000}, () => {
   const planted = check([...tests, 'test/red/planted.test.ts']);

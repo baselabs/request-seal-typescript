@@ -112,3 +112,18 @@ test('qualification has one verdict and no setup action writes or restores an ap
     assert.equal((workflow.match(/uses: actions\/checkout@/g) ?? []).length, (workflow.match(/persist-credentials: false/g) ?? []).length);
   }
 });
+test('every workflow step fails on a failure anywhere in a pipe', () => {
+  // A run: with no shell is bash -e without pipefail; shell: bash adds -o pipefail.
+  for (const name of ['ci.yml', 'publish.yml', 'pages.yml']) {
+    const source = read(`.github/workflows/${name}`);
+    assert.match(source, /^defaults:\n  run:\n    shell: bash\n/m, name);
+    // A job-level defaults.run replaces the workflow's, so none may omit the shell.
+    assert.doesNotMatch(source, /^    defaults:/m, name);
+    assert.doesNotMatch(source, /^\s+shell: (?!bash$)/m, name);
+    assert.doesNotMatch(source, /(^|[\s;&|])sh scripts\//m, name);
+  }
+  const ci = read('.github/workflows/ci.yml');
+  assert.equal((ci.match(/bash scripts\/red-proof\.sh /g) ?? []).length, 4);
+  const script = read('scripts/red-proof.sh');
+  assert.match(script, /^#!\/usr\/bin\/env bash\n(?:#[^\n]*\n)*set -euo pipefail\n/);
+});
