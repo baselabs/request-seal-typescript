@@ -1,9 +1,9 @@
 import nodeTest from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer, type Server, type ServerResponse } from 'node:http';
+import { createServer, type Server } from 'node:http';
 import { once } from 'node:events';
-import { connect } from 'node:net';
-import { Custody, Policy, ok, withDeadline, type Result, type KeyHandle } from '../src/index.ts';
+import { connect, createServer as createTCPServer, type AddressInfo, type Socket } from 'node:net';
+import { Custody, Policy, ok, remainingMs, withDeadline, type Result, type KeyHandle } from '../src/index.ts';
 import { nodeAdapterTest } from './support/node-adapter-test.ts';
 import * as fetchAdapter from '../src/adapters/fetch/index.ts';
 import * as nodeAdapter from '../src/adapters/node-http/index.ts';
@@ -86,23 +86,39 @@ for (const name of ['fetch', 'node-http'] as const) {
       }
     } finally {await key.release();}
   });
-  // A hang fails this test by name instead of exhausting the lane's job limit.
-  test(`${name} delivery keeps an open-connection reset and stalled peer unknown`, {timeout: 30_000}, async () => {
-    let received = 0;
-    const stalled: ServerResponse[] = [];
-    await withPeer(createServer((req, res) => {received++; if (req.url === '/reset') req.socket.destroy(); else stalled.push(res);}), async (url, key) => {
-      try {
-        for (const path of ['/reset', '/stall']) {
-          const result = await send(url + path, key, {context: value(withDeadline({timeoutMs: 2000}))});
-          assert.ok(!result.ok); assert.equal(classify(result), 'unknown');
-          assert.doesNotMatch(JSON.stringify(result), /stack|ECONN|socket hang up/);
-        }
-        assert.equal(received, 2, 'both failures followed real request bytes');
-      } finally {
-        // Deno's node:http close waits for in-flight requests; the stalled one ends only after the client gave up.
-        for (const res of stalled) res.end();
-      }
+  // A raw TCP peer, because a node:http handler cannot reset its connection on Deno 2.5.6 and its
+  // unanswered request then holds server close open.
+  test(`${name} delivery keeps an open-connection reset and stalled peer unknown`, async () => {
+    const received: string[] = [];
+    const sockets = new Set<Socket>();
+    const peer = createTCPServer(socket => {
+      sockets.add(socket); socket.once('close', () => sockets.delete(socket));
+      socket.once('data', chunk => {
+        const line = Buffer.from(chunk).toString('latin1');
+        received.push(line.split(' ', 2)[1]!);
+        if (line.startsWith('GET /reset ')) socket.destroy();
+      });
     });
+    peer.listen(0, '127.0.0.1'); await once(peer, 'listening');
+    const {port} = peer.address() as AddressInfo;
+    const key = value(await Custody.local('hmac-sha256', {hmac: crypto.getRandomValues(new Uint8Array(32))}));
+    try {
+      for (const path of ['/reset', '/stall']) {
+        const context = value(withDeadline({timeoutMs: 2000}));
+        const result = await send(`http://127.0.0.1:${port}${path}`, key, {context});
+        assert.ok(!result.ok); assert.equal(classify(result), 'unknown');
+        assert.doesNotMatch(JSON.stringify(result), /stack|ECONN|socket hang up/);
+        assert.equal(remainingMs(context) > 0, path === '/reset', `only the stalled peer waits for the deadline (${path})`);
+      }
+      assert.deepEqual(received, ['/reset', '/stall'], 'both failures followed real request bytes');
+    } finally {
+      await key.release();
+      peer.close();
+      for (const socket of sockets) socket.destroy();
+      // Deno 2.5.6 never calls back a TCP server close after a server-side destroy; a refused
+      // connection proves the listener is gone on every runtime.
+      await refusedAt(port);
+    }
   });
   test(`${name} delivery keeps failed response verification unknown`, async () => {
     let received = 0;
