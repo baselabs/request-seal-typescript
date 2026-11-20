@@ -326,6 +326,28 @@ test('release vendoring compares extracted index bytes with the resolved commit'
     assert.ok(constants.includes(createHash('sha256').update(bytes).digest('hex')));
   } finally {await rm(root, {recursive: true, force: true});}
 });
+function assertLatestRelease(changelog: string, version: string): void {
+  const entries = changelog.split(/^## /m).slice(1);
+  if (entries[0]?.startsWith('Unreleased\n')) entries.shift();
+  const latest = entries[0];
+  assert.ok(latest, 'the changelog has a release entry');
+  const headingEnd = latest.indexOf('\n');
+  assert.ok(headingEnd > 0, 'the release entry has a heading and body');
+  assert.ok(latest.slice(0, headingEnd).startsWith(`${version} - `), 'the first release entry matches the package version');
+  const body = latest.slice(headingEnd + 1).trim();
+  assert.match(body, /^- /);
+  assert.doesNotMatch(body, /\n\n-/);
+}
+test('format documentation accepts an optional unreleased section and rejects invalid release entries', () => {
+  const release = '## 1.2.3 - 2026-01-01\n\n- Released change.\n';
+  for (const prefix of ['', '## Unreleased\n\n- Pending change.\n\n'])
+    assert.doesNotThrow(() => assertLatestRelease('# Changelog\n\n' + prefix + release, '1.2.3'));
+  for (const changelog of ['# Changelog\n', '## Unreleased\n\n- Pending change.\n',
+    release.replace('1.2.3', '1.2.2'), release.replace('- Released change.', 'Unlisted change.'),
+    release + '\n- Second change.\n', '## Unknown\n\n- Change.\n\n' + release,
+    '## Unreleased\n\n## Unreleased\n\n' + release])
+    assert.throws(() => assertLatestRelease(changelog, '1.2.3'));
+});
 test('format documentation states the release and override contract', {timeout: 90_000}, async () => {
   const doc = await readFile('docs/reference/corpus-format.md', 'utf8');
   const {CORPUS_PIN} = await import('../src/constants.ts');
@@ -334,14 +356,7 @@ test('format documentation states the release and override contract', {timeout: 
   assert.match(doc, /unsupported_overrides/);
   const changelog = await readFile('CHANGELOG.md', 'utf8');
   const {VERSION} = await import('../src/constants.ts');
-  const latest = changelog.split(/^## /m)[1];
-  assert.ok(latest, 'the changelog has a release entry');
-  const headingEnd = latest.indexOf('\n');
-  assert.ok(headingEnd > 0, 'the release entry has a heading and body');
-  assert.ok(latest.slice(0, headingEnd).startsWith(`${VERSION} - `), 'the first release entry matches the package version');
-  const body = latest.slice(headingEnd + 1).trim();
-  assert.match(body, /^- /);
-  assert.doesNotMatch(body, /\n\n-/);
+  assertLatestRelease(changelog, VERSION);
   assert.match(changelog, /valid, invalid, or acceptable/);
 });
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Let release-documentation qualification check the latest versioned entry after an optional Unreleased section, preserving version and bullet-format validation.
 - Add exact public export/signature inventory checks across all package entry points.
 - Put the Profile extension interface under the compatibility promise and freeze the reserved namespace set with corpus-backed tests.
 - Document stable exports, results, reasons, bounds, wire bytes, profiles and telemetry, with explicit 0.x compatibility boundaries and release/deprecation rules.
