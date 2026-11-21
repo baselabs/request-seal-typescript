@@ -82,8 +82,9 @@ test('CI starts the checked platform PostgreSQL engine and names no other image'
   assert.match(action, /--entrypoint baselabs-test-postgres "\$engine"/);
   assert.match(action, /--publish 127\.0\.0\.1:15432:5432/);
   assert.match(action, /pg_isready -h 127\.0\.0\.1/);
-  assert.match(action, /stop\)\n\s+# Log, then remove, on every outcome[^\n]*\n\s+if docker container inspect "\$container" > \/dev\/null 2>&1; then\n\s+docker logs "\$container"\n\s+docker rm -f -v "\$container"\n/);
-  assert.doesNotMatch(action, /failure\(\)/, 'stop never depends on a status function inside the composite action');
+  assert.match(action, /# Log, then remove, on every outcome[^\n]*\n    - name: Remove the disposable PostgreSQL server\n      if: always\(\) && inputs\.mode == 'stop'\n/);
+  assert.match(action, /if docker container inspect "\$container" > \/dev\/null 2>&1; then\n\s+docker logs "\$container"\n\s+docker rm -f -v "\$container"\n/);
+  assert.doesNotMatch(action, /failure\(\)|success\(\)/, 'the composite action depends on no status function but always()');
 });
 
 test('publication checks the existing name and tag before build, then plans from the inspected archive', () => {

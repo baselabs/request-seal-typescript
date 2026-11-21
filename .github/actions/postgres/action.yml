@@ -35,25 +35,12 @@ runs:
           echo 'checked PostgreSQL digest differs from ghcr.io/baselabs/postgres:current' >&2; exit 1
         fi
         docker pull "$engine"
-    - name: Manage the disposable PostgreSQL server
-      if: always() && (inputs.mode == 'stop' || success())
+    - name: Start the disposable PostgreSQL server
+      if: inputs.mode == 'start'
       shell: bash
-      env:
-        MODE: ${{ inputs.mode }}
       run: |
         set -euo pipefail
         container="rs-postgres-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
-        case "$MODE" in
-          stop)
-            # Log, then remove, on every outcome: the server log carries only fixture values.
-            if docker container inspect "$container" > /dev/null 2>&1; then
-              docker logs "$container"
-              docker rm -f -v "$container"
-            fi
-            exit 0 ;;
-          start) ;;
-          *) echo "::error::mode must be start or stop"; exit 1 ;;
-        esac
         # The workflow env names the fixture values; docker reads them from the environment.
         [ -n "${TEST_PG_USER:-}" ] && [ -n "${TEST_PG_PASSWORD:-}" ] && [ -n "${TEST_PG_DATABASE:-}" ] && [ -n "${REQUESTSEAL_REPLAY_PG_URL:-}" ] || {
           echo "::error::TEST_PG_USER, TEST_PG_PASSWORD, TEST_PG_DATABASE and REQUESTSEAL_REPLAY_PG_URL are required"; exit 1; }
@@ -75,4 +62,15 @@ runs:
           docker logs "$container"
           echo "::error::PostgreSQL did not become ready within 60 attempts"
           exit 1
+        fi
+    # Log, then remove, on every outcome: the server log carries only fixture values.
+    - name: Remove the disposable PostgreSQL server
+      if: always() && inputs.mode == 'stop'
+      shell: bash
+      run: |
+        set -euo pipefail
+        container="rs-postgres-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
+        if docker container inspect "$container" > /dev/null 2>&1; then
+          docker logs "$container"
+          docker rm -f -v "$container"
         fi
