@@ -25,11 +25,12 @@ test('records exclude real private and symmetric key material', async () => {
   assert.ok(!wire.includes(secret)); assert.ok(!wire.includes(privateJwk.d!)); assert.ok(!wire.includes('PRIVATE KEY'));
   assert.ok(wire.includes(jwk.x!)); assert.ok(wire.includes('public input'));
   const job = readFileSync('.github/workflows/ci.yml', 'utf8').split('  reciprocal:')[1]!;
-  assert.match(job, /timeout-minutes: 11 /); assert.match(job, /retention-days: 3/);
+  assert.match(job, /timeout-minutes: 11 /); assert.match(job, /retention-days: 7/);
 });
-test('reciprocal PostgreSQL documents runner-only trust authentication', () => {
+test('reciprocal PostgreSQL uses throwaway password fixtures, never trust authentication', () => {
   const job = readFileSync('.github/workflows/ci.yml', 'utf8').split('  reciprocal:')[1]!;
-  assert.match(job, /# Trust authentication and the passwordless URL are for this ephemeral runner only\./);
+  assert.match(job, /# Throwaway fixture values for this job's disposable platform PostgreSQL, never service credentials\./);
+  assert.doesNotMatch(job, /[Tt]rust authentication|passwordless|POSTGRES_HOST_AUTH_METHOD/);
 });
 test('a real failing DROP preserves the original error and closes the pool', {skip: !process.env.REQUESTSEAL_REPLAY_PG_URL}, async () => {
   const {cleanupDatabase} = await import('../interop/reciprocal/records.ts');

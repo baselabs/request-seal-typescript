@@ -57,10 +57,32 @@ test('CI test steps keep repository credentials out of their environment', () =>
   assert.doesNotMatch(source, /GH_TOKEN:/);
 });
 
-test('CI PostgreSQL service images use immutable Linux image digests', () => {
-  const images = [...read('.github/workflows/ci.yml').matchAll(/image: (postgres:\S+)/g)].map(m => m[1]);
-  assert.equal(images.length, 3, 'Node, native, and reciprocal jobs each have one PostgreSQL service');
-  for (const image of images) assert.match(image!, /^postgres:18@sha256:[a-f0-9]{64}$/);
+test('CI starts the checked platform PostgreSQL engine and names no other image', () => {
+  const workflow = read('.github/workflows/ci.yml');
+  const action = read('.github/actions/postgres/action.yml');
+  const ref = read('.github/postgres.ref');
+  assert.match(ref, /^ghcr\.io\/baselabs\/postgres:[0-9]+\.[0-9]+-inputs-[0-9a-f]{64}@sha256:[0-9a-f]{64}\n$/);
+  assert.doesNotMatch(workflow, /services:/);
+  assert.doesNotMatch(workflow + action, /postgres:1[0-9]|POSTGRES_HOST_AUTH_METHOD|[Tt]rust authentication|passwordless/);
+  assert.doesNotMatch(workflow + action, /ghcr\.io\/baselabs\/postgres:[0-9]/, 'the engine comes only from .github/postgres.ref');
+  for (const job of ['node', 'native', 'reciprocal']) {
+    const section = workflow.split(`\n  ${job}:\n`)[1]!.split(/\n  [a-z][a-z0-9-]*:\n/)[0]!;
+    assert.match(section, /persist-credentials: false\n      - uses: \.\/\.github\/actions\/postgres\n/, `${job} starts the engine after checkout`);
+    assert.match(section, /- uses: \.\/\.github\/actions\/postgres\n        if: always\(\)\n        with:\n          mode: stop$/, `${job} always removes the engine last`);
+    assert.match(section, /REQUESTSEAL_REPLAY_PG_URL: postgresql:\/\/postgres:postgres@127\.0\.0\.1:15432\/requestseal_replay\n/);
+  }
+  // ci.md's public-repository check, verbatim with this repository's checked copy.
+  assert.ok(action.includes(String.raw`engine="$(cat .github/postgres.ref)"`));
+  assert.ok(action.includes(String.raw`[[ "$engine" =~ ^ghcr\.io/baselabs/postgres:[0-9]+\.[0-9]+-inputs-[0-9a-f]{64}@sha256:[0-9a-f]{64}$ ]]`));
+  assert.match(action, /manifests\/current/);
+  assert.match(action, /checked PostgreSQL digest differs from ghcr\.io\/baselabs\/postgres:current/);
+  assert.match(action, /docker pull "\$engine"/);
+  assert.match(action, /--tmpfs \/var\/lib\/pg:uid=26,gid=26,mode=0750 --tmpfs \/tmp/);
+  assert.match(action, /--env TEST_PG_USER --env TEST_PG_PASSWORD --env TEST_PG_DATABASE/);
+  assert.match(action, /--entrypoint baselabs-test-postgres "\$engine"/);
+  assert.match(action, /--publish 127\.0\.0\.1:15432:5432/);
+  assert.match(action, /pg_isready -h 127\.0\.0\.1/);
+  assert.match(action, /docker rm -f -v "\$container"/);
 });
 
 test('publication checks the existing name and tag before build, then plans from the inspected archive', () => {
