@@ -71,7 +71,7 @@ test('CI starts the checked platform PostgreSQL engine and names no other image'
     assert.match(section, /- uses: \.\/\.github\/actions\/postgres\n        if: always\(\)\n        with:\n          mode: stop$/, `${job} always removes the engine last`);
     assert.match(section, /REQUESTSEAL_REPLAY_PG_URL: postgresql:\/\/postgres:postgres@127\.0\.0\.1:15432\/requestseal_replay\n/);
   }
-  // ci.md's public-repository check, verbatim with this repository's checked copy.
+  // The platform engine's public-repository check, verbatim with this repository's checked copy.
   assert.ok(action.includes(String.raw`engine="$(cat .github/postgres.ref)"`));
   assert.ok(action.includes(String.raw`[[ "$engine" =~ ^ghcr\.io/baselabs/postgres:[0-9]+\.[0-9]+-inputs-[0-9a-f]{64}@sha256:[0-9a-f]{64}$ ]]`));
   assert.match(action, /manifests\/current/);

@@ -35,7 +35,7 @@ into null-prototype snapshots; reject unknown keys. Branding uses private WeakSe
 Public documentation explains technical usage and maintenance.
 
 The package allowlist governs publication. Corpus data and repository tools stay outside
-the tarball. Qualification runs on `kci/**`; infra publishes the inspected archive with provenance
+the tarball. Qualification runs on `kci/**`; the release maintainers publish the inspected archive with provenance
 through the repository's trusted publisher from the default branch.
 
 ## Build and test
@@ -44,17 +44,16 @@ Public-repository builds and tests run only in GitHub-hosted qualification on a 
 ref; agents run no project code on a workstation or a build box. Qualification runs
 `npm run check`, `npm run docs` and the planted-failure proof on each Node lane, plus
 the Deno, Bun and browser lanes, and a change reaches the default branch only through
-`kimosabe-land --repo . --sha <full sha>`. Pure Python source checks that compile
+the landing tool. Pure Python source checks that compile
 nothing may run with `python3 -I -B`. Only the landing command watches a run.
 
 ## CI/CD and releases
 
-Releases, deployments, and publications are done by the infra session (infra-1).
-The project lands on the default branch with `kimosabe-land --repo . --sha <full sha>`
-and stops there. Requirements live in the infra repository at `baselabs/docs/ci.md`,
-"What infra requires of every product".
+Releases, deployments, and publications are done by the release maintainers.
+The project lands on the default branch with the landing tool and stops there.
+The CI maintainers' requirements for every product apply.
 
-Workflow changes go to infra for review with repository, branch, and full commit
+Workflow changes go to the CI maintainers for review with repository, branch, and full commit
 before landing. The default branch requires the exact `qualified` context, with
 no bypass and no classic branch protection.
 
@@ -67,7 +66,7 @@ Measure timeouts on cold green jobs, use the five-minute floor and 90-minute cap
 and replace `90 # no green run yet` after the first green run.
 
 Publication and Pages are default-branch dispatches only. Agents never dispatch,
-publish, deploy, tag, push mirrors, or handle registry keys. Infra obtains owner
+publish, deploy, tag, push mirrors, or handle registry keys. The release maintainers obtain owner
 approval, dispatches, performs read-back and tagging, then creates the GitHub release
 for `v<version>` from `release-assets`. The workflow stages only the inspected archive
 with provenance; it reuses an identical public version, refuses different, deprecated,

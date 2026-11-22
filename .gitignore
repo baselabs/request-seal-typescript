@@ -17,5 +17,3 @@ interop/browser/.generated/
 interop/browser/bundle/
 deno.lock
 
-# Local process records; never tracked.
-.kimosabe/
