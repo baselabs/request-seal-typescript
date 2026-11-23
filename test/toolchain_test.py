@@ -138,6 +138,23 @@ class ToolchainTest(unittest.TestCase):
                     if 'uses: ./.github/actions/postgres' in body:
                         self.assertLess(body.index(refusal), body.index('uses: ./.github/actions/postgres'))
 
+    def test_deno_runs_without_the_python_library_path(self):
+        # setup-python exports LD_LIBRARY_PATH; Deno refuses to spawn subprocesses
+        # under a scoped --allow-run while it is set.
+        jobs = dict(re.findall(r'^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)',
+                               WORKFLOWS['ci.yml'].split('jobs:\n', 1)[1], re.M | re.S))
+        checked = 0
+        for job, body in jobs.items():
+            if 'uses: actions/setup-python@' not in body:
+                continue
+            for script in re.findall(r"run: \|\n((?:          .*\n)+)", body):
+                if re.search(r"^\s+(?:bash scripts/red-proof\.sh )?deno (?:test|run)\b", script, re.M):
+                    with self.subTest(job=job):
+                        self.assertLess(script.index('unset LD_LIBRARY_PATH'),
+                                        re.search(r"^\s+(?:bash scripts/red-proof\.sh )?deno ", script, re.M).start())
+                    checked += 1
+        self.assertEqual(checked, 2, 'both Deno steps after setup-python are checked')
+
     def test_python_refusal_accepts_the_pin_and_rejects_a_mismatch(self):
         expression = re.search(r"run: python3 -I -c '([^']+)'", WORKFLOWS['ci.yml'])[1]
         for expected, status in ((shared_outputs()['python'], 0), ('0.0.0', 1)):

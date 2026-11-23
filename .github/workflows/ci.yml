@@ -221,6 +221,9 @@ jobs:
       - name: Prove Deno rejects a failure
         if: matrix.runtime == 'deno'
         run: |
+          # setup-python exports LD_LIBRARY_PATH; Deno refuses subprocesses under a scoped
+          # --allow-run while it is set, and nothing Deno starts here needs it.
+          unset LD_LIBRARY_PATH
           bash scripts/red-proof.sh deno test --allow-read test/red/planted.test.ts
       - name: Prove Bun rejects a failure
         if: matrix.runtime == 'bun'
@@ -231,6 +234,9 @@ jobs:
       - name: Deno core tests and conformance
         if: matrix.runtime == 'deno'
         run: |
+          # setup-python exports LD_LIBRARY_PATH; Deno refuses subprocesses under a scoped
+          # --allow-run while it is set, and nothing Deno starts here needs it.
+          unset LD_LIBRARY_PATH
           deno test --no-check --allow-read --allow-write --allow-env --allow-net --allow-run=deno,node,npm,bash,sh,gh,git,openssl,cc,pkg-config,elixir,mix,ssh-agent,ssh-keygen,ssh-add,scripts/toolchain.sh test/*.test.ts
           deno run --allow-read tools/conformance/cli.ts --corpus test/fixtures/corpus-smoke --smoke
           deno run --allow-read tools/conformance/cli.ts --corpus conformance
