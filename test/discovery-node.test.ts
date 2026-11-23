@@ -1371,6 +1371,9 @@ test(
   async () => {
     const { Discovery: NodeDiscovery } = await api();
     const etag = '"keys-v1"';
+    let now = 1735689600;
+    const clock = () => now;
+    const date = () => new Date(now * 1000).toUTCString();
     let requests = 0;
     const conditional: string[] = [];
     const p = await peer((q, r) => {
@@ -1378,12 +1381,13 @@ test(
       const sent = q.headers["if-none-match"];
       if (sent !== undefined) conditional.push(String(sent));
       if (sent === etag) {
-        // RFC 9111 Section 15.4.5: the 304 answers the conditional request.
-        r.writeHead(304, [["cache-control", "max-age=30"]]);
+        // RFC 9110 Section 15.4.5: the 304 answers the conditional request.
+        r.writeHead(304, [["date", date()], ["cache-control", "max-age=30"]]);
         r.end();
         return;
       }
       r.writeHead(200, [
+        ["date", date()],
         ["content-type", "application/jwk-set+json"],
         ["etag", etag],
         ["cache-control", "max-age=1"],
@@ -1402,15 +1406,14 @@ test(
     try {
       const s = config(p);
       // The first fetch stores the validator with the set.
-      const first = value(await NodeDiscovery.fetch(s));
+      const first = value(await NodeDiscovery.fetch(s, { clock }));
       assert.equal(first.etag, etag);
       assert.deepEqual(Object.keys(first.keys), [kid]);
       // A direct conditional fetch answers 304: no keys, stored lifetime
       // renewed by the 304's own max-age.
-      const now = Math.floor(Date.now() / 1000);
       const revalidated = value(
         await NodeDiscovery.fetchWithValidators(s, etag, 99, {
-          clock: () => now,
+          clock,
         }),
       );
       assert.ok("notModified" in revalidated && revalidated.notModified === true);
@@ -1418,7 +1421,7 @@ test(
       assert.equal("notModified" in revalidated ? revalidated.expiresAt : undefined, now + 30);
       // Without the 304's directives, the stored lifetime persists.
       const bare = await peer((_q, r) => {
-        r.writeHead(304);
+        r.writeHead(304, [["date", date()]]);
         r.end();
       });
       try {
@@ -1427,7 +1430,7 @@ test(
             config(bare),
             etag,
             120,
-            { clock: () => now },
+            { clock },
           ),
         );
         assert.ok("notModified" in persisted && persisted.notModified === true);
@@ -1439,16 +1442,16 @@ test(
       // representation and rejects.
       const swapped = await peer((q, r) => {
         if (q.headers["if-none-match"] !== undefined) {
-          r.writeHead(304, [["etag", '"keys-v2"']]);
+          r.writeHead(304, [["date", date()], ["etag", '"keys-v2"']]);
           r.end();
           return;
         }
-        r.writeHead(200, [["content-type", "application/jwk-set+json"], ["etag", '"keys-v1"']]);
+        r.writeHead(200, [["date", date()], ["content-type", "application/jwk-set+json"], ["etag", '"keys-v1"']]);
         r.end(jwks());
       });
       try {
         refused(
-          await NodeDiscovery.fetchWithValidators(config(swapped), etag, 60),
+          await NodeDiscovery.fetchWithValidators(config(swapped), etag, 60, { clock }),
           "invalid_response",
         );
       } finally {
@@ -1456,11 +1459,11 @@ test(
       }
       // An unsolicited 304 stays an unexpected status.
       const unsolicited = await peer((_q, r) => {
-        r.writeHead(304);
+        r.writeHead(304, [["date", date()]]);
         r.end();
       });
       try {
-        refused(await NodeDiscovery.fetch(config(unsolicited)), "unexpected_status");
+        refused(await NodeDiscovery.fetch(config(unsolicited), { clock }), "unexpected_status");
       } finally {
         await unsolicited.close();
       }
@@ -1470,11 +1473,11 @@ test(
       const target = await peer((q, r) => {
         if (q.headers["if-none-match"] !== undefined)
           targetSawConditional = true;
-        r.writeHead(200, [["content-type", "application/jwk-set+json"], ["etag", '"target-v1"']]);
+        r.writeHead(200, [["date", date()], ["content-type", "application/jwk-set+json"], ["etag", '"target-v1"']]);
         r.end(jwks());
       });
       const redirecting = await peer((_q, r) => {
-        r.writeHead(302, { location: `https://localhost:${target.port}/keys` });
+        r.writeHead(302, { date: date(), location: `https://localhost:${target.port}/keys` });
         r.end();
       });
       try {
@@ -1492,6 +1495,7 @@ test(
             ),
             etag,
             60,
+            { clock },
           ),
         );
         assert.ok(!("notModified" in full));
@@ -1504,11 +1508,11 @@ test(
       }
       // Through a revalidating cache: the second resolve reuses the stored
       // keys and sends the validator, and the merged set carries the 304's
-      // own freshness. The cache clock is the real clock, so the 304's Date
-      // header lines up with it and apparent age does not eat the max-age.
+      // own freshness. The peer's Date and cache share a controlled clock;
+      // only the explicit advance below expires the stored set.
       const c = value(
         createCache({
-          clock: () => Math.floor(Date.now() / 1000),
+          clock,
           fetch: fetcher as never,
         }),
       );
@@ -1517,7 +1521,9 @@ test(
       try {
         const stored = value(await c.refresh(s));
         assert.equal(stored.etag, etag);
-        await new Promise((done) => setTimeout(done, 1100));
+        assert.equal(stored.expiresAt, now + 1);
+        now = stored.expiresAt;
+        assert.ok(now < stored.keys[kid]!.expiresAt);
         const resolved = value(await c.resolve(s, kid, { algorithms: ["ed25519"] }));
         assert.equal(resolved.thumbprint, kid);
         assert.equal(requests - before, 2);
@@ -1538,18 +1544,22 @@ test(
       conditional.length = 0;
       const dead = value(
         createCache({
-          clock: () => Math.floor(Date.now() / 1000),
+          clock,
           fetch: fetcher as never,
         }),
       );
       try {
         const expiring = config(p, { maxTtl: 1, minTtl: 0 });
-        value(await dead.refresh(expiring));
-        await new Promise((done) => setTimeout(done, 1100));
+        const stored = value(await dead.refresh(expiring));
+        assert.equal(stored.expiresAt, now + 1);
+        assert.equal(stored.keys[kid]!.expiresAt, stored.expiresAt);
+        now = stored.keys[kid]!.expiresAt;
         const resolved = value(
           await dead.resolve(expiring, kid, { algorithms: ["ed25519"] }),
         );
         assert.equal(resolved.thumbprint, kid);
+        assert.equal(resolved.fetchedAt, now);
+        assert.equal(resolved.expiresAt, now + 1);
         assert.equal(requests - deadBefore, 2);
         assert.deepEqual(conditional, []);
       } finally {
