@@ -69,7 +69,7 @@ test('CI starts the checked platform PostgreSQL engine and names no other image'
     const section = workflow.split(`\n  ${job}:\n`)[1]!.split(/\n  [a-z][a-z0-9-]*:\n/)[0]!;
     const checkout = section.indexOf('persist-credentials: false');
     const python = section.indexOf('uses: actions/setup-python@');
-    const refusal = section.indexOf('run: python3 -I -c');
+    const refusal = section.indexOf('run: scripts/toolchain.sh --installed "python=$EXPECTED_PYTHON"');
     const postgres = section.indexOf('uses: ./.github/actions/postgres');
     assert.ok(checkout >= 0 && checkout < python && python < refusal && refusal < postgres, `${job} starts the engine after checkout and strict Python setup`);
     assert.match(section, /python-version: \$\{\{ needs\.toolchains\.outputs\.python \}\}/);

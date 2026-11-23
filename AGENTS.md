@@ -60,8 +60,8 @@ no bypass and no classic branch protection.
 Every runtime lane comes only through the byte-identical, executable shared reader
 `scripts/toolchain.sh`, called by path. Never edit its copy or add another parser of
 `.tool-versions`, `version-file:` input, or workflow runtime pin. Setup actions use
-its outputs; `scripts/toolchain.sh --installed` refuses differing Node, Elixir and OTP.
-Deno, Bun and Python use explicit installed-version comparisons against the same outputs.
+its outputs; `scripts/toolchain.sh --installed` refuses differing Node, Elixir, OTP,
+Python, Deno and Bun versions.
 npm comes only from the root `packageManager` through `scripts/package-manager.py`;
 every manifest declares the same npm. `.tool-versions` declares product runtimes
 (Node, Deno, Bun, Elixir and Erlang) and the exact Python used by CI tooling.

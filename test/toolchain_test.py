@@ -33,7 +33,7 @@ class ToolchainTest(unittest.TestCase):
     def test_shared_reader_identity_and_executable_mode(self):
         reader = ROOT / 'scripts/toolchain.sh'
         self.assertEqual(hashlib.sha256(reader.read_bytes()).hexdigest(),
-                         'b29bfeb6ec4ec8f5b7e3ac3c963f04b6d3c73483172e5bd59ea40f20b102f1eb')
+                         '25bbfa023b7f031256428b498fe300fcc460988fea81277072355e4c0d933764')
         self.assertEqual(stat.S_IMODE(reader.stat().st_mode), 0o755)
 
     def test_complete_exact_inventory_through_shared_outputs(self):
@@ -104,16 +104,17 @@ class ToolchainTest(unittest.TestCase):
             self.assertEqual(ci.count(f'{output}-version: ${{{{ needs.toolchains.outputs.{output} }}}}'), 3)
         self.assertEqual(ci.count('version-type: strict'), 3)
         self.assertEqual(ci.count('run: scripts/toolchain.sh --installed "elixir=$EXPECTED_ELIXIR" "erlang=$EXPECTED_OTP"'), 3)
-        self.assertIn('actual="$("$EXPECTED_RUNTIME" --version | awk', ci)
-        self.assertIn('test "$actual" = "$EXPECTED_VERSION"', ci)
-        self.assertIn('actual="$(deno --version | awk', ci)
-        self.assertIn('test "$actual" = "$EXPECTED_DENO"', ci)
+        self.assertIn('run: scripts/toolchain.sh --installed "$EXPECTED_RUNTIME=$EXPECTED_VERSION"', ci)
+        self.assertIn('run: scripts/toolchain.sh --installed "deno=$EXPECTED_DENO"', ci)
+        for workflow in WORKFLOWS.values():
+            self.assertNotIn('platform.python_version()', workflow)
+            self.assertNotRegex(workflow, r'(?:deno|bun|\$EXPECTED_RUNTIME)"? --version')
 
     def test_every_python_caller_installs_and_refuses_the_reader_version_first(self):
         required = {'ci.yml': {'toolchains', 'node', 'native', 'reciprocal', 'qualified'},
                     'pages.yml': {'build'}, 'publish.yml': {'publish', 'published-package'}}
         setup = 'uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0'
-        refusal = "run: python3 -I -c 'import platform, sys; sys.exit(platform.python_version() != sys.argv[1])' \"$EXPECTED_PYTHON\""
+        refusal = 'run: scripts/toolchain.sh --installed "python=$EXPECTED_PYTHON"'
         self.assertIn('python: ${{ steps.versions.outputs.python }}', WORKFLOWS['ci.yml'])
         action = (ROOT / '.github/actions/postgres/action.yml').read_text()
         self.assertIn('python3', action, 'the PostgreSQL action is a Python caller')
@@ -131,8 +132,10 @@ class ToolchainTest(unittest.TestCase):
                     self.assertIn(f'python-version: ${{{{ {output} }}}}', body)
                     self.assertIn(f'EXPECTED_PYTHON: ${{{{ {output} }}}}', body)
                     self.assertEqual(body.count(refusal), 1)
+                    self.assertLess(body.index('uses: actions/checkout@'), body.index(refusal))
                     self.assertLess(body.index(setup), body.index(refusal))
-                    self.assertEqual(body.index('python3'), body.index(refusal) + len('run: '))
+                    if 'python3' in body:
+                        self.assertLess(body.index(refusal), body.index('python3'))
                     if 'id: versions' in body:
                         self.assertLess(body.index('run: scripts/toolchain.sh >>'), body.index(setup))
                     if 'uses: ./.github/actions/postgres' in body:
@@ -155,11 +158,21 @@ class ToolchainTest(unittest.TestCase):
                     checked += 1
         self.assertEqual(checked, 2, 'both Deno steps after setup-python are checked')
 
+    def test_native_version_probes_are_separate_from_deno_test_library_path_changes(self):
+        ci = WORKFLOWS['ci.yml']
+        for name, command in (
+            ('Refuse a different native runtime version', 'scripts/toolchain.sh --installed "$EXPECTED_RUNTIME=$EXPECTED_VERSION"'),
+            ('Refuse a different Deno version', 'scripts/toolchain.sh --installed "deno=$EXPECTED_DENO"'),
+        ):
+            step = ci.split(f'      - name: {name}\n', 1)[1].split('      - ', 1)[0]
+            self.assertIn('run: ' + command, step)
+            self.assertNotIn('LD_LIBRARY_PATH', step)
+            self.assertNotIn('--allow-run', step)
+
     def test_python_refusal_accepts_the_pin_and_rejects_a_mismatch(self):
-        expression = re.search(r"run: python3 -I -c '([^']+)'", WORKFLOWS['ci.yml'])[1]
         for expected, status in ((shared_outputs()['python'], 0), ('0.0.0', 1)):
             with self.subTest(expected=expected):
-                child = subprocess.run([sys.executable, '-I', '-c', expression, expected],
+                child = subprocess.run(['scripts/toolchain.sh', '--installed', f'python={expected}'], cwd=ROOT,
                                        text=True, capture_output=True, timeout=10)
                 self.assertEqual(child.returncode, status, child.stderr)
 

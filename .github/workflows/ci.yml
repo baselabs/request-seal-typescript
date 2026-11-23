@@ -35,7 +35,7 @@ jobs:
       - name: Refuse a different Python version
         env:
           EXPECTED_PYTHON: ${{ steps.versions.outputs.python }}
-        run: python3 -I -c 'import platform, sys; sys.exit(platform.python_version() != sys.argv[1])' "$EXPECTED_PYTHON"
+        run: scripts/toolchain.sh --installed "python=$EXPECTED_PYTHON"
       - name: Check workflow toolchain contracts
         run: python3 -I -B -m unittest discover -s test -p 'toolchain_test.py'
       - name: Read the declared package manager
@@ -86,7 +86,7 @@ jobs:
       - name: Refuse a different Python version
         env:
           EXPECTED_PYTHON: ${{ needs.toolchains.outputs.python }}
-        run: python3 -I -c 'import platform, sys; sys.exit(platform.python_version() != sys.argv[1])' "$EXPECTED_PYTHON"
+        run: scripts/toolchain.sh --installed "python=$EXPECTED_PYTHON"
       - uses: ./.github/actions/postgres
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -169,7 +169,7 @@ jobs:
       - name: Refuse a different Python version
         env:
           EXPECTED_PYTHON: ${{ needs.toolchains.outputs.python }}
-        run: python3 -I -c 'import platform, sys; sys.exit(platform.python_version() != sys.argv[1])' "$EXPECTED_PYTHON"
+        run: scripts/toolchain.sh --installed "python=$EXPECTED_PYTHON"
       - uses: ./.github/actions/postgres
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -193,9 +193,7 @@ jobs:
         env:
           EXPECTED_RUNTIME: ${{ matrix.runtime }}
           EXPECTED_VERSION: ${{ matrix.version }}
-        run: |
-          actual="$("$EXPECTED_RUNTIME" --version | awk 'NR == 1 {print ($1 == "deno" ? $2 : $1)}')"
-          test "$actual" = "$EXPECTED_VERSION" || { echo "::error::$EXPECTED_RUNTIME must be exactly $EXPECTED_VERSION"; exit 1; }
+        run: scripts/toolchain.sh --installed "$EXPECTED_RUNTIME=$EXPECTED_VERSION"
       - name: Install the declared package manager
         env:
           EXPECTED_NPM: ${{ needs.toolchains.outputs.npm }}
@@ -275,9 +273,7 @@ jobs:
       - name: Refuse a different Deno version
         env:
           EXPECTED_DENO: ${{ matrix.deno }}
-        run: |
-          actual="$(deno --version | awk 'NR == 1 {print $2}')"
-          test "$actual" = "$EXPECTED_DENO"
+        run: scripts/toolchain.sh --installed "deno=$EXPECTED_DENO"
       - name: Refuse OS roots without system permission
         env:
           REQUEST_SEAL_EXPECT_DENIED_ROOTS: '1'
@@ -345,7 +341,7 @@ jobs:
       - name: Refuse a different Python version
         env:
           EXPECTED_PYTHON: ${{ needs.toolchains.outputs.python }}
-        run: python3 -I -c 'import platform, sys; sys.exit(platform.python_version() != sys.argv[1])' "$EXPECTED_PYTHON"
+        run: scripts/toolchain.sh --installed "python=$EXPECTED_PYTHON"
       - uses: ./.github/actions/postgres
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -400,13 +396,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5 # Run 44226062526: cold job 6s; no cache restored.
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ needs.toolchains.outputs.python }}
       - name: Refuse a different Python version
         env:
           EXPECTED_PYTHON: ${{ needs.toolchains.outputs.python }}
-        run: python3 -I -c 'import platform, sys; sys.exit(platform.python_version() != sys.argv[1])' "$EXPECTED_PYTHON"
+        run: scripts/toolchain.sh --installed "python=$EXPECTED_PYTHON"
       - name: Require every qualification job to succeed
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}

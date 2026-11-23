@@ -46,7 +46,7 @@ jobs:
       - name: Refuse a different Python version
         env:
           EXPECTED_PYTHON: ${{ steps.versions.outputs.python }}
-        run: python3 -I -c 'import platform, sys; sys.exit(platform.python_version() != sys.argv[1])' "$EXPECTED_PYTHON"
+        run: scripts/toolchain.sh --installed "python=$EXPECTED_PYTHON"
       - name: Read the declared package manager
         id: manager
         run: python3 -I -B scripts/package-manager.py >> "$GITHUB_OUTPUT"
@@ -187,7 +187,7 @@ jobs:
       - name: Refuse a different Python version
         env:
           EXPECTED_PYTHON: ${{ steps.versions.outputs.python }}
-        run: python3 -I -c 'import platform, sys; sys.exit(platform.python_version() != sys.argv[1])' "$EXPECTED_PYTHON"
+        run: scripts/toolchain.sh --installed "python=$EXPECTED_PYTHON"
       - name: Read the declared package manager
         id: manager
         run: python3 -I -B scripts/package-manager.py >> "$GITHUB_OUTPUT"

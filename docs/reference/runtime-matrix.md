@@ -13,10 +13,9 @@ The browser job uses the official Playwright 1.64.1 Noble container pinned by
 digest, with all three engines and their OS packages already installed. It
 refuses an installed Playwright version that differs from the image. The job
 sets `HOME=/root` for Firefox and uses `--init --ipc=host` for browser processes.
-Node is installed from the shared reader's `.tool-versions` output and checked
-for an exact match with `scripts/toolchain.sh --installed`. Elixir and OTP use
-the same reader and refusal step. Deno, Bun and CI Python compare installed versions to its
-outputs explicitly because its installed-version check does not cover them.
+Node, Elixir, OTP, Deno, Bun and CI Python are installed from the shared reader's
+`.tool-versions` outputs and checked for exact matches with
+`scripts/toolchain.sh --installed`.
 Every job that invokes Python installs the reader-selected version before its first
 call, including the PostgreSQL setup action and final qualification verdict.
 

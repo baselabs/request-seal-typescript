@@ -22,7 +22,7 @@ test('documented runtime lanes equal the exact CI lanes and the package floor', 
   assert.match(ci, /include: \$\{\{ fromJSON\(needs\.toolchains\.outputs\.native\) \}\}/);
   assert.match(ci, /EXPECTED_RUNTIME: \$\{\{ matrix\.runtime \}\}/);
   assert.match(ci, /EXPECTED_VERSION: \$\{\{ matrix\.version \}\}/);
-  assert.match(ci, /test "\$actual" = "\$EXPECTED_VERSION"/);
+  assert.match(ci, /scripts\/toolchain\.sh --installed "\$EXPECTED_RUNTIME=\$EXPECTED_VERSION"/);
   for (const version of [...denos, ...buns]) assert.match(version, /^\d+\.\d+\.\d+$/);
   const browserJob = ci.split('  browsers:\n')[1]!.split('\n  reciprocal:')[0]!;
   const image = /image: mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble@sha256:[a-f0-9]{64}\b/.exec(browserJob);
@@ -132,6 +132,7 @@ test('CI exercises denied OS roots on an exact newer Deno without sys permission
   assert.match(ci, /deno: \$\{\{ fromJSON\(needs\.toolchains\.outputs\.deno_os_trust\) \}\}/);
   assert.match(ci, /deno-version: \$\{\{ matrix\.deno \}\}/);
   assert.match(ci, /EXPECTED_DENO: \$\{\{ matrix\.deno \}\}/);
+  assert.match(ci, /scripts\/toolchain\.sh --installed "deno=\$EXPECTED_DENO"/);
   assert.match(ci, /REQUEST_SEAL_EXPECT_DENIED_ROOTS: .1.\n\s+run: deno test --no-check --allow-read --allow-env=REQUEST_SEAL_EXPECT_DENIED_ROOTS test\/discovery-os-trust\.test\.ts/);
 });
 
