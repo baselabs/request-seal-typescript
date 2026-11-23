@@ -1,6 +1,7 @@
 import hashlib
 import importlib.util
 import json
+import re
 import stat
 import subprocess
 import sys
@@ -37,7 +38,7 @@ class ToolchainTest(unittest.TestCase):
 
     def test_complete_exact_inventory_through_shared_outputs(self):
         actual = shared_outputs()
-        tools = {'nodejs', 'deno', 'bun', 'elixir', 'erlang'}
+        tools = {'nodejs', 'deno', 'bun', 'elixir', 'erlang', 'python'}
         self.assertEqual(set(actual), tools | {name + '_lanes' for name in tools} | {'otp', 'beam_lanes'})
         self.assertEqual([actual['nodejs'], *json.loads(actual['nodejs_lanes'])],
                          ['24.21.0', '22.12.0', '22.23.1', '26.11.1'])
@@ -47,13 +48,14 @@ class ToolchainTest(unittest.TestCase):
         self.assertEqual(actual['elixir'], '1.20.3-otp-29')
         self.assertEqual(actual['otp'], actual['erlang'])
         self.assertEqual(actual['otp'], '29.0.3')
+        self.assertEqual(actual['python'], '3.14.7')
         for tool in tools:
             values = [actual[tool], *json.loads(actual[tool + '_lanes'])]
             pattern = r'\d+\.\d+\.\d+-otp-\d+' if tool == 'elixir' else r'\d+\.\d+\.\d+'
             self.assertEqual(len(set(values)), len(values), tool)
             for value in values:
                 self.assertRegex(value, '^' + pattern + '$')
-        for tool in ('bun', 'elixir', 'erlang'):
+        for tool in ('bun', 'elixir', 'erlang', 'python'):
             self.assertEqual(json.loads(actual[tool + '_lanes']), [], tool)
         self.assertEqual(json.loads(actual['beam_lanes']), [])
         for probe in json.loads(actual['deno_lanes']):
@@ -88,10 +90,9 @@ class ToolchainTest(unittest.TestCase):
         for name, workflow in WORKFLOWS.items():
             with self.subTest(workflow=name):
                 self.assertNotIn('version-file:', workflow)
-                self.assertNotIn('actions/setup-python', workflow)
                 self.assertNotIn('.tool-versions', workflow)
                 self.assertNotRegex(workflow, r'\b(?:sh|bash)\s+scripts/toolchain\.sh')
-                self.assertNotRegex(workflow, r'(?:node|deno|bun|elixir|otp)-version:\s*[\'"\d]')
+                self.assertNotRegex(workflow, r'(?:node|deno|bun|elixir|otp|python)-version:\s*[\'"\d]')
                 self.assertIn('run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"', workflow)
                 self.assertIn('run: python3 -I -B scripts/package-manager.py >> "$GITHUB_OUTPUT"', workflow)
                 self.assertNotIn('steps.versions.outputs.npm', workflow)
@@ -107,6 +108,43 @@ class ToolchainTest(unittest.TestCase):
         self.assertIn('test "$actual" = "$EXPECTED_VERSION"', ci)
         self.assertIn('actual="$(deno --version | awk', ci)
         self.assertIn('test "$actual" = "$EXPECTED_DENO"', ci)
+
+    def test_every_python_caller_installs_and_refuses_the_reader_version_first(self):
+        required = {'ci.yml': {'toolchains', 'node', 'native', 'reciprocal', 'qualified'},
+                    'pages.yml': {'build'}, 'publish.yml': {'publish', 'published-package'}}
+        setup = 'uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0'
+        refusal = "run: python3 -I -c 'import platform, sys; sys.exit(platform.python_version() != sys.argv[1])' \"$EXPECTED_PYTHON\""
+        self.assertIn('python: ${{ steps.versions.outputs.python }}', WORKFLOWS['ci.yml'])
+        action = (ROOT / '.github/actions/postgres/action.yml').read_text()
+        self.assertIn('python3', action, 'the PostgreSQL action is a Python caller')
+        for name, workflow in WORKFLOWS.items():
+            jobs = dict(re.findall(r'^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)',
+                                   workflow.split('jobs:\n', 1)[1], re.M | re.S))
+            callers = {job for job, body in jobs.items() if 'python3' in body or 'uses: ./.github/actions/postgres' in body}
+            self.assertEqual(callers, required[name], name)
+            for job in callers:
+                with self.subTest(workflow=name, job=job):
+                    body = jobs[job]
+                    output = 'steps.versions.outputs.python' if 'id: versions' in body else 'needs.toolchains.outputs.python'
+                    self.assertEqual(body.count('uses: actions/setup-python@'), 1)
+                    self.assertIn(setup, body)
+                    self.assertIn(f'python-version: ${{{{ {output} }}}}', body)
+                    self.assertIn(f'EXPECTED_PYTHON: ${{{{ {output} }}}}', body)
+                    self.assertEqual(body.count(refusal), 1)
+                    self.assertLess(body.index(setup), body.index(refusal))
+                    self.assertEqual(body.index('python3'), body.index(refusal) + len('run: '))
+                    if 'id: versions' in body:
+                        self.assertLess(body.index('run: scripts/toolchain.sh >>'), body.index(setup))
+                    if 'uses: ./.github/actions/postgres' in body:
+                        self.assertLess(body.index(refusal), body.index('uses: ./.github/actions/postgres'))
+
+    def test_python_refusal_accepts_the_pin_and_rejects_a_mismatch(self):
+        expression = re.search(r"run: python3 -I -c '([^']+)'", WORKFLOWS['ci.yml'])[1]
+        for expected, status in ((shared_outputs()['python'], 0), ('0.0.0', 1)):
+            with self.subTest(expected=expected):
+                child = subprocess.run([sys.executable, '-I', '-c', expression, expected],
+                                       text=True, capture_output=True, timeout=10)
+                self.assertEqual(child.returncode, status, child.stderr)
 
     def test_no_repository_owned_runtime_declaration_reader_remains(self):
         self.assertFalse((ROOT / 'scripts/tool-versions.py').exists())

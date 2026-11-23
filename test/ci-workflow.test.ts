@@ -67,7 +67,13 @@ test('CI starts the checked platform PostgreSQL engine and names no other image'
   assert.doesNotMatch(workflow + action, /ghcr\.io\/baselabs\/postgres:[0-9]/, 'the engine comes only from .github/postgres.ref');
   for (const job of ['node', 'native', 'reciprocal']) {
     const section = workflow.split(`\n  ${job}:\n`)[1]!.split(/\n  [a-z][a-z0-9-]*:\n/)[0]!;
-    assert.match(section, /persist-credentials: false\n      - uses: \.\/\.github\/actions\/postgres\n/, `${job} starts the engine after checkout`);
+    const checkout = section.indexOf('persist-credentials: false');
+    const python = section.indexOf('uses: actions/setup-python@');
+    const refusal = section.indexOf('run: python3 -I -c');
+    const postgres = section.indexOf('uses: ./.github/actions/postgres');
+    assert.ok(checkout >= 0 && checkout < python && python < refusal && refusal < postgres, `${job} starts the engine after checkout and strict Python setup`);
+    assert.match(section, /python-version: \$\{\{ needs\.toolchains\.outputs\.python \}\}/);
+    assert.match(section, /EXPECTED_PYTHON: \$\{\{ needs\.toolchains\.outputs\.python \}\}/);
     assert.match(section, /- uses: \.\/\.github\/actions\/postgres\n        if: always\(\)\n        with:\n          mode: stop$/, `${job} always removes the engine last`);
     assert.match(section, /REQUESTSEAL_REPLAY_PG_URL: postgresql:\/\/postgres:postgres@127\.0\.0\.1:15432\/requestseal_replay\n/);
   }

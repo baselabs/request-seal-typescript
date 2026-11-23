@@ -61,10 +61,12 @@ Every runtime lane comes only through the byte-identical, executable shared read
 `scripts/toolchain.sh`, called by path. Never edit its copy or add another parser of
 `.tool-versions`, `version-file:` input, or workflow runtime pin. Setup actions use
 its outputs; `scripts/toolchain.sh --installed` refuses differing Node, Elixir and OTP.
-Deno and Bun use explicit installed-version comparisons against the same outputs.
+Deno, Bun and Python use explicit installed-version comparisons against the same outputs.
 npm comes only from the root `packageManager` through `scripts/package-manager.py`;
-every manifest declares the same npm. `.tool-versions` declares only product runtimes
-(Node, Deno, Bun, Elixir and Erlang); CI tooling uses the runner's `python3`.
+every manifest declares the same npm. `.tool-versions` declares product runtimes
+(Node, Deno, Bun, Elixir and Erlang) and the exact Python used by CI tooling.
+Every job that invokes Python installs and checks that reader-selected version first,
+including calls inside composite actions and the final qualification verdict.
 Installs are frozen. Qualification uses no workflow
 cache and never installs this package from npm. Both Elixir peer projects retain
 locked fetching and both advisory feeds. Keep action SHAs and version comments exact.

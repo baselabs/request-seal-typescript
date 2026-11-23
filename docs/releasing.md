@@ -17,7 +17,9 @@ prerequisite; publication does not rerun or query qualification.
 3. The workflow installs the exact Node from the shared `scripts/toolchain.sh`
    reader's `.tool-versions` output, refuses a differing installation with its
    `--installed` mode, and reads npm from the root `packageManager` with
-   `scripts/package-manager.py`. It runs `npm ci --ignore-scripts`, builds the library and API docs,
+   `scripts/package-manager.py`. Python is installed from the same shared reader's
+   output and checked for an exact match before running publication tooling.
+   It runs `npm ci --ignore-scripts`, builds the library and API docs,
    inspects the package allowlist and exports, and hashes the exact archive. It uses no workflow cache or registry key.
    Configure npm's trusted publisher for `publish.yml` and environment `publish`,
    allowing staged publication. Only the inspected `package.tgz` is staged with
