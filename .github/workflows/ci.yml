@@ -12,24 +12,51 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5 # Run 44376795843: cold job 10s; no cache restored.
     outputs:
-      nodes: ${{ steps.versions.outputs.nodes }}
-      native: ${{ steps.versions.outputs.native }}
+      nodes: ${{ steps.matrix.outputs.nodes }}
+      native: ${{ steps.matrix.outputs.native }}
       node: ${{ steps.versions.outputs.nodejs }}
-      npm: ${{ steps.versions.outputs.npm }}
-      deno_os_trust: ${{ steps.versions.outputs.deno_os_trust }}
+      npm: ${{ steps.manager.outputs.npm }}
+      deno_os_trust: ${{ steps.matrix.outputs.deno_os_trust }}
+      elixir: ${{ steps.versions.outputs.elixir }}
+      otp: ${{ steps.versions.outputs.otp }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Check the toolchain reader
-        run: python3 -I -B -m unittest discover -s test -p 'tool_versions_test.py'
+      - name: Check the shared toolchain reader
+        run: scripts/toolchain.sh --self-test
+      - name: Check workflow toolchain contracts
+        run: python3 -I -B -m unittest discover -s test -p 'toolchain_test.py'
       - name: Read exact tool versions
         id: versions
-        run: python3 -I -B scripts/tool-versions.py >> "$GITHUB_OUTPUT"
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+      - name: Read the declared package manager
+        id: manager
+        run: python3 -I -B scripts/package-manager.py >> "$GITHUB_OUTPUT"
+      - name: Compose runtime matrices from shared outputs
+        id: matrix
+        env:
+          NODEJS: ${{ steps.versions.outputs.nodejs }}
+          NODEJS_LANES: ${{ steps.versions.outputs.nodejs_lanes }}
+          DENO: ${{ steps.versions.outputs.deno }}
+          DENO_LANES: ${{ steps.versions.outputs.deno_lanes }}
+          BUN: ${{ steps.versions.outputs.bun }}
+        run: |
+          python3 -I -B - >> "$GITHUB_OUTPUT" <<'PYTHON'
+          import json, os
+          matrices = {
+              'nodes': [os.environ['NODEJS'], *json.loads(os.environ['NODEJS_LANES'])],
+              'native': [{'runtime': 'deno', 'version': os.environ['DENO']},
+                         {'runtime': 'bun', 'version': os.environ['BUN']}],
+              'deno_os_trust': json.loads(os.environ['DENO_LANES']),
+          }
+          for name, value in matrices.items():
+              print(f'{name}={json.dumps(value, separators=(",", ":"))}')
+          PYTHON
   node:
     needs: toolchains
-    timeout-minutes: 8 # Run 44376795843: slowest cold Node lane, 22.12.0 215s; no cache restored.
-    name: Node ${{ matrix.node == '26.11.1' && '26' || matrix.node }}
+    timeout-minutes: 8 # Run 44376795843: slowest cold Node lane 215s; no cache restored.
+    name: Node ${{ matrix.node }}
     runs-on: ubuntu-24.04
     env:
       # Throwaway fixture values for this job's disposable platform PostgreSQL, never service credentials.
@@ -40,7 +67,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 22.23.1 is a common 22.x developer default; its tls.checkServerIdentity cannot match IPv6 literals.
         node: ${{ fromJSON(needs.toolchains.outputs.nodes) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,12 +78,10 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
           check-latest: true
-      # setup-node has no version-type input. Assert strict equality for exact lanes.
-      - name: Assert the installed Node version
+      - name: Refuse a different Node version
         env:
           EXPECTED_NODE: ${{ matrix.node }}
-        run: |
-          node -e 'const expected=process.env.EXPECTED_NODE; const actual=process.versions.node; if (actual!==expected) process.exit(1); console.log(actual)'
+        run: scripts/toolchain.sh --installed "nodejs=$EXPECTED_NODE"
       - name: Install the declared package manager
         env:
           EXPECTED_NPM: ${{ needs.toolchains.outputs.npm }}
@@ -76,16 +100,14 @@ jobs:
       - run: command -v ssh-agent ssh-keygen ssh-add && ssh -V
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ needs.toolchains.outputs.elixir }}
+          otp-version: ${{ needs.toolchains.outputs.otp }}
           version-type: strict
       - name: Refuse different Elixir or OTP versions
-        run: |
-          expected_elixir="$(awk '$1 == "elixir" {sub(/-otp-.*/, "", $2); print $2}' .tool-versions)"
-          expected_otp="$(awk '$1 == "erlang" {print $2}' .tool-versions)"
-          actual_elixir="$(elixir -e 'IO.write(System.version())')"
-          actual_otp="$(erl -noshell -eval 'io:put_chars(element(2, file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])))), halt().')"
-          test "$actual_elixir" = "$expected_elixir" || { echo "::error::Elixir must be exactly $expected_elixir"; exit 1; }
-          test "$actual_otp" = "$expected_otp" || { echo "::error::OTP must be exactly $expected_otp"; exit 1; }
+        env:
+          EXPECTED_ELIXIR: ${{ needs.toolchains.outputs.elixir }}
+          EXPECTED_OTP: ${{ needs.toolchains.outputs.otp }}
+        run: scripts/toolchain.sh --installed "elixir=$EXPECTED_ELIXIR" "erlang=$EXPECTED_OTP"
       - name: Reextract the pinned Elixir error vocabulary
         run: |
           git init "$RUNNER_TEMP/request-seal-reference"
@@ -132,9 +154,9 @@ jobs:
           node-version: ${{ needs.toolchains.outputs.node }}
           package-manager-cache: false
       - name: Refuse a different Node version
-        run: |
-          expected='${{ needs.toolchains.outputs.node }}'
-          test "$(node --version)" = "v$expected" || { echo "::error::Node must be exactly $expected"; exit 1; }
+        env:
+          EXPECTED_NODE: ${{ needs.toolchains.outputs.node }}
+        run: scripts/toolchain.sh --installed "nodejs=$EXPECTED_NODE"
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         if: matrix.runtime == 'deno'
         with:
@@ -166,16 +188,14 @@ jobs:
       - run: command -v ssh-agent ssh-keygen ssh-add && ssh -V
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ needs.toolchains.outputs.elixir }}
+          otp-version: ${{ needs.toolchains.outputs.otp }}
           version-type: strict
       - name: Refuse different Elixir or OTP versions
-        run: |
-          expected_elixir="$(awk '$1 == "elixir" {sub(/-otp-.*/, "", $2); print $2}' .tool-versions)"
-          expected_otp="$(awk '$1 == "erlang" {print $2}' .tool-versions)"
-          actual_elixir="$(elixir -e 'IO.write(System.version())')"
-          actual_otp="$(erl -noshell -eval 'io:put_chars(element(2, file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])))), halt().')"
-          test "$actual_elixir" = "$expected_elixir" || { echo "::error::Elixir must be exactly $expected_elixir"; exit 1; }
-          test "$actual_otp" = "$expected_otp" || { echo "::error::OTP must be exactly $expected_otp"; exit 1; }
+        env:
+          EXPECTED_ELIXIR: ${{ needs.toolchains.outputs.elixir }}
+          EXPECTED_OTP: ${{ needs.toolchains.outputs.otp }}
+        run: scripts/toolchain.sh --installed "elixir=$EXPECTED_ELIXIR" "erlang=$EXPECTED_OTP"
       - name: Prove Deno rejects a failure
         if: matrix.runtime == 'deno'
         run: |
@@ -189,10 +209,10 @@ jobs:
       - name: Deno core tests and conformance
         if: matrix.runtime == 'deno'
         run: |
-          deno test --no-check --allow-read --allow-write --allow-env --allow-net --allow-run=deno,node,npm,bash,sh,gh,git,openssl,cc,pkg-config,elixir,mix,ssh-agent,ssh-keygen,ssh-add test/*.test.ts
+          deno test --no-check --allow-read --allow-write --allow-env --allow-net --allow-run=deno,node,npm,bash,sh,gh,git,openssl,cc,pkg-config,elixir,mix,ssh-agent,ssh-keygen,ssh-add,scripts/toolchain.sh test/*.test.ts
           deno run --allow-read tools/conformance/cli.ts --corpus test/fixtures/corpus-smoke --smoke
           deno run --allow-read tools/conformance/cli.ts --corpus conformance
-      # Bun 1.3.14 --isolate intermittently recreates stdio with epoll_ctl EEXIST on Linux.
+      # Bun --isolate intermittently recreates stdio with epoll_ctl EEXIST on Linux.
       - name: Bun core tests and conformance
         if: matrix.runtime == 'bun'
         run: |
@@ -227,7 +247,9 @@ jobs:
       - name: Refuse a different Deno version
         env:
           EXPECTED_DENO: ${{ matrix.deno }}
-        run: test "$(deno --version | awk 'NR == 1 {print $2}')" = "$EXPECTED_DENO"
+        run: |
+          actual="$(deno --version | awk 'NR == 1 {print $2}')"
+          test "$actual" = "$EXPECTED_DENO"
       - name: Refuse OS roots without system permission
         env:
           REQUEST_SEAL_EXPECT_DENIED_ROOTS: '1'
@@ -250,9 +272,9 @@ jobs:
           node-version: ${{ needs.toolchains.outputs.node }}
           package-manager-cache: false
       - name: Refuse a different Node version
-        run: |
-          expected='${{ needs.toolchains.outputs.node }}'
-          test "$(node --version)" = "v$expected" || { echo "::error::Node must be exactly $expected"; exit 1; }
+        env:
+          EXPECTED_NODE: ${{ needs.toolchains.outputs.node }}
+        run: scripts/toolchain.sh --installed "nodejs=$EXPECTED_NODE"
       - name: Install the declared package manager
         env:
           EXPECTED_NPM: ${{ needs.toolchains.outputs.npm }}
@@ -295,21 +317,19 @@ jobs:
           node-version: ${{ needs.toolchains.outputs.node }}
           package-manager-cache: false
       - name: Refuse a different Node version
-        run: |
-          expected='${{ needs.toolchains.outputs.node }}'
-          test "$(node --version)" = "v$expected" || { echo "::error::Node must be exactly $expected"; exit 1; }
+        env:
+          EXPECTED_NODE: ${{ needs.toolchains.outputs.node }}
+        run: scripts/toolchain.sh --installed "nodejs=$EXPECTED_NODE"
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ needs.toolchains.outputs.elixir }}
+          otp-version: ${{ needs.toolchains.outputs.otp }}
           version-type: strict
       - name: Refuse different Elixir or OTP versions
-        run: |
-          expected_elixir="$(awk '$1 == "elixir" {sub(/-otp-.*/, "", $2); print $2}' .tool-versions)"
-          expected_otp="$(awk '$1 == "erlang" {print $2}' .tool-versions)"
-          actual_elixir="$(elixir -e 'IO.write(System.version())')"
-          actual_otp="$(erl -noshell -eval 'io:put_chars(element(2, file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])))), halt().')"
-          test "$actual_elixir" = "$expected_elixir" || { echo "::error::Elixir must be exactly $expected_elixir"; exit 1; }
-          test "$actual_otp" = "$expected_otp" || { echo "::error::OTP must be exactly $expected_otp"; exit 1; }
+        env:
+          EXPECTED_ELIXIR: ${{ needs.toolchains.outputs.elixir }}
+          EXPECTED_OTP: ${{ needs.toolchains.outputs.otp }}
+        run: scripts/toolchain.sh --installed "elixir=$EXPECTED_ELIXIR" "erlang=$EXPECTED_OTP"
       - name: Install the declared package manager
         env:
           EXPECTED_NPM: ${{ needs.toolchains.outputs.npm }}

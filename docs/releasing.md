@@ -14,8 +14,10 @@ prerequisite; publication does not rerun or query qualification.
    from the default branch, without inputs, in environment `publish`. Both the
    original actor and the triggering actor must be authorized. The package must
    already have a public npm version; first publication belongs to the owner.
-3. The workflow installs the exact Node from `.tool-versions` and npm from the root
-   `packageManager`, runs `npm ci --ignore-scripts`, builds the library and API docs,
+3. The workflow installs the exact Node from the shared `scripts/toolchain.sh`
+   reader's `.tool-versions` output, refuses a differing installation with its
+   `--installed` mode, and reads npm from the root `packageManager` with
+   `scripts/package-manager.py`. It runs `npm ci --ignore-scripts`, builds the library and API docs,
    inspects the package allowlist and exports, and hashes the exact archive. It uses no workflow cache or registry key.
    Configure npm's trusted publisher for `publish.yml` and environment `publish`,
    allowing staged publication. Only the inspected `package.tgz` is staged with

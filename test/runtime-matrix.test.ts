@@ -3,21 +3,22 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {selectRuntimeLimits} from '../tools/conformance/runtime-limits.ts';
 import {FETCH_VERIFICATION_RUNTIMES} from '../src/adapters/fetch/index.ts';
+import {readToolchain} from './support/toolchain.ts';
 const read = (file: string) => readFileSync(new URL('../' + file, import.meta.url), 'utf8');
 
 test('documented runtime lanes equal the exact CI lanes and the package floor', () => {
   const ci = read('.github/workflows/ci.yml');
-  const tools = new Map(read('.tool-versions').trim().split('\n').map(line => { const [key, ...values] = line.split(/\s+/); return [key!, values] as const; }));
-  const tokens = [...tools.get('nodejs')!].sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+  const tools = readToolchain();
+  const tokens = [tools.get('nodejs')!, ...JSON.parse(tools.get('nodejs_lanes')!) as string[]].sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
   assert.match(ci, /node: \$\{\{ fromJSON\(needs\.toolchains\.outputs\.nodes\) \}\}/);
   assert.ok(tokens);
   for (const token of tokens) assert.match(token, /^\d+\.\d+\.\d+$/, 'every Node lane must pin an exact version');
   assert.deepEqual(tokens, ['22.12.0', '22.23.1', '24.21.0', '26.11.1']);
-  assert.match(ci, /name: Node \$\{\{ matrix\.node == '26\.11\.1' && '26' \|\| matrix\.node \}\}/);
-  assert.match(ci, /if \(actual!==expected\) process\.exit\(1\)/);
-  const denos = tools.get('deno')!;
+  assert.match(ci, /name: Node \$\{\{ matrix\.node \}\}/);
+  assert.match(ci, /scripts\/toolchain\.sh --installed "nodejs=\$EXPECTED_NODE"/);
+  const denos = [tools.get('deno')!, ...JSON.parse(tools.get('deno_lanes')!) as string[]];
   assert.deepEqual(denos, ['2.5.6', '2.9.7'], 'the supported Deno comes first, then the denied-roots Deno');
-  const buns = [tools.get('bun')![0]!];
+  const buns = [tools.get('bun')!];
   assert.match(ci, /include: \$\{\{ fromJSON\(needs\.toolchains\.outputs\.native\) \}\}/);
   assert.match(ci, /EXPECTED_RUNTIME: \$\{\{ matrix\.runtime \}\}/);
   assert.match(ci, /EXPECTED_VERSION: \$\{\{ matrix\.version \}\}/);

@@ -6,14 +6,17 @@ Bun 1.3.14; the denied-roots-only check on Deno 2.9.7; Chromium 156.0.8078.80, F
 Playwright 1.64.1. The separate `reciprocal` job runs on Node 24.21.0 with Erlang/OTP
 29.0.3 and Elixir 1.20.3. The complete matrix, including `browsers`, qualifies
 a release commit before it lands; `publish.yml` stages the archive from the default branch.
-The Node 26 job remains named `Node 26`; all Node pins and installed-version
-assertions use exact patch versions.
+Node job names and installed-version assertions use the exact patch versions
+from the shared `scripts/toolchain.sh` reader's default and JSON lane outputs.
 
 The browser job uses the official Playwright 1.64.1 Noble container pinned by
 digest, with all three engines and their OS packages already installed. It
 refuses an installed Playwright version that differs from the image. The job
 sets `HOME=/root` for Firefox and uses `--init --ipc=host` for browser processes.
-Node is still installed from `.tool-versions` and checked for an exact match.
+Node is installed from the shared reader's `.tool-versions` output and checked
+for an exact match with `scripts/toolchain.sh --installed`. Elixir and OTP use
+the same reader and refusal step. Deno and Bun compare installed versions to its
+outputs explicitly because its installed-version check does not cover them.
 
 ## Tested runtime lanes
 

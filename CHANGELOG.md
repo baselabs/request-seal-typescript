@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read all workflow runtime versions only through the shared executable `scripts/toolchain.sh`, build matrices from its outputs, and use its installed-version refusals for Node, Elixir and OTP. Keep npm selection in a manifest-only reader and explicit installed-version checks for Deno and Bun.
 - Run every workflow step under bash with `pipefail`, so a failing command fails its step behind a pipe, and run the red-proof script as bash with `set -euo pipefail`. Release instructions wait for npm to show an approved version before dispatching again.
 - Let release-documentation qualification check the latest versioned entry after an optional Unreleased section, preserving version and bullet-format validation.
 - Read signature-base input lengths through the shared TypedArray intrinsic when Uint8Array allocations are instrumented, preserving the pre-copy byte ceiling and private-buffer zeroing checks.

@@ -11,6 +11,7 @@ import { ok, err } from '../src/result.ts';
 import { structuredInteger } from '../src/numbers.ts';
 import { decodeBase64, decodeBase64Url } from '../src/bytes.ts';
 import { JOSE_MAX_PLAINTEXT_BYTES } from '../src/constants.ts';
+import {readToolchain} from './support/toolchain.ts';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const prefix = Object.hasOwn(process.versions, 'deno') ? ['eval', '--no-check'] : Object.hasOwn(process.versions, 'bun') ? ['-e'] : ['--experimental-strip-types', '--no-warnings', '--input-type=module', '-e'];
 test('scratch directories use OS temp', () => {
@@ -108,8 +109,9 @@ test('OTP JSON edge fixture drives expectations', async () => {
 });
 test('native CI pins exact releases and required tests', () => {
   const ci = read('../.github/workflows/ci.yml');
-  const versions = read('../.tool-versions');
-  assert.match(versions, /^deno \d+\.\d+\.\d+(?: \d+\.\d+\.\d+)+$/m); assert.match(versions, /^bun \d+\.\d+\.\d+$/m);
+  const versions = readToolchain();
+  for (const tool of ['deno', 'bun']) assert.match(versions.get(tool)!, /^\d+\.\d+\.\d+$/);
+  assert.ok(JSON.parse(versions.get('deno_lanes')!).length > 0);
   assert.match(ci, /deno-version: \$\{\{ matrix\.version \}\}/); assert.match(ci, /bun-version: \$\{\{ matrix\.version \}\}/);
   assert.doesNotMatch(ci, /setup-bun@[^\n]+# v2\s*\n/);
   assert.equal((ci.match(/test\/\*\.test\.ts/g) ?? []).length, 2);
