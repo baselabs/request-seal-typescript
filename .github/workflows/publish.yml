@@ -157,6 +157,7 @@ jobs:
           name: release-assets
           path: artifacts/
           if-no-files-found: error
+          retention-days: 7
   published-package:
     if: contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)
     needs: publish
