@@ -142,6 +142,7 @@ jobs:
         working-directory: artifacts
         run: sha256sum --check SHA256SUMS
       - name: Refuse a package whose changelog is not stamped for its version
+        id: changelog
         env:
           VERSION: ${{ steps.inspect.outputs.version }}
         shell: bash
@@ -198,7 +199,7 @@ jobs:
         id: readback
         run: node --experimental-strip-types --no-warnings scripts/registry-check.ts read-back
       - name: Retain all release files for the versioned GitHub release
-        if: always() && steps.inspect.outcome == 'success'
+        if: always() && steps.inspect.outcome == 'success' && steps.changelog.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-assets

@@ -102,11 +102,11 @@ test('publication checks the existing name and tag before build, then plans from
   assert.match(source, /git.*ls-remote.*--tags.*refs\/tags\/v\$\{version\}/);
   assert.match(source, /assert\.equal\(tags\.trim\(\), '', `v\$\{version\} is already tagged`\)/);
   assert.match(source, /output\.write\(f"version=\{packed\['version'\]\}\\n"\)/);
-  assert.match(source, /- name: Refuse a package whose changelog is not stamped for its version\n\s+env:\n\s+VERSION: \$\{\{ steps\.inspect\.outputs\.version \}\}\n/);
+  assert.match(source, /- name: Refuse a package whose changelog is not stamped for its version\n\s+id: changelog\n\s+env:\n\s+VERSION: \$\{\{ steps\.inspect\.outputs\.version \}\}\n/);
   assert.ok(source.includes(`python3 -I - artifacts/package.tgz "$VERSION" <<'PY'`));
   assert.match(source, /if: steps\.registry\.outputs\.action == 'stage'/);
   assert.match(source, /npm stage publish \.\/artifacts\/package\.tgz --provenance --ignore-scripts/);
-  assert.match(source, /if: always\(\) && steps\.inspect\.outcome == 'success'/);
+  assert.match(source, /- name: Retain all release files for the versioned GitHub release\n\s+if: always\(\) && steps\.inspect\.outcome == 'success' && steps\.changelog\.outcome == 'success'\n/);
   assert.match(source, /name: release-assets\n\s+path: artifacts\/\n\s+if-no-files-found: error\n\s+retention-days: 7\n/);
   assert.doesNotMatch(source, /NODE_AUTH_TOKEN|NPM_TOKEN|secrets\.|gh release|tags:/);
 });
