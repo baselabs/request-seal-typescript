@@ -95,12 +95,15 @@ test('CI starts the checked platform PostgreSQL engine and names no other image'
 
 test('publication checks the existing name and tag before build, then plans from the inspected archive', () => {
   const source = read('.github/workflows/publish.yml');
-  const order = ['scripts/registry-check.ts existing', 'Refuse an already-tagged version', 'Build the library and documentation', 'Inspect the exact package archive', 'scripts/registry-check.ts plan', 'npm stage publish', 'scripts/registry-check.ts read-back'];
+  const order = ['scripts/registry-check.ts existing', 'Refuse an already-tagged version', 'Build the library and documentation', 'Inspect the exact package archive', 'Verify the inspected archive checksum', 'Refuse a package whose changelog is not stamped for its version', 'scripts/registry-check.ts plan', 'npm stage publish', 'scripts/registry-check.ts read-back'];
   const positions = order.map(text => source.indexOf(text));
   assert.ok(positions.every(position => position >= 0));
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
   assert.match(source, /git.*ls-remote.*--tags.*refs\/tags\/v\$\{version\}/);
   assert.match(source, /assert\.equal\(tags\.trim\(\), '', `v\$\{version\} is already tagged`\)/);
+  assert.match(source, /output\.write\(f"version=\{packed\['version'\]\}\\n"\)/);
+  assert.match(source, /- name: Refuse a package whose changelog is not stamped for its version\n\s+env:\n\s+VERSION: \$\{\{ steps\.inspect\.outputs\.version \}\}\n/);
+  assert.ok(source.includes(`python3 -I - artifacts/package.tgz "$VERSION" <<'PY'`));
   assert.match(source, /if: steps\.registry\.outputs\.action == 'stage'/);
   assert.match(source, /npm stage publish \.\/artifacts\/package\.tgz --provenance --ignore-scripts/);
   assert.match(source, /if: always\(\) && steps\.inspect\.outcome == 'success'/);
