@@ -13,6 +13,7 @@
   "out": "site-dist",
   "readme": "none",
   "name": "@request-seal/core API",
+  "customFooterHtml": "© 2026 BaseLabs Holdings LLC · Apache-2.0",
   "treatWarningsAsErrors": true,
   "validation": {
     "notExported": true,

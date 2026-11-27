@@ -118,7 +118,7 @@ jobs:
               packed = json.load(package.extractfile('package/package.json'))
           assert (packed['name'], packed['version']) == (source['name'], source['version']), 'package identity differs'
           assert packed.get('publishConfig', {}).get('access') == 'public', 'package must be public'
-          assert {'package.json', 'README.md', 'LICENSE', 'NOTICE'} <= paths, 'required package documents are missing'
+          assert {'package.json', 'README.md', 'LICENSE', 'NOTICE', 'IPR.md', 'TRADEMARKS.md'} <= paths, 'required package documents are missing'
           def inspect(value):
               if isinstance(value, dict):
                   for child in value.values():

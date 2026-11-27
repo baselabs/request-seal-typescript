@@ -55,7 +55,9 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "IPR.md",
+    "TRADEMARKS.md"
   ],
   "engines": {
     "node": ">=22.12.0"
@@ -81,7 +83,8 @@
     "build": "node --experimental-strip-types --no-warnings scripts/clean-dist.ts && node node_modules/typescript/bin/tsc -p tsconfig.build.json",
     "conformance": "node --experimental-strip-types --no-warnings tools/conformance/cli.ts --corpus test/fixtures/corpus-smoke --smoke && node --experimental-strip-types --no-warnings tools/conformance/cli.ts --corpus conformance",
     "pack:check": "node --experimental-strip-types --no-warnings scripts/pack-check.ts",
-    "check": "npm run typecheck && npm run typecheck:web && npm run build && npm test && npm run self-checks && npm run conformance && npm run pack:check",
+    "dco:check": "python3 -I -B -m unittest discover -s test -p dco_test.py && python3 -I -B scripts/check-dco.py",
+    "check": "npm run dco:check && npm run typecheck && npm run typecheck:web && npm run build && npm test && npm run self-checks && npm run conformance && npm run pack:check",
     "docs": "node --import ./scripts/typedoc-register.mjs node_modules/typedoc/bin/typedoc --options typedoc.json"
   },
   "devDependencies": {

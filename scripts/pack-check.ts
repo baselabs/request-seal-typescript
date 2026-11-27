@@ -6,8 +6,9 @@ import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {pathToFileURL, fileURLToPath} from 'node:url';
 import { testBuilt } from './test-built.ts';
+const documents = new Set(['package.json', 'README.md', 'CHANGELOG.md', 'LICENSE', 'NOTICE', 'IPR.md', 'TRADEMARKS.md']);
+
 export function assertPackedSources(files: readonly {path: string}[], root = process.cwd()): void {
-  const documents = new Set(['package.json','README.md','CHANGELOG.md','LICENSE','NOTICE']);
   for (const file of files) {
     assert.ok(documents.has(file.path) || /^dist\/[a-z_/-]+(?:\.js|\.d\.ts)$/.test(file.path), `Unexpected packed file: ${file.path}`);
     if (file.path.startsWith('dist/')) {
@@ -25,7 +26,6 @@ async function main(): Promise<void> {
   const [pack] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {encoding: 'utf8'}));
   assert.equal(pack.name, '@request-seal/core');
   assert.equal(pack.filename, `request-seal-core-${pkg.version}.tgz`);
-  const documents = new Set(['package.json', 'README.md', 'CHANGELOG.md', 'LICENSE', 'NOTICE']);
   assertPackedSources(pack.files);
   const paths = new Set(pack.files.map((f: {path: string}) => f.path));
   for (const path of [...documents, 'dist/index.js', 'dist/index.d.ts']) assert.ok(paths.has(path), `Required packed file: ${path}`);

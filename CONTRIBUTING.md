@@ -1,5 +1,9 @@
 # Contributing
 
+Contributions are licensed under Apache-2.0, as section 5 of the license describes, and
+every commit carries a Developer Certificate of Origin sign-off (`git commit -s`). See
+IPR.md.
+
 Use Node 22.12.0 or newer and the npm version declared in `package.json` (11.19.0). Elixir must be on PATH for the replay peer URL check;
 local tests print a skip reason when it is absent, and CI requires it. The OpenSSL tests need OpenSSL 3 or later as `openssl` on PATH (on macOS, Homebrew's `openssl@3` or newer; the system LibreSSL lacks `pkeyutl -rawin` Ed25519 signing), and the reciprocal tests also need its development headers, a C compiler, and pkg-config; the AES-GCM peer uses EVP because the `openssl enc` frontend rejects AEAD. Development supports macOS and Linux; Windows developers use WSL2. CI runs on Linux.
 
@@ -10,7 +14,7 @@ npm ci --prefix interop/adapters --ignore-scripts
 npm run check
 ```
 
-`npm run check` runs, in order: `typecheck`, `typecheck:web`, `build`, `test`, `self-checks`, `conformance`, and `pack:check`. CI also runs `npm run docs` and the migration claims test after `npm ci --prefix interop/migration --ignore-scripts`: `node --experimental-strip-types --no-warnings --test interop/migration/claims.test.ts`. Build the [API reference](https://baselabs.github.io/request-seal-typescript/) locally with `npm run docs` and open `site-dist/index.html`; warnings fail the build.
+`npm run check` requires a full Git history and runs, in order: `dco:check`, `typecheck`, `typecheck:web`, `build`, `test`, `self-checks`, `conformance`, and `pack:check`. CI also runs `npm run docs` and the migration claims test after `npm ci --prefix interop/migration --ignore-scripts`: `node --experimental-strip-types --no-warnings --test interop/migration/claims.test.ts`. Build the [API reference](https://baselabs.github.io/request-seal-typescript/) locally with `npm run docs` and open `site-dist/index.html`; warnings fail the build.
 
 Keep the core independent of Node modules and runtime dependencies. Regenerate `docs/reference/error-parity.md` in place with `node --experimental-strip-types --no-warnings scripts/render-parity.ts`. To refresh the pinned extraction, set `REQUEST_SEAL_REPO` to an Elixir reference checkout, then run `node --experimental-strip-types --no-warnings scripts/extract-elixir-reasons.ts 511fed142044ccea28bdcbb317c091cb2c8a515d <output.json>`. Extraction reads pinned public source only through `git show` and requires Elixir with OTP 29 for AST parsing. It writes only the requested output. Compare it before explicitly replacing `test/fixtures/elixir-reasons-511fed1.json`. Run `REQUEST_SEAL_REPO=<reference-repo> node --experimental-strip-types --no-warnings --test test/extract-elixir-reasons.ts` to check live extraction against the fixture.
 

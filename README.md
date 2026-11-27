@@ -1,4 +1,4 @@
-# RequestSeal for TypeScript
+# RequestSeal™ for TypeScript
 
 See the [compatibility contract](docs/reference/compatibility.md) for the 0.x policy,
 stable interfaces, release boundaries, and security fixes.
@@ -424,3 +424,8 @@ this repository's [GitHub release for `v<version>`](https://github.com/baselabs/
 See [release verification](SECURITY.md#verifying-a-release) and the
 [release procedure](docs/releasing.md). Publication stages the inspected archive for
 owner approval on npmjs.com; an approved version is read back and verified before tagging.
+
+## License
+
+Apache-2.0, maintained by BaseLabs Holdings LLC. See LICENSE and NOTICE, and IPR.md
+for contributions and use of the name.

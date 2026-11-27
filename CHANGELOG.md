@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Document BaseLabs Holdings LLC stewardship, contribution terms and the RequestSeal name policy, include the policies in the npm package, and require DCO sign-offs in qualification.
 - Pin CI Python in `.tool-versions`, install it from the shared reader's output, and refuse mismatches before every direct or composite-action Python call, including the final qualification verdict.
 - Read all workflow runtime versions only through the shared executable `scripts/toolchain.sh`, build matrices from its outputs, and use its installed-version refusals for Node, Elixir, OTP, Python, Deno and Bun. Keep npm selection in a manifest-only reader.
 - Run every workflow step under bash with `pipefail`, so a failing command fails its step behind a pipe, and run the red-proof script as bash with `set -euo pipefail`. Release instructions wait for npm to show an approved version before dispatching again.
